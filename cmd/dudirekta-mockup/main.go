@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/mockup"
 )
@@ -23,10 +25,17 @@ func main() {
 
 	flag.Parse()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	localStruct := &local[remote]{}
 	remoteStruct := &remote{}
 
-	registry := mockup.NewRegistry(localStruct, remoteStruct)
+	registry := mockup.NewRegistry(localStruct, remoteStruct, ctx)
+
+	time.AfterFunc(time.Second*10, func() {
+		fmt.Println(remoteStruct.Multiply(5, 2))
+	})
 
 	if *listen {
 		lis, err := net.Listen("tcp", *addr)
@@ -53,6 +62,4 @@ func main() {
 			panic(err)
 		}
 	}
-
-	fmt.Println(remoteStruct.Multiply(5, 2))
 }
