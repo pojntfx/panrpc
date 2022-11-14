@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -11,12 +11,18 @@ import (
 	"github.com/pojntfx/dudirekta/pkg/mockup"
 )
 
-type local[P any] struct {
-	Divide func(peer P, divident, divisor float64) (quotient float64, err error)
+type local[P any] struct{}
+
+func (s local[P]) Divide(ctx context.Context, divident, divisor float64) (quotient float64, err error) {
+	if divisor == 0 {
+		return -1, errors.New("could not divide by zero")
+	}
+
+	return divident / divisor, nil
 }
 
 type remote struct {
-	Multiply func(multiplicant, multiplier float64) (product float64)
+	Multiply func(ctx context.Context, multiplicant, multiplier float64) (product float64)
 }
 
 func main() {
@@ -28,13 +34,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	localStruct := &local[remote]{}
-	remoteStruct := &remote{}
+	registry := mockup.NewRegistry(
+		&local[remote]{},
+		remote{},
+		ctx,
+	)
 
-	registry := mockup.NewRegistry(localStruct, remoteStruct, ctx)
-
-	time.AfterFunc(time.Second*10, func() {
-		fmt.Println(remoteStruct.Multiply(5, 2))
+	time.AfterFunc(time.Second*5, func() {
+		for peerID, peer := range registry.Peers() {
+			log.Println(peerID, peer.Multiply(ctx, 5, 2))
+		}
 	})
 
 	if *listen {
