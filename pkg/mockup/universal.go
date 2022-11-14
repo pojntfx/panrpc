@@ -6,22 +6,30 @@ import (
 	"log"
 	"net"
 	"reflect"
+	"sync"
 
 	"github.com/google/uuid"
 )
 
-type Registry[L any, R any] struct {
-	local  L
+type Registry[R any] struct {
+	local  any
 	remote R
+
+	remotes     map[string]R
+	remotesLock *sync.Mutex
 
 	ctx context.Context
 }
 
-func NewRegistry[L any, R any](local L, remote R, ctx context.Context) *Registry[L, R] {
-	return &Registry[L, R]{local, remote, ctx}
+func NewRegistry[R any](
+	local any,
+	remote R,
+	ctx context.Context,
+) *Registry[R] {
+	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, ctx}
 }
 
-func (r Registry[L, R]) Listen(lis net.Listener) error {
+func (r Registry[R]) Listen(lis net.Listener) error {
 	clients := 0
 
 	for {
@@ -47,9 +55,7 @@ func (r Registry[L, R]) Listen(lis net.Listener) error {
 				log.Printf("%v clients connected", clients)
 			}()
 
-			remote := reflect.
-				ValueOf(r.remote).
-				Elem()
+			remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
 			for i := 0; i < remote.NumField(); i++ {
 				functionField := remote.Type().Field(i)
@@ -59,7 +65,13 @@ func (r Registry[L, R]) Listen(lis net.Listener) error {
 					cmd := []any{true, uuid.NewString(), functionField.Name}
 
 					cmdArgs := []any{}
-					for _, arg := range args {
+					for i, arg := range args {
+						if i == 0 {
+							// Don't sent the context over the wire
+
+							continue
+						}
+
 						cmdArgs = append(cmdArgs, arg.Interface())
 					}
 					cmd = append(cmd, cmdArgs)
@@ -87,7 +99,7 @@ func (r Registry[L, R]) Listen(lis net.Listener) error {
 					select {
 					case rawReturnValues := <-res:
 						for i, rawReturnValue := range rawReturnValues {
-							returnValue := reflect.New(functionType.In(i))
+							returnValue := reflect.New(functionType.Out(i))
 
 							if err := json.Unmarshal(rawReturnValue, returnValue.Interface()); err != nil {
 								panic(err)
@@ -104,10 +116,20 @@ func (r Registry[L, R]) Listen(lis net.Listener) error {
 
 				remote.FieldByName(functionField.Name).Set(fn)
 			}
+
+			remoteID := uuid.NewString()
+
+			r.remotesLock.Lock()
+			r.remotes[remoteID] = remote.Interface().(R)
+			r.remotesLock.Unlock()
 		}()
 	}
 }
 
-func (r Registry[L, R]) Connect(conn net.Conn) error {
+func (r Registry[R]) Connect(conn net.Conn) error {
 	return nil
+}
+
+func (r Registry[R]) Peers() map[string]R {
+	return r.remotes
 }
