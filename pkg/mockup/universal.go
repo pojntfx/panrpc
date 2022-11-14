@@ -3,9 +3,11 @@ package mockup
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -13,8 +15,9 @@ import (
 )
 
 type response struct {
-	id     string
-	values []json.RawMessage
+	id    string
+	value json.RawMessage
+	err   error
 }
 
 type Registry[R any] struct {
@@ -86,7 +89,17 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 						panic(err)
 					}
 
-					responseResolver.Broadcast(response{id, res[2:]})
+					var errMsg string
+					if err := json.Unmarshal(res[3], &errMsg); err != nil {
+						panic(err)
+					}
+
+					var err error
+					if strings.TrimSpace(errMsg) != "" {
+						err = errors.New(errMsg)
+					}
+
+					responseResolver.Broadcast(response{id, res[2], err})
 				}
 			}()
 
@@ -121,20 +134,15 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 					l := responseResolver.Listener(0)
 					defer l.Close()
 
-					res := make(chan []json.RawMessage)
+					res := make(chan response)
 					go func() {
 						for msg := range l.Ch() {
 							if msg.id == callID {
-								break
+								res <- msg
+
+								return
 							}
 						}
-
-						b, err := json.Marshal(25)
-						if err != nil {
-							panic(err)
-						}
-
-						res <- []json.RawMessage{json.RawMessage(b)}
 					}()
 
 					if _, err := conn.Write(b); err != nil {
@@ -144,15 +152,18 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 					returnValues := []reflect.Value{}
 					select {
 					case rawReturnValues := <-res:
-						for i, rawReturnValue := range rawReturnValues {
-							returnValue := reflect.New(functionType.Out(i))
+						returnValue := reflect.New(functionType.Out(0))
 
-							if err := json.Unmarshal(rawReturnValue, returnValue.Interface()); err != nil {
+						// TODO: Handle 0 and 2 return values
+						if functionType.Out(0).Name() == "error" {
+							returnValue.Set(reflect.ValueOf(rawReturnValues.err))
+						} else {
+							if err := json.Unmarshal(rawReturnValues.value, returnValue.Interface()); err != nil {
 								panic(err)
 							}
-
-							returnValues = append(returnValues, returnValue.Elem())
 						}
+
+						returnValues = append(returnValues, returnValue.Elem())
 					case err := <-r.ctx.Done():
 						panic(err)
 					}
