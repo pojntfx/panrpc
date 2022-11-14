@@ -9,7 +9,13 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/teivah/broadcast"
 )
+
+type response struct {
+	id     string
+	values []json.RawMessage
+}
 
 type Registry[R any] struct {
 	local  any
@@ -55,6 +61,35 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 				log.Printf("%v clients connected", clients)
 			}()
 
+			responseResolver := broadcast.NewRelay[response]()
+			go func() {
+				d := json.NewDecoder(conn)
+
+				for {
+					var res []json.RawMessage
+					if err := d.Decode(&res); err != nil {
+						panic(err)
+					}
+
+					var isCall bool
+					if err := json.Unmarshal(res[0], &isCall); err != nil {
+						panic(err)
+					}
+
+					if isCall {
+						// TODO: Dispatch call to local struct
+						continue
+					}
+
+					var id string
+					if err := json.Unmarshal(res[1], &id); err != nil {
+						panic(err)
+					}
+
+					responseResolver.Broadcast(response{id, res[2:]})
+				}
+			}()
+
 			remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
 			for i := 0; i < remote.NumField(); i++ {
@@ -62,7 +97,9 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 				functionType := functionField.Type
 
 				fn := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
-					cmd := []any{true, uuid.NewString(), functionField.Name}
+					callID := uuid.NewString()
+
+					cmd := []any{true, callID, functionField.Name}
 
 					cmdArgs := []any{}
 					for i, arg := range args {
@@ -81,8 +118,17 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 						panic(err)
 					}
 
+					l := responseResolver.Listener(0)
+					defer l.Close()
+
 					res := make(chan []json.RawMessage)
 					go func() {
+						for msg := range l.Ch() {
+							if msg.id == callID {
+								break
+							}
+						}
+
 						b, err := json.Marshal(25)
 						if err != nil {
 							panic(err)
