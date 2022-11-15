@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -22,7 +23,10 @@ func (s local[P]) Divide(ctx context.Context, divident, divisor float64) (quotie
 }
 
 type remote struct {
-	Multiply func(ctx context.Context, multiplicant, multiplier float64) (product float64)
+	Multiply      func(ctx context.Context, multiplicant, multiplier float64) (product float64)
+	PrintString   func(ctx context.Context, msg string)
+	ValidateEmail func(ctx context.Context, email string) error
+	ParseJSON     func(ctx context.Context, p []byte) (any, error)
 }
 
 func main() {
@@ -42,7 +46,33 @@ func main() {
 
 	time.AfterFunc(time.Second*5, func() {
 		for peerID, peer := range registry.Peers() {
-			log.Println(peerID, peer.Multiply(ctx, 5, 2))
+			log.Println("Calling functions for peer with ID", peerID)
+
+			fmt.Println(peer.Multiply(ctx, 5, 2))
+
+			peer.PrintString(ctx, "Hello, world!")
+
+			if err := peer.ValidateEmail(ctx, "anne@example.com"); err != nil {
+				log.Println("Got email validation error:", err)
+			}
+
+			if err := peer.ValidateEmail(ctx, "asdf"); err != nil {
+				log.Println("Got email validation error:", err)
+			}
+
+			res, err := peer.ParseJSON(ctx, []byte(`{"name": "Jane"}`))
+			if err != nil {
+				log.Println("Got JSON parser error:", err)
+			} else {
+				fmt.Println(res)
+			}
+
+			res, err = peer.ParseJSON(ctx, []byte(`{"n`))
+			if err != nil {
+				log.Println("Got JSON parser error:", err)
+			} else {
+				fmt.Println(res)
+			}
 		}
 	})
 
