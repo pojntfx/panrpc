@@ -14,6 +14,10 @@ import (
 	"github.com/teivah/broadcast"
 )
 
+var (
+	errorType = reflect.TypeOf((*error)(nil)).Elem()
+)
+
 type response struct {
 	id    string
 	value json.RawMessage
@@ -151,19 +155,33 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 
 					returnValues := []reflect.Value{}
 					select {
-					case rawReturnValues := <-res:
-						returnValue := reflect.New(functionType.Out(0))
+					case rawReturnValue := <-res:
+						if functionType.NumOut() == 1 {
+							returnValue := reflect.New(functionType.Out(0))
 
-						// TODO: Handle 0 and 2 return values
-						if functionType.Out(0).Name() == "error" {
-							returnValue.Set(reflect.ValueOf(rawReturnValues.err))
-						} else {
-							if err := json.Unmarshal(rawReturnValues.value, returnValue.Interface()); err != nil {
+							if rawReturnValue.err != nil {
+								returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+							} else if !functionType.Out(0).Implements(errorType) {
+								if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
+									panic(err)
+								}
+							}
+
+							returnValues = append(returnValues, returnValue.Elem())
+						} else if functionType.NumOut() == 2 {
+							valueReturnValue := reflect.New(functionType.Out(0))
+							errReturnValue := reflect.New(functionType.Out(1))
+
+							if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
 								panic(err)
 							}
-						}
 
-						returnValues = append(returnValues, returnValue.Elem())
+							if rawReturnValue.err != nil {
+								errReturnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+							}
+
+							returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
+						}
 					case err := <-r.ctx.Done():
 						panic(err)
 					}
