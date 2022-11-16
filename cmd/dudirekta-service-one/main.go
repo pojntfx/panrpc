@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"net/mail"
 	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/mockup"
@@ -14,19 +15,31 @@ import (
 
 type local[P any] struct{}
 
-func (s local[P]) Divide(ctx context.Context, divident, divisor float64) (quotient float64, err error) {
-	if divisor == 0 {
-		return -1, errors.New("could not divide by zero")
+func (s local[P]) Multiply(ctx context.Context, multiplicant, multiplier float64) (product float64) {
+	return multiplicant * multiplier
+}
+
+func (s local[P]) PrintString(ctx context.Context, msg string) {
+	fmt.Println(msg)
+}
+
+func (s local[P]) ValidateEmail(ctx context.Context, email string) error {
+	_, err := mail.ParseAddress(email)
+
+	return err
+}
+
+func (s local[P]) ParseJSON(ctx context.Context, p []byte) (any, error) {
+	var output any
+	if err := json.Unmarshal(p, &output); err != nil {
+		return nil, err
 	}
 
-	return divident / divisor, nil
+	return output, nil
 }
 
 type remote struct {
-	Multiply      func(ctx context.Context, multiplicant, multiplier float64) (product float64)
-	PrintString   func(ctx context.Context, msg string)
-	ValidateEmail func(ctx context.Context, email string) error
-	ParseJSON     func(ctx context.Context, p []byte) (any, error)
+	Divide func(ctx context.Context, divident, divisor float64) (quotient float64, err error)
 }
 
 func main() {
@@ -48,30 +61,18 @@ func main() {
 		for peerID, peer := range registry.Peers() {
 			log.Println("Calling functions for peer with ID", peerID)
 
-			fmt.Println(peer.Multiply(ctx, 5, 2))
-
-			peer.PrintString(ctx, "Hello, world!")
-
-			if err := peer.ValidateEmail(ctx, "anne@example.com"); err != nil {
-				log.Println("Got email validation error:", err)
-			}
-
-			if err := peer.ValidateEmail(ctx, "asdf"); err != nil {
-				log.Println("Got email validation error:", err)
-			}
-
-			res, err := peer.ParseJSON(ctx, []byte(`{"name": "Jane"}`))
+			quotient, err := peer.Divide(ctx, 50, 2)
 			if err != nil {
-				log.Println("Got JSON parser error:", err)
+				log.Println("Got division error:", err)
 			} else {
-				fmt.Println(res)
+				fmt.Println(quotient)
 			}
 
-			res, err = peer.ParseJSON(ctx, []byte(`{"n`))
+			quotient, err = peer.Divide(ctx, 50, 0)
 			if err != nil {
-				log.Println("Got JSON parser error:", err)
+				log.Println("Got division error:", err)
 			} else {
-				fmt.Println(res)
+				fmt.Println(quotient)
 			}
 		}
 	})
