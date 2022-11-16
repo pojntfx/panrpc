@@ -18,6 +18,14 @@ var (
 	errorType = reflect.TypeOf((*error)(nil)).Elem()
 )
 
+const (
+	remoteIDContextKey = "dudirekta.remoteID"
+)
+
+func GetRemoteID(ctx context.Context) string {
+	return ctx.Value(remoteIDContextKey).(string)
+}
+
 type response struct {
 	id    string
 	value json.RawMessage
@@ -210,7 +218,7 @@ func (r Registry[R]) Connect(conn net.Conn) error {
 				for i := 0; i < function.Type().NumIn(); i++ {
 					if i == 0 {
 						// Add the context to the function arguments
-						args = append(args, reflect.ValueOf(r.ctx))
+						args = append(args, reflect.ValueOf(context.WithValue(r.ctx, remoteIDContextKey, remoteID)))
 
 						continue
 					}
