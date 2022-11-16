@@ -13,23 +13,29 @@ import (
 	"github.com/pojntfx/dudirekta/pkg/mockup"
 )
 
-type local[P any] struct{}
+type local struct{}
 
-func (s local[P]) Multiply(ctx context.Context, multiplicant, multiplier float64) (product float64) {
+func (s local) Multiply(ctx context.Context, multiplicant, multiplier float64) (product float64) {
+	log.Printf("Multiplying for remote %v, multiplicant %v and multiplier %v", mockup.GetRemoteID(ctx), multiplicant, multiplier)
+
 	return multiplicant * multiplier
 }
 
-func (s local[P]) PrintString(ctx context.Context, msg string) {
+func (s local) PrintString(ctx context.Context, msg string) {
+	log.Printf("Printing string for remote %v and message %v", mockup.GetRemoteID(ctx), msg)
+
 	fmt.Println(msg)
 }
 
-func (s local[P]) ValidateEmail(ctx context.Context, email string) error {
+func (s local) ValidateEmail(ctx context.Context, email string) error {
 	_, err := mail.ParseAddress(email)
+
+	log.Printf("Validating email for remote %v and email %v", mockup.GetRemoteID(ctx), email)
 
 	return err
 }
 
-func (s local[P]) ParseJSON(ctx context.Context, p []byte) (any, error) {
+func (s local) ParseJSON(ctx context.Context, p []byte) (any, error) {
 	var output any
 	if err := json.Unmarshal(p, &output); err != nil {
 		return nil, err
@@ -52,7 +58,7 @@ func main() {
 	defer cancel()
 
 	registry := mockup.NewRegistry(
-		&local[remote]{},
+		&local{},
 		remote{},
 		ctx,
 	)

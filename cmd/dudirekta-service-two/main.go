@@ -12,9 +12,11 @@ import (
 	"github.com/pojntfx/dudirekta/pkg/mockup"
 )
 
-type local[P any] struct{}
+type local struct{}
 
-func (s local[P]) Divide(ctx context.Context, divident, divisor float64) (quotient float64, err error) {
+func (s local) Divide(ctx context.Context, divident, divisor float64) (quotient float64, err error) {
+	log.Printf("Dividing for remote %v, divident %v and divisor %v", mockup.GetRemoteID(ctx), divident, divisor)
+
 	if divisor == 0 {
 		return -1, errors.New("could not divide by zero")
 	}
@@ -39,7 +41,7 @@ func main() {
 	defer cancel()
 
 	registry := mockup.NewRegistry(
-		&local[remote]{},
+		&local{},
 		remote{},
 		ctx,
 	)
