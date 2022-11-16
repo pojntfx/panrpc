@@ -83,14 +83,112 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 						panic(err)
 					}
 
-					if isCall {
-						// TODO: Dispatch call to local struct
-						continue
+					var callID string
+					if err := json.Unmarshal(res[1], &callID); err != nil {
+						panic(err)
 					}
 
-					var id string
-					if err := json.Unmarshal(res[1], &id); err != nil {
-						panic(err)
+					if isCall {
+						go func() {
+							var functionName string
+							if err := json.Unmarshal(res[2], &functionName); err != nil {
+								panic(err)
+							}
+
+							var functionArgs []json.RawMessage
+							if err := json.Unmarshal(res[3], &functionArgs); err != nil {
+								panic(err)
+							}
+
+							function := reflect.
+								ValueOf(r.local).
+								Elem().
+								MethodByName(functionName)
+
+							args := []reflect.Value{}
+							for i := 0; i < function.Type().NumIn(); i++ {
+								if i == 0 {
+									// Add the context to the function arguments
+									args = append(args, reflect.ValueOf(r.ctx))
+
+									continue
+								}
+
+								arg := reflect.New(function.Type().In(i))
+								if err := json.Unmarshal(functionArgs[i-1], arg.Interface()); err != nil {
+									panic(err)
+								}
+
+								args = append(args, arg.Elem())
+							}
+
+							go func() {
+								res := function.Call(args)
+								switch len(res) {
+								case 0:
+									b, err := json.Marshal([]interface{}{callID, nil, ""})
+									if err != nil {
+										panic(err)
+									}
+
+									if _, err := conn.Write(b); err != nil {
+										panic(err)
+									}
+								case 1:
+									if res[0].Type().Implements(errorType) {
+										b, err := json.Marshal([]interface{}{callID, nil, res[0].Interface().(error).Error()})
+										if err != nil {
+											panic(err)
+										}
+
+										if _, err := conn.Write(b); err != nil {
+											panic(err)
+										}
+									} else {
+										v, err := json.Marshal(res[0].Interface())
+										if err != nil {
+											panic(err)
+										}
+
+										b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
+										if err != nil {
+											panic(err)
+										}
+
+										if _, err := conn.Write(b); err != nil {
+											panic(err)
+										}
+									}
+								case 2:
+									v, err := json.Marshal(res[0].Interface())
+									if err != nil {
+										panic(err)
+									}
+
+									if res[1].Interface() == nil {
+										b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
+										if err != nil {
+											panic(err)
+										}
+
+										if _, err := conn.Write(b); err != nil {
+											panic(err)
+										}
+									} else {
+										b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), res[1].Interface().(error).Error()})
+										if err != nil {
+											panic(err)
+										}
+
+										if _, err := conn.Write(b); err != nil {
+											panic(err)
+										}
+									}
+								}
+							}()
+						}()
+
+						continue
 					}
 
 					var errMsg string
@@ -103,7 +201,7 @@ func (r Registry[R]) Listen(lis net.Listener) error {
 						err = errors.New(errMsg)
 					}
 
-					responseResolver.Broadcast(response{id, res[2], err})
+					responseResolver.Broadcast(response{callID, res[2], err})
 				}
 			}()
 
