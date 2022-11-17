@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/pojntfx/dudirekta/pkg/mockup"
+	"nhooyr.io/websocket"
 )
 
 type local struct{}
@@ -163,11 +163,6 @@ func main() {
 		}
 
 	case "websockets":
-		upgrader := websocket.Upgrader{}
-		upgrader.CheckOrigin = func(r *http.Request) bool {
-			return true
-		}
-
 		if *listen {
 			lis, err := net.Listen("tcp", *addr)
 			if err != nil {
@@ -198,14 +193,12 @@ func main() {
 
 				switch r.Method {
 				case http.MethodGet:
-					conn, err := upgrader.Upgrade(w, r, nil)
+					c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+						OriginPatterns: []string{"*"},
+					})
 					if err != nil {
 						panic(err)
 					}
-
-					conn.SetPongHandler(func(string) error {
-						return conn.SetReadDeadline(time.Now().Add(time.Second))
-					})
 
 					pings := time.NewTicker(time.Second / 2)
 					defer pings.Stop()
@@ -213,14 +206,7 @@ func main() {
 					errs := make(chan error)
 					go func() {
 						for range pings.C {
-							if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-								errs <- err
-
-								return
-							}
-
-							if err := conn.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
-
+							if err := c.Ping(ctx); err != nil {
 								errs <- err
 
 								return
@@ -228,8 +214,11 @@ func main() {
 						}
 					}()
 
+					conn := websocket.NetConn(ctx, c, websocket.MessageText)
+					defer conn.Close()
+
 					go func() {
-						if err := registry.Link(conn.UnderlyingConn()); err != nil {
+						if err := registry.Link(conn); err != nil {
 							errs <- err
 
 							return
@@ -246,15 +235,17 @@ func main() {
 				panic(err)
 			}
 		} else {
-			conn, _, err := websocket.DefaultDialer.Dial("ws://"+*addr, nil)
+			c, _, err := websocket.Dial(ctx, "ws://"+*addr, nil)
 			if err != nil {
 				panic(err)
 			}
+
+			conn := websocket.NetConn(ctx, c, websocket.MessageText)
 			defer conn.Close()
 
 			log.Printf("Connected to dudirekta+%v://%v", "ws", conn.RemoteAddr().String())
 
-			if err := registry.Link(conn.UnderlyingConn()); err != nil {
+			if err := registry.Link(conn); err != nil {
 				panic(err)
 			}
 		}
