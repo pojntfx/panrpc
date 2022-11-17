@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
+	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -55,7 +55,7 @@ func NewRegistry[R any](
 	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, ctx}
 }
 
-func (r Registry[R]) Link(conn net.Conn) error {
+func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 	responseResolver := broadcast.NewRelay[response]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()

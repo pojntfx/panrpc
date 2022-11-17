@@ -4,17 +4,28 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/mail"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/mockup"
+	"github.com/pojntfx/weron/pkg/wrtcconn"
+	"github.com/rs/zerolog"
 	"nhooyr.io/websocket"
+)
+
+var (
+	errMissingCommunity = errors.New("missing community")
+	errMissingPassword  = errors.New("missing password")
+	errMissingKey       = errors.New("missing key")
 )
 
 type local struct{}
@@ -55,7 +66,15 @@ type remote struct {
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
 	listen := flag.Bool("listen", true, "Whether to allow connecting to peers by listening or dialing")
-	transport := flag.String("transport", "tcp", "Transport to use (valid options are tcp or websockets)")
+	transport := flag.String("transport", "tcp", "Transport to use (valid options are tcp, websockets or webrtc)")
+	verbose := flag.Int("verbose", 5, "Verbosity level (0 is disabled, default is info, 7 is trace)")
+	signaler := flag.String("signaler", "wss://weron.herokuapp.com/", "Signaler address")
+	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for connections")
+	community := flag.String("community", "", "ID of community to join")
+	password := flag.String("password", "", "Password for community")
+	key := flag.String("key", "", "Encryption key for community")
+	ice := flag.String("ice", "stun:stun.l.google.com:19302", "Comma-separated list of STUN servers (in format stun:host:port) and TURN servers to use (in format username:credential@turn:host:port) (i.e. username:credential@turn:global.turn.twilio.com:3478?transport=tcp)")
+	forceRelay := flag.Bool("force-relay", false, "Force usage of TURN servers")
 
 	flag.Parse()
 
@@ -251,6 +270,106 @@ func main() {
 
 			if err := registry.Link(conn); err != nil {
 				panic(err)
+			}
+		}
+
+	case "webrtc":
+		switch *verbose {
+		case 0:
+			zerolog.SetGlobalLevel(zerolog.Disabled)
+		case 1:
+			zerolog.SetGlobalLevel(zerolog.PanicLevel)
+		case 2:
+			zerolog.SetGlobalLevel(zerolog.FatalLevel)
+		case 3:
+			zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		case 4:
+			zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		case 5:
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		case 6:
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		default:
+			zerolog.SetGlobalLevel(zerolog.TraceLevel)
+		}
+
+		if strings.TrimSpace(*community) == "" {
+			panic(errMissingCommunity)
+		}
+
+		if strings.TrimSpace(*password) == "" {
+			panic(errMissingPassword)
+		}
+
+		if strings.TrimSpace(*key) == "" {
+			panic(errMissingKey)
+		}
+
+		u, err := url.Parse(*signaler)
+		if err != nil {
+			panic(err)
+		}
+
+		q := u.Query()
+		q.Set("community", *community)
+		q.Set("password", *password)
+		u.RawQuery = q.Encode()
+
+		adapter := wrtcconn.NewAdapter(
+			u.String(),
+			*key,
+			strings.Split(*ice, ","),
+			[]string{"dudirekta/" + *addr},
+			&wrtcconn.AdapterConfig{
+				Timeout:    *timeout,
+				ForceRelay: *forceRelay,
+				OnSignalerReconnect: func() {
+					log.Println("Reconnecting to signaler with address", *signaler)
+				},
+			},
+			ctx,
+		)
+
+		ids, err := adapter.Open()
+		if err != nil {
+			panic(err)
+		}
+		defer adapter.Close()
+
+		clients := 0
+		errs := make(chan error)
+		for {
+			select {
+			case <-ctx.Done():
+				if err := ctx.Err(); err != context.Canceled {
+					panic(err)
+				}
+
+				return
+			case err := <-errs:
+				panic(err)
+			case rid := <-ids:
+				log.Printf("Joined dudirekta+%v://%v/dudirekta/%v with ID %v", "webrtc", *signaler, *addr, rid)
+			case peer := <-adapter.Accept():
+				go func() {
+					clients++
+
+					log.Printf("%v clients connected", clients)
+
+					defer func() {
+						clients--
+
+						if err := recover(); err != nil {
+							log.Printf("Client disconnected with error: %v", err)
+						}
+
+						log.Printf("%v clients connected", clients)
+					}()
+
+					if err := registry.Link(peer.Conn); err != nil {
+						panic(err)
+					}
+				}()
 			}
 		}
 	}
