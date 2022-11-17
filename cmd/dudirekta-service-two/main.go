@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	"time"
+	"os"
 
 	"github.com/pojntfx/dudirekta/pkg/mockup"
 )
@@ -46,37 +47,59 @@ func main() {
 		ctx,
 	)
 
-	time.AfterFunc(time.Second*5, func() {
-		for peerID, peer := range registry.Peers() {
-			log.Println("Calling functions for peer with ID", peerID)
+	go func() {
+		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote:
 
-			fmt.Println(peer.Multiply(ctx, 5, 2))
+- a: Print "Hello from remote!" on remote's stdout
+- b: Validate email "anne@example.com"
+- c: Validate email "asdf" (will throw an error)
+- d: Parse JSON "{"name": "Jane"}"
+- e: Parse JSON "{"n" (will throw an error)`)
 
-			peer.PrintString(ctx, "Hello from remote!")
+		stdin := bufio.NewReader(os.Stdin)
 
-			if err := peer.ValidateEmail(ctx, "anne@example.com"); err != nil {
-				log.Println("Got email validation error:", err)
-			}
-
-			if err := peer.ValidateEmail(ctx, "asdf"); err != nil {
-				log.Println("Got email validation error:", err)
-			}
-
-			res, err := peer.ParseJSON(ctx, []byte(`{"name": "Jane"}`))
+		for {
+			line, err := stdin.ReadString('\n')
 			if err != nil {
-				log.Println("Got JSON parser error:", err)
-			} else {
-				fmt.Println(res)
+				panic(err)
 			}
 
-			res, err = peer.ParseJSON(ctx, []byte(`{"n`))
-			if err != nil {
-				log.Println("Got JSON parser error:", err)
-			} else {
-				fmt.Println(res)
+			for peerID, peer := range registry.Peers() {
+				log.Println("Calling functions for peer with ID", peerID)
+
+				switch line {
+				case "a\n":
+					peer.PrintString(ctx, "Hello from remote!")
+				case "b\n":
+					if err := peer.ValidateEmail(ctx, "anne@example.com"); err != nil {
+						log.Println("Got email validation error:", err)
+					}
+				case "c\n":
+					if err := peer.ValidateEmail(ctx, "asdf"); err != nil {
+						log.Println("Got email validation error:", err)
+					}
+				case "d\n":
+					res, err := peer.ParseJSON(ctx, []byte(`{"name": "Jane"}`))
+					if err != nil {
+						log.Println("Got JSON parser error:", err)
+					} else {
+						fmt.Println(res)
+					}
+				case "e\n":
+					res, err := peer.ParseJSON(ctx, []byte(`{"n`))
+					if err != nil {
+						log.Println("Got JSON parser error:", err)
+					} else {
+						fmt.Println(res)
+					}
+				default:
+					log.Printf("Unknown letter %v, ignoring input", line)
+
+					continue
+				}
 			}
 		}
-	})
+	}()
 
 	if *listen {
 		lis, err := net.Listen("tcp", *addr)
@@ -87,9 +110,39 @@ func main() {
 
 		log.Printf("Listening on dudirekta+%v://%v", lis.Addr().Network(), lis.Addr().String())
 
-		if err := registry.Listen(lis); err != nil {
-			panic(err)
+		clients := 0
+
+		for {
+			func() {
+				conn, err := lis.Accept()
+				if err != nil {
+					log.Println("could not accept connection, continuing:", err)
+
+					return
+				}
+
+				go func() {
+					clients++
+
+					log.Printf("%v clients connected", clients)
+
+					defer func() {
+						clients--
+
+						if err := recover(); err != nil {
+							log.Printf("Client disconnected with error: %v", err)
+						}
+
+						log.Printf("%v clients connected", clients)
+					}()
+
+					if err := registry.Link(conn); err != nil {
+						panic(err)
+					}
+				}()
+			}()
 		}
+
 	} else {
 		conn, err := net.Dial("tcp", *addr)
 		if err != nil {
@@ -99,7 +152,7 @@ func main() {
 
 		log.Printf("Connected to dudirekta+%v://%v", conn.RemoteAddr().Network(), conn.RemoteAddr().String())
 
-		if err := registry.Connect(conn); err != nil {
+		if err := registry.Link(conn); err != nil {
 			panic(err)
 		}
 	}

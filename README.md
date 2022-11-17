@@ -1,6 +1,6 @@
 # dudirekta
 
-Framework that allows exposing and calling functions on both clients and servers over WebSockets.
+Transport-agnostic framework that allows exposing and calling functions on both clients and servers.
 
 ## Overview
 
