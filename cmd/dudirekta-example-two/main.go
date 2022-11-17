@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/mockup"
+	"github.com/pojntfx/dudirekta/pkg/rpc"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
 	"github.com/rs/zerolog"
 	"nhooyr.io/websocket"
@@ -29,7 +29,7 @@ var (
 type local struct{}
 
 func (s local) Divide(ctx context.Context, divident, divisor float64) (quotient float64, err error) {
-	log.Printf("Dividing for remote %v, divident %v and divisor %v", mockup.GetRemoteID(ctx), divident, divisor)
+	log.Printf("Dividing for remote %v, divident %v and divisor %v", rpc.GetRemoteID(ctx), divident, divisor)
 
 	if divisor == 0 {
 		return -1, errors.New("could not divide by zero")
@@ -63,7 +63,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	registry := mockup.NewRegistry(
+	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
 		ctx,

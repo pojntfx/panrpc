@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/mockup"
+	"github.com/pojntfx/dudirekta/pkg/rpc"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
 	"github.com/rs/zerolog"
 	"nhooyr.io/websocket"
@@ -31,13 +31,13 @@ var (
 type local struct{}
 
 func (s local) Multiply(ctx context.Context, multiplicant, multiplier float64) (product float64) {
-	log.Printf("Multiplying for remote %v, multiplicant %v and multiplier %v", mockup.GetRemoteID(ctx), multiplicant, multiplier)
+	log.Printf("Multiplying for remote %v, multiplicant %v and multiplier %v", rpc.GetRemoteID(ctx), multiplicant, multiplier)
 
 	return multiplicant * multiplier
 }
 
 func (s local) PrintString(ctx context.Context, msg string) {
-	log.Printf("Printing string for remote %v and message %v", mockup.GetRemoteID(ctx), msg)
+	log.Printf("Printing string for remote %v and message %v", rpc.GetRemoteID(ctx), msg)
 
 	fmt.Println(msg)
 }
@@ -45,7 +45,7 @@ func (s local) PrintString(ctx context.Context, msg string) {
 func (s local) ValidateEmail(ctx context.Context, email string) error {
 	_, err := mail.ParseAddress(email)
 
-	log.Printf("Validating email for remote %v and email %v", mockup.GetRemoteID(ctx), email)
+	log.Printf("Validating email for remote %v and email %v", rpc.GetRemoteID(ctx), email)
 
 	return err
 }
@@ -81,7 +81,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	registry := mockup.NewRegistry(
+	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
 		ctx,
