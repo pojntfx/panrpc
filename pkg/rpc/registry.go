@@ -19,6 +19,7 @@ var (
 	ErrInvalidReturn         = errors.New("can only return void, a value or a value and an error")
 	ErrInvalidRequest        = errors.New("invalid request")
 	ErrCannotCallNonFunction = errors.New("can not call non function")
+	ErrInvalidArgs           = errors.New("invalid arguments")
 )
 
 type key int
@@ -220,11 +221,16 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 					function := reflect.
 						ValueOf(r.local).
-						Elem().
 						MethodByName(functionName)
 
 					if function.Kind() != reflect.Func {
 						errs <- ErrCannotCallNonFunction
+
+						return
+					}
+
+					if function.Type().NumIn() != len(functionArgs)+1 {
+						errs <- ErrInvalidArgs
 
 						return
 					}
