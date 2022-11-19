@@ -4,50 +4,29 @@ import (
 	"bufio"
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
-	"os/exec"
-	"sync/atomic"
-	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
-type local struct {
-	counter int64
-}
+type local struct{}
 
-func (s local) GetTime(ctx context.Context) time.Time {
-	log.Println("Getting time for peer with ID", rpc.GetRemoteID(ctx))
+func (s *local) Println(ctx context.Context, msg string) {
+	log.Println("Printing message", msg, "for peer with ID", rpc.GetRemoteID(ctx))
 
-	return time.Now()
-}
-
-func (s *local) Increment(ctx context.Context, delta int64) int64 {
-	log.Println("Incrementing counter by", delta, "for peer with ID", rpc.GetRemoteID(ctx))
-
-	return atomic.AddInt64(&s.counter, delta)
-}
-
-func (s *local) OpenHomeFolder(ctx context.Context) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	return exec.Command("xdg-open", home).Run()
+	fmt.Println(msg)
 }
 
 type remote struct {
-	GetTime        func(ctx context.Context) time.Time
-	Increment      func(ctx context.Context, delta int64) int64
-	OpenHomeFolder func(ctx context.Context) error
+	Increment func(ctx context.Context, delta int64) int64
 }
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", true, "Whether to allow connecting to peers by listening or dialing")
+	listen := flag.Bool("listen", false, "Whether to allow connecting to peers by listening or dialing")
 
 	flag.Parse()
 
@@ -61,12 +40,10 @@ func main() {
 	)
 
 	go func() {
-		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote:
+		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
 
-- a: Get remote server's current time
-- b: Increment remote counter by one
-- c: Decrement remote counter by one
-- d: Open home folder in file explorer on remote`)
+- a: Increment remote counter by one
+- b: Decrement remote counter by one`)
 
 		stdin := bufio.NewReader(os.Stdin)
 
@@ -81,13 +58,9 @@ func main() {
 
 				switch line {
 				case "a\n":
-					log.Println(peer.GetTime(ctx))
-				case "b\n":
 					log.Println(peer.Increment(ctx, 1))
-				case "c\n":
+				case "b\n":
 					log.Println(peer.Increment(ctx, -1))
-				case "d\n":
-					log.Println(peer.OpenHomeFolder(ctx))
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
