@@ -16,7 +16,7 @@ It enables you to ...
 
 - **Call remote functions transparently**: dudirekta makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
 - **Call functions on the client from the server**: Unlike most RPC frameworks, dudirekta allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
-- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser`, you can build services using dudirekta on pretty much any transport layer such as TCP, WebSockets or even WebRTC!
+- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser`, you can build services using dudirekta on pretty much any transport layer such as TCP, WebSockets or even WebRTC, meaning it can run in the browser!
 
 ## Installation
 
@@ -208,8 +208,11 @@ To make getting started with dudirekta easier, take a look at the following exam
 - **WebSocket Transport**
   - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
   - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
+  - [Browser Client](./cmd/dudirekta-example-websocket-client/index.html)
 - **WebRTC Transport**
   - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
+
+Be sure to also check out [Hydrapp](https://github.com/pojntfx/hydrapp), a framework for building apps that run everywhere - it uses dudirekta extensively.
 
 ### Protocol
 
