@@ -39,6 +39,8 @@ func main() {
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
+
+		time.Second*10,
 		ctx,
 	)
 
