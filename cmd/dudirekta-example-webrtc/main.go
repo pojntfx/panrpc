@@ -56,6 +56,8 @@ func main() {
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
+
+		time.Second*10,
 		ctx,
 	)
 
@@ -179,6 +181,8 @@ func main() {
 
 				defer func() {
 					clients--
+
+					_ = peer.Conn.Close()
 
 					if err := recover(); err != nil {
 						log.Printf("Client disconnected with error: %v", err)

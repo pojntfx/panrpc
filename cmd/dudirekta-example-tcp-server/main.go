@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
@@ -38,6 +39,8 @@ func main() {
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
+
+		time.Second*10,
 		ctx,
 	)
 
@@ -96,6 +99,8 @@ func main() {
 
 					defer func() {
 						clients--
+
+						_ = conn.Close()
 
 						if err := recover(); err != nil {
 							log.Printf("Client disconnected with error: %v", err)

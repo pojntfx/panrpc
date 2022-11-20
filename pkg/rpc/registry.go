@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/teivah/broadcast"
@@ -20,6 +21,7 @@ var (
 	ErrInvalidRequest        = errors.New("invalid request")
 	ErrCannotCallNonFunction = errors.New("can not call non function")
 	ErrInvalidArgs           = errors.New("invalid arguments")
+	ErrCallTimedOut          = errors.New("call timed out")
 )
 
 type key int
@@ -45,15 +47,18 @@ type Registry[R any] struct {
 	remotes     map[string]R
 	remotesLock *sync.Mutex
 
-	ctx context.Context
+	timeout time.Duration
+	ctx     context.Context
 }
 
 func NewRegistry[R any](
 	local any,
 	remote R,
+
+	timeout time.Duration,
 	ctx context.Context,
 ) *Registry[R] {
-	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, ctx}
+	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx}
 }
 
 func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
@@ -104,13 +109,29 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 			l := responseResolver.Listener(0)
 			defer l.Close()
 
+			t := time.NewTimer(r.timeout)
+			defer t.Stop()
+
 			res := make(chan response)
 			go func() {
-				for msg := range l.Ch() {
-					if msg.id == callID {
-						res <- msg
+				for {
+					select {
+					case <-t.C:
+						t.Stop()
+
+						errs <- ErrCallTimedOut
 
 						return
+					case msg, ok := <-l.Ch():
+						if !ok {
+							return
+						}
+
+						if msg.id == callID {
+							res <- msg
+
+							return
+						}
 					}
 				}
 			}()
