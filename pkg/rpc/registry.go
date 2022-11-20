@@ -15,12 +15,14 @@ import (
 )
 
 var (
-	errorType = reflect.TypeOf((*error)(nil)).Elem()
+	errorType   = reflect.TypeOf((*error)(nil)).Elem()
+	contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 
-	ErrInvalidReturn         = errors.New("can only return an error or a value and an error")
+	ErrInvalidReturn = errors.New("invalid return, can only return an error or a value and an error")
+	ErrInvalidArgs   = errors.New("invalid arguments, first argument needs to be a context.Context")
+
 	ErrInvalidRequest        = errors.New("invalid request")
 	ErrCannotCallNonFunction = errors.New("can not call non function")
-	ErrInvalidArgs           = errors.New("invalid arguments")
 	ErrCallTimedOut          = errors.New("call timed out")
 )
 
@@ -86,6 +88,18 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 			if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
 				errs <- ErrInvalidReturn
+
+				break
+			}
+
+			if functionType.NumIn() < 1 {
+				errs <- ErrInvalidArgs
+
+				break
+			}
+
+			if !functionType.In(0).Implements(contextType) {
+				errs <- ErrInvalidArgs
 
 				break
 			}
