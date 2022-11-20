@@ -172,6 +172,12 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 	r.remotes[remoteID] = remote.Interface().(R)
 	r.remotesLock.Unlock()
 
+	defer func() {
+		r.remotesLock.Lock()
+		delete(r.remotes, remoteID)
+		r.remotesLock.Unlock()
+	}()
+
 	d := json.NewDecoder(conn)
 
 	go func() {
