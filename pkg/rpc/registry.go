@@ -17,7 +17,7 @@ import (
 var (
 	errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-	ErrInvalidReturn         = errors.New("can only return void, a value or a value and an error")
+	ErrInvalidReturn         = errors.New("can only return an error or a value and an error")
 	ErrInvalidRequest        = errors.New("invalid request")
 	ErrCannotCallNonFunction = errors.New("can not call non function")
 	ErrInvalidArgs           = errors.New("invalid arguments")
@@ -31,9 +31,10 @@ const (
 )
 
 type response struct {
-	id    string
-	value json.RawMessage
-	err   error
+	id      string
+	value   json.RawMessage
+	err     error
+	timeout bool
 }
 
 func GetRemoteID(ctx context.Context) string {
@@ -68,140 +69,148 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 	errs := make(chan error)
 
-	for i := 0; i < remote.NumField(); i++ {
-		functionField := remote.Type().Field(i)
-		functionType := functionField.Type
-
-		if functionType.Kind() != reflect.Func {
-			continue
-		}
-
-		if n := functionType.NumOut(); n > 2 || (n == 2 && !functionType.Out(1).Implements(errorType)) {
-			errs <- ErrInvalidReturn
-
-			break
-		}
-
-		fn := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
-			callID := uuid.NewString()
-
-			cmd := []any{true, callID, functionField.Name}
-
-			cmdArgs := []any{}
-			for i, arg := range args {
-				if i == 0 {
-					// Don't sent the context over the wire
-
-					continue
-				}
-
-				cmdArgs = append(cmdArgs, arg.Interface())
-			}
-			cmd = append(cmd, cmdArgs)
-
-			b, err := json.Marshal(cmd)
-			if err != nil {
-				errs <- err
-
-				return
-			}
-
-			l := responseResolver.Listener(0)
-			defer l.Close()
-
-			t := time.NewTimer(r.timeout)
-			defer t.Stop()
-
-			res := make(chan response)
-			go func() {
-				for {
-					select {
-					case <-t.C:
-						t.Stop()
-
-						errs <- ErrCallTimedOut
-
-						return
-					case msg, ok := <-l.Ch():
-						if !ok {
-							return
-						}
-
-						if msg.id == callID {
-							res <- msg
-
-							return
-						}
-					}
-				}
-			}()
-
-			if _, err := conn.Write(b); err != nil {
-				errs <- err
-
-				return
-			}
-
-			returnValues := []reflect.Value{}
-			select {
-			case rawReturnValue := <-res:
-				if functionType.NumOut() == 1 {
-					returnValue := reflect.New(functionType.Out(0))
-
-					if rawReturnValue.err != nil {
-						returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
-					} else if !functionType.Out(0).Implements(errorType) {
-						if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
-							errs <- err
-
-							return
-						}
-					}
-
-					returnValues = append(returnValues, returnValue.Elem())
-				} else if functionType.NumOut() == 2 {
-					valueReturnValue := reflect.New(functionType.Out(0))
-					errReturnValue := reflect.New(functionType.Out(1))
-
-					if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
-						errs <- err
-
-						return
-					}
-
-					if rawReturnValue.err != nil {
-						errReturnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
-					}
-
-					returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
-				}
-			case <-r.ctx.Done():
-				errs <- r.ctx.Err()
-
-				return
-			}
-
-			return returnValues
-		})
-
-		remote.FieldByName(functionField.Name).Set(fn)
-	}
-
-	remoteID := uuid.NewString()
-
-	r.remotesLock.Lock()
-	r.remotes[remoteID] = remote.Interface().(R)
-	r.remotesLock.Unlock()
-
-	defer func() {
-		r.remotesLock.Lock()
-		delete(r.remotes, remoteID)
-		r.remotesLock.Unlock()
-	}()
-
-	d := json.NewDecoder(conn)
-
 	go func() {
+		for i := 0; i < remote.NumField(); i++ {
+			functionField := remote.Type().Field(i)
+			functionType := functionField.Type
+
+			if functionType.Kind() != reflect.Func {
+				continue
+			}
+
+			if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
+				errs <- ErrInvalidReturn
+
+				break
+			}
+
+			if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
+				errs <- ErrInvalidReturn
+
+				break
+			}
+
+			fn := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+				callID := uuid.NewString()
+
+				cmd := []any{true, callID, functionField.Name}
+
+				cmdArgs := []any{}
+				for i, arg := range args {
+					if i == 0 {
+						// Don't sent the context over the wire
+
+						continue
+					}
+
+					cmdArgs = append(cmdArgs, arg.Interface())
+				}
+				cmd = append(cmd, cmdArgs)
+
+				b, err := json.Marshal(cmd)
+				if err != nil {
+					errs <- err
+
+					return
+				}
+
+				l := responseResolver.Listener(0)
+				defer l.Close()
+
+				t := time.NewTimer(r.timeout)
+				defer t.Stop()
+
+				res := make(chan response)
+				go func() {
+					for {
+						select {
+						case <-t.C:
+							t.Stop()
+
+							res <- response{"", nil, ErrCallTimedOut, true}
+
+							return
+						case msg, ok := <-l.Ch():
+							if !ok {
+								return
+							}
+
+							if msg.id == callID {
+								res <- msg
+
+								return
+							}
+						}
+					}
+				}()
+
+				if _, err := conn.Write(b); err != nil {
+					errs <- err
+
+					return
+				}
+
+				returnValues := []reflect.Value{}
+				select {
+				case rawReturnValue := <-res:
+					if functionType.NumOut() == 1 {
+						returnValue := reflect.New(functionType.Out(0))
+
+						if rawReturnValue.err != nil {
+							returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+						} else if !functionType.Out(0).Implements(errorType) {
+							if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
+								errs <- err
+
+								return
+							}
+						}
+
+						returnValues = append(returnValues, returnValue.Elem())
+					} else if functionType.NumOut() == 2 {
+						valueReturnValue := reflect.New(functionType.Out(0))
+						errReturnValue := reflect.New(functionType.Out(1))
+
+						if !rawReturnValue.timeout {
+							if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
+								errs <- err
+
+								return
+							}
+						}
+
+						if rawReturnValue.err != nil {
+							errReturnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+						}
+
+						returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
+					}
+				case <-r.ctx.Done():
+					errs <- r.ctx.Err()
+
+					return
+				}
+
+				return returnValues
+			})
+
+			remote.FieldByName(functionField.Name).Set(fn)
+		}
+
+		remoteID := uuid.NewString()
+
+		r.remotesLock.Lock()
+		r.remotes[remoteID] = remote.Interface().(R)
+		r.remotesLock.Unlock()
+
+		defer func() {
+			r.remotesLock.Lock()
+			delete(r.remotes, remoteID)
+			r.remotesLock.Unlock()
+		}()
+
+		d := json.NewDecoder(conn)
+
 		for {
 			var res []json.RawMessage
 			if err := d.Decode(&res); err != nil {
@@ -387,7 +396,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 				err = errors.New(errMsg)
 			}
 
-			responseResolver.Broadcast(response{callID, res[2], err})
+			responseResolver.Broadcast(response{callID, res[2], err, false})
 		}
 	}()
 
