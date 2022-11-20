@@ -75,22 +75,20 @@ func main() {
 			}
 
 			for peerID, peer := range registry.Peers() {
-				go func(peerID string, peer remote) {
-					log.Println("Calling functions for peer with ID", peerID)
+				log.Println("Calling functions for peer with ID", peerID)
 
-					switch line {
-					case "a\n":
-						log.Println(peer.Increment(ctx, 1))
-					case "b\n":
-						log.Println(peer.Increment(ctx, -1))
-					case "c\n":
-						peer.Println(ctx, "Hello, world!")
-					default:
-						log.Printf("Unknown letter %v, ignoring input", line)
+				switch line {
+				case "a\n":
+					log.Println(peer.Increment(ctx, 1))
+				case "b\n":
+					log.Println(peer.Increment(ctx, -1))
+				case "c\n":
+					peer.Println(ctx, "Hello, world!")
+				default:
+					log.Printf("Unknown letter %v, ignoring input", line)
 
-						return
-					}
-				}(peerID, peer)
+					return
+				}
 			}
 		}
 	}()
