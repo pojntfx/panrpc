@@ -108,6 +108,20 @@ registry := rpc.NewRegistry(
 )
 ```
 
+And do the same for the client:
+
+```go
+// client.go
+
+registry := rpc.NewRegistry(
+	&local{},
+	remote{},
+
+	time.Second*10,
+	context.Background(),
+)
+```
+
 ### 4. Link the Registry to a Transport
 
 Next, expose the functions by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`):
