@@ -17,14 +17,16 @@ import (
 
 type local struct{}
 
-func (s *local) Println(ctx context.Context, msg string) {
+func (s *local) Println(ctx context.Context, msg string) error {
 	log.Println("Printing message", msg, "for peer with ID", rpc.GetRemoteID(ctx))
 
 	fmt.Println(msg)
+
+	return nil
 }
 
 type remote struct {
-	Increment func(ctx context.Context, delta int64) int64
+	Increment func(ctx context.Context, delta int64) (int64, error)
 }
 
 func main() {
@@ -63,9 +65,23 @@ func main() {
 
 				switch line {
 				case "a\n":
-					log.Println(peer.Increment(ctx, 1))
+					new, err := peer.Increment(ctx, 1)
+					if err != nil {
+						log.Println("Got error for Increment func:", err)
+
+						continue
+					}
+
+					log.Println(new)
 				case "b\n":
-					log.Println(peer.Increment(ctx, -1))
+					new, err := peer.Increment(ctx, -1)
+					if err != nil {
+						log.Println("Got error for Increment func:", err)
+
+						continue
+					}
+
+					log.Println(new)
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
@@ -138,6 +154,8 @@ func main() {
 				}()
 
 				if err := <-errs; err != nil {
+					log.Println(err)
+
 					panic(err)
 				}
 			default:
@@ -155,7 +173,7 @@ func main() {
 		conn := websocket.NetConn(ctx, c, websocket.MessageText)
 		defer conn.Close()
 
-		log.Println("Connected to", conn.RemoteAddr())
+		log.Println("Connected to", *addr)
 
 		if err := registry.Link(conn); err != nil {
 			panic(err)

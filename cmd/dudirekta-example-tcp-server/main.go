@@ -17,14 +17,14 @@ type local struct {
 	counter int64
 }
 
-func (s *local) Increment(ctx context.Context, delta int64) int64 {
+func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
 	log.Println("Incrementing counter by", delta, "for peer with ID", rpc.GetRemoteID(ctx))
 
-	return atomic.AddInt64(&s.counter, delta)
+	return atomic.AddInt64(&s.counter, delta), nil
 }
 
 type remote struct {
-	Println func(ctx context.Context, msg string)
+	Println func(ctx context.Context, msg string) error
 }
 
 func main() {
@@ -62,7 +62,11 @@ func main() {
 
 				switch line {
 				case "a\n":
-					peer.Println(ctx, "Hello, world!")
+					if err := peer.Println(ctx, "Hello, world!"); err != nil {
+						log.Println("Got error for Println func:", err)
+
+						continue
+					}
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
