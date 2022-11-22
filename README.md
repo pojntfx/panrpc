@@ -6,6 +6,8 @@ Transport-agnostic framework that allows exposing and calling functions on both 
 
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/dudirekta.svg)](https://pkg.go.dev/github.com/pojntfx/dudirekta)
+[![npm: @pojntfx/dudirekta](https://img.shields.io/npm/v/@pojntfx/dudirekta)](https://www.npmjs.com/package/@pojntfx/dudirekta)
+[![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/dudirekta)
 [![Matrix](https://img.shields.io/matrix/dudirekta:matrix.org)](https://matrix.to/#/#dudirekta:matrix.org?via=matrix.org)
 
 ## Overview
@@ -25,6 +27,14 @@ You can add dudirekta to your Go project by running the following:
 ```shell
 $ go get github.com/pojntfx/dudirekta/...@latest
 ```
+
+There is also a minimal TypeScript version for browser support; you can install it like so:
+
+```shell
+$ npm i -s @pojntfx/dudirekta
+```
+
+This README's documentation only covers the Go version. For the browser version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses dudirekta in its examples. You can find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/dudirekta).
 
 ## Usage
 
@@ -222,11 +232,8 @@ To make getting started with dudirekta easier, take a look at the following exam
 - **WebSocket Transport**
   - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
   - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
-  - [Browser Client](./cmd/dudirekta-example-websocket-client/index.html)
 - **WebRTC Transport**
   - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
-
-Be sure to also check out [Hydrapp](https://github.com/pojntfx/hydrapp), a framework for building apps that run everywhere - it uses dudirekta extensively.
 
 ### Protocol
 
