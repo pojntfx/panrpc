@@ -115,6 +115,7 @@ registry := rpc.NewRegistry(
 
 	time.Second*10,
 	context.Background(),
+	nil,
 )
 ```
 
@@ -129,6 +130,7 @@ registry := rpc.NewRegistry(
 
 	time.Second*10,
 	context.Background(),
+	nil,
 )
 ```
 
