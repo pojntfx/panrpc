@@ -1,6 +1,6 @@
 {
   "name": "@pojntfx/dudirekta",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Transport-agnostic framework that allows exposing and calling functions on both clients and servers.",
   "source": "ts/index.ts",
   "main": "dist/main.js",
@@ -39,6 +39,7 @@
     "@types/jest": "^28.1.5",
     "@types/json-bigint": "^1.0.1",
     "@types/node": "^18.6.3",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.30.6",
     "@typescript-eslint/parser": "^5.30.6",
     "eslint": "^7.32.0",
@@ -56,5 +57,8 @@
     "ts-jest": "^28.0.6",
     "typedoc": "^0.23.8",
     "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
   }
 }
