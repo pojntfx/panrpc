@@ -1,3 +1,5 @@
+import { v4 } from "uuid";
+
 export interface IBindConfig {
   onOpen?: () => void;
   onError?: (e: Event) => void;
@@ -48,7 +50,7 @@ export const bind = (
   for (const functionName in r) {
     (r as any)[functionName] = async (...args: any[]) =>
       new Promise((res, rej) => {
-        const id = Math.random().toString(16).slice(2);
+        const id = v4();
 
         const handleReturn = ({ detail }: any) => {
           const [rv, err] = detail;
