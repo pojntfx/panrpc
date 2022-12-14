@@ -43,6 +43,10 @@ func GetRemoteID(ctx context.Context) string {
 	return ctx.Value(remoteIDContextKey).(string)
 }
 
+type Options struct {
+	ResponseBufferLen int
+}
+
 type Registry[R any] struct {
 	local  any
 	remote R
@@ -52,6 +56,8 @@ type Registry[R any] struct {
 
 	timeout time.Duration
 	ctx     context.Context
+
+	options *Options
 }
 
 func NewRegistry[R any](
@@ -60,8 +66,16 @@ func NewRegistry[R any](
 
 	timeout time.Duration,
 	ctx context.Context,
+
+	options *Options,
 ) *Registry[R] {
-	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx}
+	if options == nil {
+		options = &Options{
+			ResponseBufferLen: 1024,
+		}
+	}
+
+	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
 }
 
 func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
@@ -128,7 +142,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 					return
 				}
 
-				l := responseResolver.Listener(0)
+				l := responseResolver.Listener(r.options.ResponseBufferLen)
 				defer l.Close()
 
 				t := time.NewTimer(r.timeout)
