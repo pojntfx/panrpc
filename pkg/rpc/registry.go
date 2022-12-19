@@ -30,6 +30,8 @@ type key int
 
 const (
 	remoteIDContextKey key = iota
+
+	DefaultResponseBufferLen = 1024
 )
 
 type response struct {
@@ -44,7 +46,9 @@ func GetRemoteID(ctx context.Context) string {
 }
 
 type Options struct {
-	ResponseBufferLen int
+	ResponseBufferLen  int
+	OnClientConnect    func(remoteID string)
+	OnClientDisconnect func(remoteID string)
 }
 
 type Registry[R any] struct {
@@ -71,7 +75,7 @@ func NewRegistry[R any](
 ) *Registry[R] {
 	if options == nil {
 		options = &Options{
-			ResponseBufferLen: 1024,
+			ResponseBufferLen: DefaultResponseBufferLen,
 		}
 	}
 
@@ -229,11 +233,19 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 		r.remotesLock.Lock()
 		r.remotes[remoteID] = remote.Interface().(R)
+
+		if r.options.OnClientConnect != nil {
+			r.options.OnClientConnect(remoteID)
+		}
 		r.remotesLock.Unlock()
 
 		defer func() {
 			r.remotesLock.Lock()
 			delete(r.remotes, remoteID)
+
+			if r.options.OnClientDisconnect != nil {
+				r.options.OnClientDisconnect(remoteID)
+			}
 			r.remotesLock.Unlock()
 		}()
 

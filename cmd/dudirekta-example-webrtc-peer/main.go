@@ -42,7 +42,7 @@ type remote struct {
 
 func main() {
 	verbose := flag.Int("verbose", 5, "Verbosity level (0 is disabled, default is info, 7 is trace)")
-	signaler := flag.String("signaler", "wss://weron.herokuapp.com/", "Signaler address")
+	signaler := flag.String("signaler", "wss://weron.up.railway.app/", "Signaler address")
 	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for connections")
 	community := flag.String("community", "", "ID of community to join")
 	password := flag.String("password", "", "Password for community")
@@ -55,13 +55,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	clients := 0
+
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
 
 		time.Second*10,
 		ctx,
-		nil,
+		&rpc.Options{
+			ResponseBufferLen: rpc.DefaultResponseBufferLen,
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v clients connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v clients connected", clients)
+			},
+		},
 	)
 
 	go func() {
@@ -178,7 +192,6 @@ func main() {
 	}
 	defer adapter.Close()
 
-	clients := 0
 	errs := make(chan error)
 	for {
 		select {
@@ -196,20 +209,12 @@ func main() {
 			log.Println("Connected to peer with ID", peer.PeerID)
 
 			go func() {
-				clients++
-
-				log.Printf("%v clients connected", clients)
-
 				defer func() {
-					clients--
-
 					_ = peer.Conn.Close()
 
 					if err := recover(); err != nil {
 						log.Printf("Client disconnected with error: %v", err)
 					}
-
-					log.Printf("%v clients connected", clients)
 				}()
 
 				if err := registry.Link(peer.Conn); err != nil {

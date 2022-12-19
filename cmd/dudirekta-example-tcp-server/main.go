@@ -36,13 +36,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	clients := 0
+
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
 
 		time.Second*10,
 		ctx,
-		nil,
+		&rpc.Options{
+			ResponseBufferLen: rpc.DefaultResponseBufferLen,
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v clients connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v clients connected", clients)
+			},
+		},
 	)
 
 	go func() {
@@ -86,8 +100,6 @@ func main() {
 
 		log.Println("Listening on", lis.Addr())
 
-		clients := 0
-
 		for {
 			func() {
 				conn, err := lis.Accept()
@@ -98,20 +110,13 @@ func main() {
 				}
 
 				go func() {
-					clients++
-
-					log.Printf("%v clients connected", clients)
 
 					defer func() {
-						clients--
-
 						_ = conn.Close()
 
 						if err := recover(); err != nil {
 							log.Printf("Client disconnected with error: %v", err)
 						}
-
-						log.Printf("%v clients connected", clients)
 					}()
 
 					if err := registry.Link(conn); err != nil {
