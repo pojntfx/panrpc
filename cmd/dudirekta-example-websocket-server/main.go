@@ -38,13 +38,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	clients := 0
+
 	registry := rpc.NewRegistry(
 		&local{},
 		remote{},
 
 		time.Second*10,
 		ctx,
-		nil,
+		&rpc.Options{
+			ResponseBufferLen: rpc.DefaultResponseBufferLen,
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v clients connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v clients connected", clients)
+			},
+		},
 	)
 
 	go func() {
@@ -88,23 +102,13 @@ func main() {
 
 		log.Println("Listening on", lis.Addr())
 
-		clients := 0
-
 		if err := http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			clients++
-
-			log.Printf("%v clients connected", clients)
-
 			defer func() {
-				clients--
-
 				if err := recover(); err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 
 					log.Printf("Client disconnected with error: %v", err)
 				}
-
-				log.Printf("%v clients connected", clients)
 			}()
 
 			switch r.Method {
