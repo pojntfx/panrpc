@@ -1,6 +1,6 @@
 {
   "name": "@pojntfx/dudirekta",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "description": "Transport-agnostic framework that allows exposing and calling functions on both clients and servers.",
   "source": "ts/index.ts",
   "main": "dist/main.js",
