@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -17,52 +16,60 @@ import (
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
-func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, error), error) {
-	fnVal := reflect.ValueOf(fn)
-	fnType := fnVal.Type()
+var (
+	errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-	if fnType.Kind() != reflect.Func {
-		return nil, errors.New("not a function")
+	ErrNotAFunction     = errors.New("not a function")
+	ErrInvalidArgsCount = errors.New("invalid argument count")
+	ErrInvalidArg       = errors.New("invalid argument")
+)
+
+func CreateClosure(fn interface{}) (func(args ...interface{}) (interface{}, error), error) {
+	functionType := reflect.ValueOf(fn).Type()
+
+	if functionType.Kind() != reflect.Func {
+		return nil, ErrNotAFunction
 	}
 
-	numOut := fnType.NumOut()
-	if numOut != 1 && numOut != 2 {
-		return nil, errors.New("function must return either one or two values")
+	if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
+		return nil, rpc.ErrInvalidReturn
 	}
 
-	if numOut == 2 && fnType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
-		return nil, errors.New("second return value must be an error")
+	if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
+		return nil, rpc.ErrInvalidReturn
 	}
 
 	return func(args ...interface{}) (interface{}, error) {
-		if len(args) != fnType.NumIn() {
-			return nil, errors.New("wrong number of arguments")
+		if len(args) != functionType.NumIn() {
+			return nil, ErrInvalidArgsCount
 		}
 
 		in := make([]reflect.Value, len(args))
 		for i, arg := range args {
-			argType := reflect.TypeOf(arg)
-			if argType != fnType.In(i) {
-				if argType.ConvertibleTo(fnType.In(i)) {
-					in[i] = reflect.ValueOf(arg).Convert(fnType.In(i))
+			if argType := reflect.TypeOf(arg); argType != functionType.In(i) {
+				if argType.ConvertibleTo(functionType.In(i)) {
+					in[i] = reflect.ValueOf(arg).Convert(functionType.In(i))
 				} else {
-					return nil, fmt.Errorf("argument %d must be of type %s", i, fnType.In(i))
+					return nil, ErrInvalidArg
 				}
 			} else {
 				in[i] = reflect.ValueOf(arg)
 			}
 		}
 
-		out := fnVal.Call(in)
+		out := reflect.ValueOf(fn).Call(in)
 		if len(out) == 1 {
 			if out[0].IsValid() && !out[0].IsNil() {
 				return nil, out[0].Interface().(error)
 			}
+
 			return nil, nil
 		}
+
 		if out[1].IsValid() && !out[1].IsNil() {
 			return out[0].Interface(), out[1].Interface().(error)
 		}
+
 		return out[0].Interface(), nil
 	}, nil
 }
@@ -94,7 +101,7 @@ type remote struct {
 }
 
 func Iterate(caller *local, callee remote, ctx context.Context, length int, onIteration func(i int) error) (int, error) {
-	fn, err := createClosure(onIteration)
+	fn, err := CreateClosure(onIteration)
 	if err != nil {
 		return -1, err
 	}
