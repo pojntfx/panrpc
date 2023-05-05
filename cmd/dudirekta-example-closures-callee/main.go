@@ -24,7 +24,7 @@ func (s *local) Iterate(
 	for i := 0; i < length; i++ {
 		for candidateIP, peer := range s.Peers() {
 			if candidateIP == peerID {
-				if _, err := peer.ResolveClosure(ctx, onIterationClosureID, []interface{}{i}); err != nil {
+				if _, err := peer.CallClosure(ctx, onIterationClosureID, []interface{}{i}); err != nil {
 					return -1, err
 				}
 			}
@@ -35,7 +35,7 @@ func (s *local) Iterate(
 }
 
 type remote struct {
-	ResolveClosure func(ctx context.Context, closureID string, args []interface{}) (interface{}, error)
+	CallClosure func(ctx context.Context, closureID string, args []interface{}) (interface{}, error)
 }
 
 func main() {

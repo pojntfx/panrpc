@@ -19,12 +19,13 @@ import (
 var (
 	errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-	ErrNotAFunction     = errors.New("not a function")
-	ErrInvalidArgsCount = errors.New("invalid argument count")
-	ErrInvalidArg       = errors.New("invalid argument")
+	ErrNotAFunction        = errors.New("not a function")
+	ErrInvalidArgsCount    = errors.New("invalid argument count")
+	ErrInvalidArg          = errors.New("invalid argument")
+	ErrClosureDoesNotExist = errors.New("closure does not exist")
 )
 
-func CreateClosure(fn interface{}) (func(args ...interface{}) (interface{}, error), error) {
+func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, error), error) {
 	functionType := reflect.ValueOf(fn).Type()
 
 	if functionType.Kind() != reflect.Func {
@@ -75,21 +76,51 @@ func CreateClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 }
 
 type local struct {
+	*ClosureManager
+}
+
+type ClosureManager struct {
 	closuresLock sync.Mutex
 	closures     map[string]func(args ...interface{}) (interface{}, error)
 }
 
-func (s *local) ResolveClosure(ctx context.Context, closureID string, args []interface{}) (interface{}, error) {
-	s.closuresLock.Lock()
-	closure, ok := s.closures[closureID]
-	if !ok {
-		s.closuresLock.Unlock()
-
-		return nil, errors.New("could not find closure")
+func NewClosureManager() *ClosureManager {
+	return &ClosureManager{
+		closuresLock: sync.Mutex{},
+		closures:     map[string]func(args ...interface{}) (interface{}, error){},
 	}
-	s.closuresLock.Unlock()
+}
+
+func (m *ClosureManager) CallClosure(ctx context.Context, closureID string, args []interface{}) (interface{}, error) {
+	m.closuresLock.Lock()
+	closure, ok := m.closures[closureID]
+	if !ok {
+		m.closuresLock.Unlock()
+
+		return nil, ErrClosureDoesNotExist
+	}
+	m.closuresLock.Unlock()
 
 	return closure(args...)
+}
+
+func RegisterClosure(m *ClosureManager, fn interface{}) (string, func(), error) {
+	cls, err := createClosure(fn)
+	if err != nil {
+		return "", func() {}, err
+	}
+
+	closureID := uuid.New().String()
+
+	m.closuresLock.Lock()
+	m.closures[closureID] = cls
+	m.closuresLock.Unlock()
+
+	return closureID, func() {
+		m.closuresLock.Lock()
+		delete(m.closures, closureID)
+		m.closuresLock.Unlock()
+	}, nil
 }
 
 type remote struct {
@@ -101,22 +132,11 @@ type remote struct {
 }
 
 func Iterate(caller *local, callee remote, ctx context.Context, length int, onIteration func(i int) error) (int, error) {
-	fn, err := CreateClosure(onIteration)
+	onIterationClosureID, freeClosure, err := RegisterClosure(caller.ClosureManager, onIteration)
 	if err != nil {
 		return -1, err
 	}
-
-	onIterationClosureID := uuid.New().String()
-
-	caller.closuresLock.Lock()
-	caller.closures[onIterationClosureID] = fn
-	caller.closuresLock.Unlock()
-
-	defer func() {
-		caller.closuresLock.Lock()
-		delete(caller.closures, onIterationClosureID)
-		caller.closuresLock.Unlock()
-	}()
+	defer freeClosure()
 
 	return callee.Iterate(ctx, length, onIterationClosureID)
 }
@@ -129,10 +149,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	service := &local{
-		closuresLock: sync.Mutex{},
-		closures:     map[string]func(args ...interface{}) (interface{}, error){},
-	}
+	service := &local{NewClosureManager()}
 
 	clients := 0
 	registry := rpc.NewRegistry(
