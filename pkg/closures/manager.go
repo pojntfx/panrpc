@@ -7,12 +7,12 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
 var (
 	errorType = reflect.TypeOf((*error)(nil)).Elem()
 
+	ErrInvalidReturn       = errors.New("invalid return, can only return an error or a value and an error")
 	ErrNotAFunction        = errors.New("not a function")
 	ErrInvalidArgsCount    = errors.New("invalid argument count")
 	ErrInvalidArg          = errors.New("invalid argument")
@@ -31,11 +31,11 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 	}
 
 	if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
-		return nil, rpc.ErrInvalidReturn
+		return nil, ErrInvalidReturn
 	}
 
 	if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
-		return nil, rpc.ErrInvalidReturn
+		return nil, ErrInvalidReturn
 	}
 
 	return func(args ...interface{}) (interface{}, error) {

@@ -9,30 +9,21 @@ import (
 	"os"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/closures"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
-type local struct {
-	*closures.ClosureManager
-}
+type local struct{}
 
 type remote struct {
 	Iterate func(
 		ctx context.Context,
 		length int,
-		onIterationClosureID string,
+		onIteration func(i int) error,
 	) (int, error)
 }
 
-func Iterate(caller *local, callee remote, ctx context.Context, length int, onIteration func(i int) error) (int, error) {
-	onIterationClosureID, freeClosure, err := closures.RegisterClosure(caller.ClosureManager, onIteration)
-	if err != nil {
-		return -1, err
-	}
-	defer freeClosure()
-
-	return callee.Iterate(ctx, length, onIterationClosureID)
+func Iterate(callee remote, ctx context.Context, length int, onIteration func(i int) error) (int, error) {
+	return callee.Iterate(ctx, length, onIteration)
 }
 
 func main() {
@@ -43,11 +34,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	service := &local{closures.NewClosureManager()}
-
 	clients := 0
 	registry := rpc.NewRegistry(
-		service,
+		&local{},
 		remote{},
 
 		time.Second*10,
@@ -84,7 +73,7 @@ func main() {
 			for _, peer := range registry.Peers() {
 				switch line {
 				case "a\n":
-					length, err := Iterate(service, peer, ctx, 5, func(i int) error {
+					length, err := Iterate(peer, ctx, 5, func(i int) error {
 						log.Println("In iteration", i)
 
 						return nil
@@ -97,7 +86,7 @@ func main() {
 
 					log.Println(length)
 				case "b\n":
-					length, err := Iterate(service, peer, ctx, 10, func(i int) error {
+					length, err := Iterate(peer, ctx, 10, func(i int) error {
 						log.Println("In iteration", i)
 
 						return nil

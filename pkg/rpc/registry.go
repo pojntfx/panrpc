@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pojntfx/dudirekta/pkg/closures"
 	"github.com/teivah/broadcast"
 )
 
@@ -51,8 +52,13 @@ type Options struct {
 	OnClientDisconnect func(remoteID string)
 }
 
+type wrappedChild struct {
+	wrappee any
+	wrapper *closures.ClosureManager
+}
+
 type Registry[R any] struct {
-	local  any
+	local  wrappedChild
 	remote R
 
 	remotes     map[string]R
@@ -79,7 +85,10 @@ func NewRegistry[R any](
 		}
 	}
 
-	return &Registry[R]{local, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
+	return &Registry[R]{wrappedChild{
+		local,
+		closures.NewClosureManager(),
+	}, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
 }
 
 func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
@@ -135,7 +144,19 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 						continue
 					}
 
-					cmdArgs = append(cmdArgs, arg.Interface())
+					if arg.Kind() == reflect.Func {
+						closureID, freeClosure, err := closures.RegisterClosure(r.local.wrapper, arg.Interface())
+						if err != nil {
+							errs <- err
+
+							return
+						}
+						defer freeClosure()
+
+						cmdArgs = append(cmdArgs, closureID)
+					} else {
+						cmdArgs = append(cmdArgs, arg.Interface())
+					}
 				}
 				cmd = append(cmd, cmdArgs)
 
@@ -296,13 +317,19 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 					}
 
 					function := reflect.
-						ValueOf(r.local).
+						ValueOf(r.local.wrappee).
 						MethodByName(functionName)
 
 					if function.Kind() != reflect.Func {
-						errs <- ErrCannotCallNonFunction
+						function = reflect.
+							ValueOf(r.local.wrapper).
+							MethodByName(functionName)
 
-						return
+						if function.Kind() != reflect.Func {
+							errs <- ErrCannotCallNonFunction
+
+							return
+						}
 					}
 
 					if function.Type().NumIn() != len(functionArgs)+1 {
