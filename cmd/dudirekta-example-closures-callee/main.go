@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/pojntfx/dudirekta/pkg/closures"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
@@ -35,7 +36,7 @@ func (s *local) Iterate(
 }
 
 type remote struct {
-	CallClosure func(ctx context.Context, closureID string, args []interface{}) (interface{}, error)
+	CallClosure closures.CallClosureType
 }
 
 func main() {
