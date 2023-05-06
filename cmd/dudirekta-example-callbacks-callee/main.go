@@ -3,33 +3,36 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
-type local struct{}
+type local struct {
+	counter int64
 
-func (s *local) Iterate(
-	ctx context.Context,
-	length int,
-	onIteration func(i int, b string) (string, error),
-) (int, error) {
-	for i := 0; i < length; i++ {
-		rv, err := onIteration(i, "This is from the callee")
-		if err != nil {
-			return -1, err
-		}
-
-		log.Println("Closure returned:", rv)
-	}
-
-	return length, nil
+	Peers func() map[string]remote
 }
 
-type remote struct{}
+func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
+	peerID := rpc.GetRemoteID(ctx)
+
+	for candidateIP, peer := range s.Peers() {
+		if candidateIP == peerID {
+			peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
+		}
+	}
+
+	return atomic.AddInt64(&s.counter, delta), nil
+}
+
+type remote struct {
+	Println func(ctx context.Context, msg string) error
+}
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
@@ -40,9 +43,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	service := &local{}
+
 	clients := 0
 	registry := rpc.NewRegistry(
-		&local{},
+		service,
 		remote{},
 
 		time.Second*10,
@@ -61,6 +66,7 @@ func main() {
 			},
 		},
 	)
+	service.Peers = registry.Peers
 
 	if *listen {
 		lis, err := net.Listen("tcp", *addr)
