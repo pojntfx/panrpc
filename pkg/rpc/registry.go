@@ -401,7 +401,9 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									valueReturnValue := reflect.New(functionType.Out(0))
 									errReturnValue := reflect.New(functionType.Out(1))
 
-									valueReturnValue.Elem().Set(rcpRv[0].Elem().Convert(valueReturnValue.Type().Elem()))
+									if el := rcpRv[0].Elem(); el.IsValid() {
+										valueReturnValue.Elem().Set(el.Convert(valueReturnValue.Type().Elem()))
+									}
 									errReturnValue.Elem().Set(rcpRv[1])
 
 									rv = append(rv, valueReturnValue.Elem(), errReturnValue.Elem())
