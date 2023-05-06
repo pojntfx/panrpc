@@ -381,12 +381,12 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									responseResolver,
 								)
 
-								rpcArgs := []interface{}{reflect.ValueOf(context.WithValue(r.ctx, remoteIDContextKey, remoteID))}
-								for i := 1; i < len(args); i++ {
+								rpcArgs := []interface{}{}
+								for i := 0; i < len(args); i++ {
 									rpcArgs = append(rpcArgs, args[i].Interface())
 								}
 
-								rcpRv := rpc.Call([]reflect.Value{args[0], reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+								rcpRv := rpc.Call([]reflect.Value{reflect.ValueOf(r.ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
 
 								rv := []reflect.Value{}
 								if functionType.NumOut() == 1 {

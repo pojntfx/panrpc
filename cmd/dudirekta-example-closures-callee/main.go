@@ -17,10 +17,10 @@ type local struct {
 func (s *local) Iterate(
 	ctx context.Context,
 	length int,
-	onIteration func(ctx context.Context, i int) error,
+	onIteration func(i int) error,
 ) (int, error) {
 	for i := 0; i < length; i++ {
-		if err := onIteration(ctx, i); err != nil {
+		if err := onIteration(i); err != nil {
 			return -1, err
 		}
 	}
