@@ -1,4 +1,4 @@
-package closures
+package rpc
 
 import (
 	"context"
@@ -10,17 +10,16 @@ import (
 )
 
 var (
-	errorType = reflect.TypeOf((*error)(nil)).Elem()
+	ErrNotAFunction = errors.New("not a function")
 
-	ErrInvalidReturn       = errors.New("invalid return, can only return an error or a value and an error")
-	ErrNotAFunction        = errors.New("not a function")
-	ErrInvalidArgsCount    = errors.New("invalid argument count")
-	ErrInvalidArg          = errors.New("invalid argument")
+	ErrInvalidArgsCount = errors.New("invalid argument count")
+	ErrInvalidArg       = errors.New("invalid argument")
+
 	ErrClosureDoesNotExist = errors.New("closure does not exist")
 )
 
 type (
-	CallClosureType = func(ctx context.Context, closureID string, args []interface{}) (interface{}, error)
+	callClosureType = func(ctx context.Context, closureID string, args []interface{}) (interface{}, error)
 )
 
 func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, error), error) {
@@ -73,19 +72,12 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 	}, nil
 }
 
-type ClosureManager struct {
+type closureManager struct {
 	closuresLock sync.Mutex
 	closures     map[string]func(args ...interface{}) (interface{}, error)
 }
 
-func NewClosureManager() *ClosureManager {
-	return &ClosureManager{
-		closuresLock: sync.Mutex{},
-		closures:     map[string]func(args ...interface{}) (interface{}, error){},
-	}
-}
-
-func (m *ClosureManager) CallClosure(ctx context.Context, closureID string, args []interface{}) (interface{}, error) {
+func (m *closureManager) CallClosure(ctx context.Context, closureID string, args []interface{}) (interface{}, error) {
 	m.closuresLock.Lock()
 	closure, ok := m.closures[closureID]
 	if !ok {
@@ -98,7 +90,7 @@ func (m *ClosureManager) CallClosure(ctx context.Context, closureID string, args
 	return closure(args...)
 }
 
-func RegisterClosure(m *ClosureManager, fn interface{}) (string, func(), error) {
+func registerClosure(m *closureManager, fn interface{}) (string, func(), error) {
 	cls, err := createClosure(fn)
 	if err != nil {
 		return "", func() {}, err

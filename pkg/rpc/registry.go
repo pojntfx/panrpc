@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/dudirekta/pkg/closures"
 	"github.com/teivah/broadcast"
 )
 
@@ -44,7 +43,7 @@ type response struct {
 
 type wrappedChild struct {
 	wrappee any
-	wrapper *closures.ClosureManager
+	wrapper *closureManager
 }
 
 func GetRemoteID(ctx context.Context) string {
@@ -87,7 +86,10 @@ func NewRegistry[R any](
 
 	return &Registry[R]{wrappedChild{
 		local,
-		closures.NewClosureManager(),
+		&closureManager{
+			closuresLock: sync.Mutex{},
+			closures:     map[string]func(args ...interface{}) (interface{}, error){},
+		},
 	}, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
 }
 
@@ -112,7 +114,7 @@ func (r Registry[R]) makeRPC(
 			}
 
 			if arg.Kind() == reflect.Func {
-				closureID, freeClosure, err := closures.RegisterClosure(r.local.wrapper, arg.Interface())
+				closureID, freeClosure, err := registerClosure(r.local.wrapper, arg.Interface())
 				if err != nil {
 					errs <- err
 
@@ -375,7 +377,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 								rpc := r.makeRPC(
 									"CallClosure",
-									reflect.TypeOf(closures.CallClosureType(nil)),
+									reflect.TypeOf(callClosureType(nil)),
 									errs,
 									conn,
 									responseResolver,
