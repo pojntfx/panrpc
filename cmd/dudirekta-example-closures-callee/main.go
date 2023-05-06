@@ -17,12 +17,15 @@ type local struct {
 func (s *local) Iterate(
 	ctx context.Context,
 	length int,
-	onIteration func(i int) error,
+	onIteration func(i int, b string) (string, error),
 ) (int, error) {
 	for i := 0; i < length; i++ {
-		if err := onIteration(i); err != nil {
+		rv, err := onIteration(i, "This is from the callee")
+		if err != nil {
 			return -1, err
 		}
+
+		log.Println("Closure returned:", rv)
 	}
 
 	return length, nil
