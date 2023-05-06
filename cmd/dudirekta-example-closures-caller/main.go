@@ -27,7 +27,8 @@ func Iterate(callee remote, ctx context.Context, length int, onIteration func(i 
 }
 
 func main() {
-	addr := flag.String("addr", "localhost:1337", "Remote address")
+	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
+	listen := flag.Bool("listen", false, "Whether to allow connecting to peers by listening or dialing")
 
 	flag.Parse()
 
@@ -70,7 +71,9 @@ func main() {
 				panic(err)
 			}
 
-			for _, peer := range registry.Peers() {
+			for peerID, peer := range registry.Peers() {
+				log.Println("Calling functions for peer with ID", peerID)
+
 				switch line {
 				case "a\n":
 					length, err := Iterate(peer, ctx, 5, func(i int, b string) (string, error) {
@@ -107,15 +110,50 @@ func main() {
 		}
 	}()
 
-	conn, err := net.Dial("tcp", *addr)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
+	if *listen {
+		lis, err := net.Listen("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+		defer lis.Close()
 
-	log.Println("Connected to", conn.RemoteAddr())
+		log.Println("Listening on", lis.Addr())
 
-	if err := registry.Link(conn); err != nil {
-		panic(err)
+		for {
+			func() {
+				conn, err := lis.Accept()
+				if err != nil {
+					log.Println("could not accept connection, continuing:", err)
+
+					return
+				}
+
+				go func() {
+					defer func() {
+						_ = conn.Close()
+
+						if err := recover(); err != nil {
+							log.Printf("Client disconnected with error: %v", err)
+						}
+					}()
+
+					if err := registry.Link(conn); err != nil {
+						panic(err)
+					}
+				}()
+			}()
+		}
+	} else {
+		conn, err := net.Dial("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+
+		log.Println("Connected to", conn.RemoteAddr())
+
+		if err := registry.Link(conn); err != nil {
+			panic(err)
+		}
 	}
 }

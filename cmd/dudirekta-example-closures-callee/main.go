@@ -10,9 +10,7 @@ import (
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
-type local struct {
-	Peers func() map[string]remote
-}
+type local struct{}
 
 func (s *local) Iterate(
 	ctx context.Context,
@@ -34,18 +32,17 @@ func (s *local) Iterate(
 type remote struct{}
 
 func main() {
-	addr := flag.String("addr", ":1337", "Listen address")
+	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
+	listen := flag.Bool("listen", true, "Whether to allow connecting to peers by listening or dialing")
 
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	service := &local{}
-
 	clients := 0
 	registry := rpc.NewRegistry(
-		service,
+		&local{},
 		remote{},
 
 		time.Second*10,
@@ -64,7 +61,6 @@ func main() {
 			},
 		},
 	)
-	service.Peers = registry.Peers
 
 	lis, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -74,29 +70,51 @@ func main() {
 
 	log.Println("Listening on", lis.Addr())
 
-	for {
-		func() {
-			conn, err := lis.Accept()
-			if err != nil {
-				log.Println("could not accept connection, continuing:", err)
+	if *listen {
+		lis, err := net.Listen("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+		defer lis.Close()
 
-				return
-			}
+		log.Println("Listening on", lis.Addr())
 
-			go func() {
+		for {
+			func() {
+				conn, err := lis.Accept()
+				if err != nil {
+					log.Println("could not accept connection, continuing:", err)
 
-				defer func() {
-					_ = conn.Close()
+					return
+				}
 
-					if err := recover(); err != nil {
-						log.Printf("Client disconnected with error: %v", err)
+				go func() {
+
+					defer func() {
+						_ = conn.Close()
+
+						if err := recover(); err != nil {
+							log.Printf("Client disconnected with error: %v", err)
+						}
+					}()
+
+					if err := registry.Link(conn); err != nil {
+						panic(err)
 					}
 				}()
-
-				if err := registry.Link(conn); err != nil {
-					panic(err)
-				}
 			}()
-		}()
+		}
+	} else {
+		conn, err := net.Dial("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+
+		log.Println("Connected to", conn.RemoteAddr())
+
+		if err := registry.Link(conn); err != nil {
+			panic(err)
+		}
 	}
 }
