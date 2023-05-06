@@ -42,6 +42,11 @@ type response struct {
 	timeout bool
 }
 
+type wrappedChild struct {
+	wrappee any
+	wrapper *closures.ClosureManager
+}
+
 func GetRemoteID(ctx context.Context) string {
 	return ctx.Value(remoteIDContextKey).(string)
 }
@@ -50,11 +55,6 @@ type Options struct {
 	ResponseBufferLen  int
 	OnClientConnect    func(remoteID string)
 	OnClientDisconnect func(remoteID string)
-}
-
-type wrappedChild struct {
-	wrappee any
-	wrapper *closures.ClosureManager
 }
 
 type Registry[R any] struct {
@@ -89,6 +89,130 @@ func NewRegistry[R any](
 		local,
 		closures.NewClosureManager(),
 	}, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
+}
+
+func (r Registry[R]) makeRPC(
+	name string,
+	functionType reflect.Type,
+	errs chan error,
+	conn io.ReadWriteCloser,
+	responseResolver *broadcast.Relay[response],
+) reflect.Value {
+	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+		callID := uuid.NewString()
+
+		cmd := []any{true, callID, name}
+
+		cmdArgs := []any{}
+		for i, arg := range args {
+			if i == 0 {
+				// Don't sent the context over the wire
+
+				continue
+			}
+
+			if arg.Kind() == reflect.Func {
+				closureID, freeClosure, err := closures.RegisterClosure(r.local.wrapper, arg.Interface())
+				if err != nil {
+					errs <- err
+
+					return
+				}
+				defer freeClosure()
+
+				cmdArgs = append(cmdArgs, closureID)
+			} else {
+				cmdArgs = append(cmdArgs, arg.Interface())
+			}
+		}
+		cmd = append(cmd, cmdArgs)
+
+		b, err := json.Marshal(cmd)
+		if err != nil {
+			errs <- err
+
+			return
+		}
+
+		l := responseResolver.Listener(r.options.ResponseBufferLen)
+		defer l.Close()
+
+		t := time.NewTimer(r.timeout)
+		defer t.Stop()
+
+		res := make(chan response)
+		go func() {
+			for {
+				select {
+				case <-t.C:
+					t.Stop()
+
+					res <- response{"", nil, ErrCallTimedOut, true}
+
+					return
+				case msg, ok := <-l.Ch():
+					if !ok {
+						return
+					}
+
+					if msg.id == callID {
+						res <- msg
+
+						return
+					}
+				}
+			}
+		}()
+
+		if _, err := conn.Write(b); err != nil {
+			errs <- err
+
+			return
+		}
+
+		returnValues := []reflect.Value{}
+		select {
+		case rawReturnValue := <-res:
+			if functionType.NumOut() == 1 {
+				returnValue := reflect.New(functionType.Out(0))
+
+				if rawReturnValue.err != nil {
+					returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+				} else if !functionType.Out(0).Implements(errorType) {
+					if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
+						errs <- err
+
+						return
+					}
+				}
+
+				returnValues = append(returnValues, returnValue.Elem())
+			} else if functionType.NumOut() == 2 {
+				valueReturnValue := reflect.New(functionType.Out(0))
+				errReturnValue := reflect.New(functionType.Out(1))
+
+				if !rawReturnValue.timeout {
+					if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
+						errs <- err
+
+						return
+					}
+				}
+
+				if rawReturnValue.err != nil {
+					errReturnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
+				}
+
+				returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
+			}
+		case <-r.ctx.Done():
+			errs <- r.ctx.Err()
+
+			return
+		}
+
+		return returnValues
+	})
 }
 
 func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
@@ -131,123 +255,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 				break
 			}
 
-			fn := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
-				callID := uuid.NewString()
-
-				cmd := []any{true, callID, functionField.Name}
-
-				cmdArgs := []any{}
-				for i, arg := range args {
-					if i == 0 {
-						// Don't sent the context over the wire
-
-						continue
-					}
-
-					if arg.Kind() == reflect.Func {
-						closureID, freeClosure, err := closures.RegisterClosure(r.local.wrapper, arg.Interface())
-						if err != nil {
-							errs <- err
-
-							return
-						}
-						defer freeClosure()
-
-						cmdArgs = append(cmdArgs, closureID)
-					} else {
-						cmdArgs = append(cmdArgs, arg.Interface())
-					}
-				}
-				cmd = append(cmd, cmdArgs)
-
-				b, err := json.Marshal(cmd)
-				if err != nil {
-					errs <- err
-
-					return
-				}
-
-				l := responseResolver.Listener(r.options.ResponseBufferLen)
-				defer l.Close()
-
-				t := time.NewTimer(r.timeout)
-				defer t.Stop()
-
-				res := make(chan response)
-				go func() {
-					for {
-						select {
-						case <-t.C:
-							t.Stop()
-
-							res <- response{"", nil, ErrCallTimedOut, true}
-
-							return
-						case msg, ok := <-l.Ch():
-							if !ok {
-								return
-							}
-
-							if msg.id == callID {
-								res <- msg
-
-								return
-							}
-						}
-					}
-				}()
-
-				if _, err := conn.Write(b); err != nil {
-					errs <- err
-
-					return
-				}
-
-				returnValues := []reflect.Value{}
-				select {
-				case rawReturnValue := <-res:
-					if functionType.NumOut() == 1 {
-						returnValue := reflect.New(functionType.Out(0))
-
-						if rawReturnValue.err != nil {
-							returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
-						} else if !functionType.Out(0).Implements(errorType) {
-							if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
-								errs <- err
-
-								return
-							}
-						}
-
-						returnValues = append(returnValues, returnValue.Elem())
-					} else if functionType.NumOut() == 2 {
-						valueReturnValue := reflect.New(functionType.Out(0))
-						errReturnValue := reflect.New(functionType.Out(1))
-
-						if !rawReturnValue.timeout {
-							if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
-								errs <- err
-
-								return
-							}
-						}
-
-						if rawReturnValue.err != nil {
-							errReturnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
-						}
-
-						returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
-					}
-				case <-r.ctx.Done():
-					errs <- r.ctx.Err()
-
-					return
-				}
-
-				return returnValues
-			})
-
-			remote.FieldByName(functionField.Name).Set(fn)
+			remote.
+				FieldByName(functionField.Name).
+				Set(r.makeRPC(
+					functionField.Name,
+					functionType,
+					errs,
+					conn,
+					responseResolver,
+				))
 		}
 
 		remoteID := uuid.NewString()
@@ -347,14 +363,63 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 							continue
 						}
 
-						arg := reflect.New(function.Type().In(i))
-						if err := json.Unmarshal(functionArgs[i-1], arg.Interface()); err != nil {
-							errs <- err
+						functionType := function.Type().In(i)
+						if functionType.Kind() == reflect.Func {
+							arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+								closureID := ""
+								if err := json.Unmarshal(functionArgs[i-2], &closureID); err != nil {
+									errs <- err
 
-							return
+									return
+								}
+
+								rpc := r.makeRPC(
+									"CallClosure",
+									reflect.TypeOf(closures.CallClosureType(nil)),
+									errs,
+									conn,
+									responseResolver,
+								)
+
+								rpcArgs := []interface{}{reflect.ValueOf(context.WithValue(r.ctx, remoteIDContextKey, remoteID))}
+								for i := 1; i < len(args); i++ {
+									rpcArgs = append(rpcArgs, args[i].Interface())
+								}
+
+								rcpRv := rpc.Call([]reflect.Value{args[0], reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+
+								rv := []reflect.Value{}
+								if functionType.NumOut() == 1 {
+									returnValue := reflect.New(functionType.Out(0))
+
+									returnValue.Elem().Set(rcpRv[1]) // Error return value is at index 1
+
+									rv = append(rv, returnValue.Elem())
+								} else if functionType.NumOut() == 2 {
+									valueReturnValue := reflect.New(functionType.Out(0))
+									errReturnValue := reflect.New(functionType.Out(1))
+
+									valueReturnValue.Elem().Set(rcpRv[0])
+									errReturnValue.Elem().Set(rcpRv[1])
+
+									rv = append(rv, valueReturnValue.Elem(), errReturnValue.Elem())
+								}
+
+								return rv
+							})
+
+							args = append(args, arg)
+						} else {
+							arg := reflect.New(functionType)
+
+							if err := json.Unmarshal(functionArgs[i-1], arg.Interface()); err != nil {
+								errs <- err
+
+								return
+							}
+
+							args = append(args, arg.Elem())
 						}
-
-						args = append(args, arg.Elem())
 					}
 
 					go func() {

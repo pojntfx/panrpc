@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/closures"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
@@ -18,26 +17,18 @@ type local struct {
 func (s *local) Iterate(
 	ctx context.Context,
 	length int,
-	onIterationClosureID string,
+	onIteration func(ctx context.Context, i int) error,
 ) (int, error) {
-	peerID := rpc.GetRemoteID(ctx)
-
 	for i := 0; i < length; i++ {
-		for candidateIP, peer := range s.Peers() {
-			if candidateIP == peerID {
-				if _, err := peer.CallClosure(ctx, onIterationClosureID, []interface{}{i}); err != nil {
-					return -1, err
-				}
-			}
+		if err := onIteration(ctx, i); err != nil {
+			return -1, err
 		}
 	}
 
 	return length, nil
 }
 
-type remote struct {
-	CallClosure closures.CallClosureType
-}
+type remote struct{}
 
 func main() {
 	addr := flag.String("addr", ":1337", "Listen address")

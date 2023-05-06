@@ -18,11 +18,11 @@ type remote struct {
 	Iterate func(
 		ctx context.Context,
 		length int,
-		onIteration func(i int) error,
+		onIteration func(ctx context.Context, i int) error,
 	) (int, error)
 }
 
-func Iterate(callee remote, ctx context.Context, length int, onIteration func(i int) error) (int, error) {
+func Iterate(callee remote, ctx context.Context, length int, onIteration func(ctx context.Context, i int) error) (int, error) {
 	return callee.Iterate(ctx, length, onIteration)
 }
 
@@ -73,7 +73,7 @@ func main() {
 			for _, peer := range registry.Peers() {
 				switch line {
 				case "a\n":
-					length, err := Iterate(peer, ctx, 5, func(i int) error {
+					length, err := Iterate(peer, ctx, 5, func(ctx context.Context, i int) error {
 						log.Println("In iteration", i)
 
 						return nil
@@ -86,7 +86,7 @@ func main() {
 
 					log.Println(length)
 				case "b\n":
-					length, err := Iterate(peer, ctx, 10, func(i int) error {
+					length, err := Iterate(peer, ctx, 10, func(ctx context.Context, i int) error {
 						log.Println("In iteration", i)
 
 						return nil

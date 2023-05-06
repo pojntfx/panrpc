@@ -10,13 +10,15 @@ import (
 )
 
 var (
-	errorType = reflect.TypeOf((*error)(nil)).Elem()
+	errorType   = reflect.TypeOf((*error)(nil)).Elem()
+	contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 
 	ErrInvalidReturn       = errors.New("invalid return, can only return an error or a value and an error")
 	ErrNotAFunction        = errors.New("not a function")
 	ErrInvalidArgsCount    = errors.New("invalid argument count")
 	ErrInvalidArg          = errors.New("invalid argument")
 	ErrClosureDoesNotExist = errors.New("closure does not exist")
+	ErrInvalidArgs         = errors.New("invalid arguments, first argument needs to be a context.Context")
 )
 
 type (
@@ -38,6 +40,14 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 		return nil, ErrInvalidReturn
 	}
 
+	if functionType.NumIn() < 1 {
+		return nil, ErrInvalidArgs
+	}
+
+	if !functionType.In(0).Implements(contextType) {
+		return nil, ErrInvalidArgs
+	}
+
 	return func(args ...interface{}) (interface{}, error) {
 		if len(args) != functionType.NumIn() {
 			return nil, ErrInvalidArgsCount
@@ -49,7 +59,12 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 				if argType.ConvertibleTo(functionType.In(i)) {
 					in[i] = reflect.ValueOf(arg).Convert(functionType.In(i))
 				} else {
-					return nil, ErrInvalidArg
+					// TODO: Drop this and the whole "there has to be a context in the callback function" requirementt
+					if functionType.In(i).Implements(contextType) {
+						in[i] = reflect.ValueOf(context.Background())
+					} else {
+						return nil, ErrInvalidArg
+					}
 				}
 			} else {
 				in[i] = reflect.ValueOf(arg)
