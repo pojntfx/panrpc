@@ -19,6 +19,7 @@ It enables you to ...
 - **Call remote functions transparently**: dudirekta makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
 - **Call functions on the client from the server**: Unlike most RPC frameworks, dudirekta allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
 - **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser`, you can build services using dudirekta on pretty much any transport layer such as TCP, WebSockets or even WebRTC, meaning it can run in the browser!
+- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, dudirekta can use closures and callbacks transparently, just like a local function call!
 
 ## Installation
 
@@ -28,7 +29,7 @@ You can add dudirekta to your Go project by running the following:
 $ go get github.com/pojntfx/dudirekta/...@latest
 ```
 
-There is also a minimal TypeScript version for browser support; you can install it like so:
+There is also a minimal TypeScript version for browser support (without transparent support for closures); you can install it like so:
 
 ```shell
 $ npm i -s @pojntfx/dudirekta
@@ -194,13 +195,11 @@ Now you can call the functions exposed on the server from the client and vise ve
 ```go
 // server.go
 
-time.AfterFunc(time.Second*10, func() {
-	for _, peer := range registry.Peers() {
-		if err := peer.Println(ctx, "Hello, world!"); err != nil {
-			panic(err)
-		}
+for _, peer := range registry.Peers() {
+	if err := peer.Println(ctx, "Hello, world!"); err != nil {
+		panic(err)
 	}
-})
+}
 ```
 
 Or to call the `Increment` function exposed by the server on the client:
@@ -208,16 +207,114 @@ Or to call the `Increment` function exposed by the server on the client:
 ```go
 // client.go
 
-time.AfterFunc(time.Second*10, func() {
-	for _, peer := range registry.Peers() {
-		new, err := peer.Increment(ctx, 1)
+for _, peer := range registry.Peers() {
+	new, err := peer.Increment(ctx, 1)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Println(new)
+}
+```
+
+By passing the `Peers()` method to the local service itself, you can also access remote functions in the other direction:
+
+```go
+// server.go
+
+type local struct {
+	counter int64
+
+	Peers func() map[string]remote
+}
+
+func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
+	peerID := rpc.GetRemoteID(ctx)
+
+	for candidateIP, peer := range s.Peers() {
+		if candidateIP == peerID {
+			peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
+		}
+	}
+
+	return atomic.AddInt64(&s.counter, delta), nil
+}
+
+// In `main`:
+service := &local{}
+registry := rpc.NewRegistry(
+	service,
+	remote{},
+
+	time.Second*10,
+	context.Background(),
+	nil,
+)
+service.Peers = registry.Peers
+```
+
+### 6. Using Closures and Callbacks
+
+Because dudirekta is bidirectional, it is possible to pass closures and callbacks as function arguments, just like you would locally. For example, on the server:
+
+```go
+// server.go
+
+type local struct{}
+
+func (s *local) Iterate(
+	ctx context.Context,
+	length int,
+	onIteration func(i int, b string) (string, error),
+) (int, error) {
+	for i := 0; i < length; i++ {
+		rv, err := onIteration(i, "This is from the callee")
 		if err != nil {
-			panic(err)
+			return -1, err
 		}
 
-		log.Println(new)
+		log.Println("Closure returned:", rv)
 	}
-})
+
+	return length, nil
+}
+
+type remote struct{}
+```
+
+And the client:
+
+```go
+// client.go
+
+type local struct{}
+
+type remote struct {
+	Iterate func(
+		ctx context.Context,
+		length int,
+		onIteration func(i int, b string) (string, error),
+	) (int, error)
+}
+```
+
+When you call `peer.Iterate`, you can now pass in a closure:
+
+```go
+// client.go
+
+for _, peer := range registry.Peers() {
+	length, err := Iterate(peer, ctx, 5, func(i int, b string) (string, error) {
+		log.Println("In iteration", i, b)
+
+		return "This is from the caller", nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	log.Println(length)
+}
 ```
 
 🚀 That's it! We can't wait to see what you're going to build with dudirekta.
@@ -236,6 +333,12 @@ To make getting started with dudirekta easier, take a look at the following exam
   - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
 - **WebRTC Transport**
   - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
+- **Callbacks**
+  - [Callbacks Demo Server](./cmd/dudirekta-example-callbacks-callee/main.go)
+  - [Callbacks Demo Client](./cmd/dudirekta-example-callbacks-caller/main.go)
+- **Closures**
+  - [Closures Demo Server](./cmd/dudirekta-example-closures-callee/main.go)
+  - [Closures Demo Client](./cmd/dudirekta-example-closures-caller/main.go)
 
 ### Protocol
 
