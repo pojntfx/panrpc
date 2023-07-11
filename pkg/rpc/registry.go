@@ -29,7 +29,7 @@ var (
 type key int
 
 const (
-	remoteIDContextKey key = iota
+	RemoteIDContextKey key = iota
 
 	DefaultResponseBufferLen = 1024
 )
@@ -47,7 +47,7 @@ type wrappedChild struct {
 }
 
 func GetRemoteID(ctx context.Context) string {
-	return ctx.Value(remoteIDContextKey).(string)
+	return ctx.Value(RemoteIDContextKey).(string)
 }
 
 type Options struct {
@@ -360,7 +360,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 					for i := 0; i < function.Type().NumIn(); i++ {
 						if i == 0 {
 							// Add the context to the function arguments
-							args = append(args, reflect.ValueOf(context.WithValue(r.ctx, remoteIDContextKey, remoteID)))
+							args = append(args, reflect.ValueOf(context.WithValue(r.ctx, RemoteIDContextKey, remoteID)))
 
 							continue
 						}
