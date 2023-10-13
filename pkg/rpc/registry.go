@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"reflect"
 	"strings"
 	"sync"
@@ -149,6 +150,8 @@ func (r Registry[R]) makeRPC(
 				case <-t.C:
 					t.Stop()
 
+					log.Println("Timed out RPC", name, callID)
+
 					res <- response{"", nil, ErrCallTimedOut, true}
 
 					return
@@ -156,6 +159,8 @@ func (r Registry[R]) makeRPC(
 					if !ok {
 						return
 					}
+
+					log.Println("Received response", name, callID)
 
 					if msg.id == callID {
 						res <- msg
@@ -166,11 +171,15 @@ func (r Registry[R]) makeRPC(
 			}
 		}()
 
+		log.Println("Sending request", name, callID)
+
 		if _, err := conn.Write(b); err != nil {
 			errs <- err
 
 			return
 		}
+
+		log.Println("Sent request", name, callID)
 
 		returnValues := []reflect.Value{}
 		select {
@@ -291,6 +300,8 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 		d := json.NewDecoder(conn)
 
 		for {
+			log.Println("Receiving requests")
+
 			var res []json.RawMessage
 			if err := d.Decode(&res); err != nil {
 				errs <- err
@@ -326,6 +337,8 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 
 						return
 					}
+
+					log.Println("Received request", functionName, callID)
 
 					var functionArgs []json.RawMessage
 					if err := json.Unmarshal(res[3], &functionArgs); err != nil {
@@ -438,11 +451,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 								return
 							}
 
+							log.Println("Sending response", functionName, callID)
+
 							if _, err := conn.Write(b); err != nil {
 								errs <- err
 
 								return
 							}
+
+							log.Println("Sent response", functionName, callID)
 						case 1:
 							if res[0].Type().Implements(errorType) && !res[0].IsNil() {
 								b, err := json.Marshal([]interface{}{false, callID, nil, res[0].Interface().(error).Error()})
@@ -452,11 +469,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
+								log.Println("Sending response", functionName, callID)
+
 								if _, err := conn.Write(b); err != nil {
 									errs <- err
 
 									return
 								}
+
+								log.Println("Sent response", functionName, callID)
 							} else {
 								v, err := json.Marshal(res[0].Interface())
 								if err != nil {
@@ -472,11 +493,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
+								log.Println("Sending response", functionName, callID)
+
 								if _, err := conn.Write(b); err != nil {
 									errs <- err
 
 									return
 								}
+
+								log.Println("Sent response", functionName, callID)
 							}
 						case 2:
 							v, err := json.Marshal(res[0].Interface())
@@ -494,11 +519,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
+								log.Println("Sending response", functionName, callID)
+
 								if _, err := conn.Write(b); err != nil {
 									errs <- err
 
 									return
 								}
+
+								log.Println("Sent response", functionName, callID)
 							} else {
 								b, err := json.Marshal([]interface{}{false, callID, json.RawMessage(string(v)), res[1].Interface().(error).Error()})
 								if err != nil {
@@ -507,11 +536,15 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
+								log.Println("Sending response", functionName, callID)
+
 								if _, err := conn.Write(b); err != nil {
 									errs <- err
 
 									return
 								}
+
+								log.Println("Sent response", functionName, callID)
 							}
 						}
 					}()

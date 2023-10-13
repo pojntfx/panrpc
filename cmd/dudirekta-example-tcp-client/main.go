@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
@@ -60,46 +58,18 @@ func main() {
 	)
 
 	go func() {
-		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Increment remote counter by one
-- b: Decrement remote counter by one`)
-
-		stdin := bufio.NewReader(os.Stdin)
-
 		for {
-			line, err := stdin.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-
 			for peerID, peer := range registry.Peers() {
 				log.Println("Calling functions for peer with ID", peerID)
 
-				switch line {
-				case "a\n":
-					new, err := peer.Increment(ctx, 1)
-					if err != nil {
-						log.Println("Got error for Increment func:", err)
-
-						continue
-					}
-
-					log.Println(new)
-				case "b\n":
-					new, err := peer.Increment(ctx, -1)
-					if err != nil {
-						log.Println("Got error for Increment func:", err)
-
-						continue
-					}
-
-					log.Println(new)
-				default:
-					log.Printf("Unknown letter %v, ignoring input", line)
+				_, err := peer.Increment(ctx, 1)
+				if err != nil {
+					log.Println("Got error for Increment func:", err)
 
 					continue
 				}
+
+				time.Sleep(time.Millisecond * 10)
 			}
 		}
 	}()
