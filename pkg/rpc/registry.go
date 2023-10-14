@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -97,8 +96,9 @@ func (r Registry[R]) makeRPC(
 	name string,
 	functionType reflect.Type,
 	errs chan error,
-	conn io.ReadWriteCloser,
 	responseResolver *broadcast.Relay[response],
+
+	write func(b []byte) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 		callID := uuid.NewString()
@@ -166,7 +166,7 @@ func (r Registry[R]) makeRPC(
 			}
 		}()
 
-		if _, err := conn.Write(b); err != nil {
+		if err := write(b); err != nil {
 			errs <- err
 
 			return
@@ -217,7 +217,10 @@ func (r Registry[R]) makeRPC(
 	})
 }
 
-func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
+func (r Registry[R]) Link(
+	write func(b []byte) error,
+	read func() ([]byte, error),
+) error {
 	responseResolver := broadcast.NewRelay[response]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
@@ -263,8 +266,8 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 					functionField.Name,
 					functionType,
 					errs,
-					conn,
 					responseResolver,
+					write,
 				))
 		}
 
@@ -288,11 +291,16 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 			r.remotesLock.Unlock()
 		}()
 
-		d := json.NewDecoder(conn)
-
 		for {
+			b, err := read()
+			if err != nil {
+				errs <- err
+
+				return
+			}
+
 			var res []json.RawMessage
-			if err := d.Decode(&res); err != nil {
+			if err := json.Unmarshal(b, &res); err != nil {
 				errs <- err
 
 				return
@@ -379,8 +387,8 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									"CallClosure",
 									reflect.TypeOf(callClosureType(nil)),
 									errs,
-									conn,
 									responseResolver,
+									write,
 								)
 
 								rpcArgs := []interface{}{}
@@ -438,7 +446,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 								return
 							}
 
-							if _, err := conn.Write(b); err != nil {
+							if err := write(b); err != nil {
 								errs <- err
 
 								return
@@ -452,7 +460,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
-								if _, err := conn.Write(b); err != nil {
+								if err := write(b); err != nil {
 									errs <- err
 
 									return
@@ -472,7 +480,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
-								if _, err := conn.Write(b); err != nil {
+								if err := write(b); err != nil {
 									errs <- err
 
 									return
@@ -494,7 +502,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
-								if _, err := conn.Write(b); err != nil {
+								if err := write(b); err != nil {
 									errs <- err
 
 									return
@@ -507,7 +515,7 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 									return
 								}
 
-								if _, err := conn.Write(b); err != nil {
+								if err := write(b); err != nil {
 									errs <- err
 
 									return
@@ -527,7 +535,6 @@ func (r Registry[R]) Link(conn io.ReadWriteCloser) error {
 				return
 			}
 
-			var err error
 			if strings.TrimSpace(errMsg) != "" {
 				err = errors.New(errMsg)
 			}
