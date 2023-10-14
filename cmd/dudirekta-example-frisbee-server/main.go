@@ -17,8 +17,12 @@ import (
 	"github.com/pojntfx/r3map/pkg/utils"
 )
 
+type Key int
+
 const (
 	DUDIREKTA = uint16(10)
+
+	ConnIDKey Key = iota
 )
 
 type local struct {
@@ -104,8 +108,7 @@ func main() {
 	packets := map[string]chan []byte{}
 
 	handlers[DUDIREKTA] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
-
-		connID := ctx.Value("connID").(string)
+		connID := ctx.Value(ConnIDKey).(string)
 
 		packetsLock.Lock()
 		p, ok := packets[connID]
@@ -116,7 +119,9 @@ func main() {
 		}
 		packetsLock.Unlock()
 
-		p <- incoming.Content.Bytes()
+		b := make([]byte, incoming.Metadata.ContentLength)
+		copy(b, incoming.Content.Bytes())
+		p <- b
 
 		return
 	}
@@ -177,7 +182,7 @@ func main() {
 			}
 		}()
 
-		return context.WithValue(ctx, "connID", connID)
+		return context.WithValue(ctx, ConnIDKey, connID)
 	}
 
 	log.Println("Listening on", *laddr)

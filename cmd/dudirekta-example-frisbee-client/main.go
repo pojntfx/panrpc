@@ -114,7 +114,9 @@ func main() {
 
 	packets := make(chan []byte)
 	handlers[DUDIREKTA] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
-		packets <- incoming.Content.Bytes()
+		b := make([]byte, incoming.Metadata.ContentLength)
+		copy(b, incoming.Content.Bytes())
+		packets <- b
 
 		return
 	}
