@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pojntfx/dudirekta/pkg/utils"
 	"github.com/teivah/broadcast"
 )
 
@@ -400,7 +401,12 @@ func (r Registry[R]) Link(
 									rpcArgs = append(rpcArgs, args[i].Interface())
 								}
 
-								rcpRv := rpc.Call([]reflect.Value{reflect.ValueOf(r.ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+								rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(r.ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+								if err != nil {
+									errs <- err
+
+									return
+								}
 
 								rv := []reflect.Value{}
 								if functionType.NumOut() == 1 {
@@ -439,7 +445,12 @@ func (r Registry[R]) Link(
 					}
 
 					go func() {
-						res := function.Call(args)
+						res, err := utils.Call(function, args)
+						if err != nil {
+							errs <- err
+
+							return
+						}
 
 						switch len(res) {
 						case 0:
