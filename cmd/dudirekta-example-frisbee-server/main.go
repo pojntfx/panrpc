@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"log"
 	"net"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,7 +18,8 @@ import (
 type Key int
 
 const (
-	DUDIREKTA = uint16(10)
+	DUDIREKTA_REQUESTS  = uint16(10)
+	DUDIREKTA_RESPONSES = uint16(11)
 
 	ConnIDKey Key = iota
 )
@@ -71,30 +70,10 @@ func main() {
 	)
 
 	go func() {
-		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Print "Hello, world!"`)
-
-		stdin := bufio.NewReader(os.Stdin)
-
 		for {
-			line, err := stdin.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
-
-				switch line {
-				case "a\n":
-					if err := peer.Println(ctx, "Hello, world!"); err != nil {
-						log.Println("Got error for Println func:", err)
-
-						continue
-					}
-				default:
-					log.Printf("Unknown letter %v, ignoring input", line)
+			for _, peer := range registry.Peers() {
+				if err := peer.Println(ctx, "Hello, world!"); err != nil {
+					log.Println("Got error for Println func:", err)
 
 					continue
 				}
@@ -104,20 +83,42 @@ func main() {
 
 	handlers := make(frisbee.HandlerTable)
 
-	var packetsLock sync.Mutex
-	packets := map[string]chan []byte{}
+	var requestPacketsLock sync.Mutex
+	requestPackets := map[string]chan []byte{}
 
-	handlers[DUDIREKTA] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
+	handlers[DUDIREKTA_REQUESTS] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
 		connID := ctx.Value(ConnIDKey).(string)
 
-		packetsLock.Lock()
-		p, ok := packets[connID]
+		requestPacketsLock.Lock()
+		p, ok := requestPackets[connID]
 		if !ok {
 			p = make(chan []byte)
 
-			packets[connID] = p
+			requestPackets[connID] = p
 		}
-		packetsLock.Unlock()
+		requestPacketsLock.Unlock()
+
+		b := make([]byte, incoming.Metadata.ContentLength)
+		copy(b, incoming.Content.Bytes())
+		p <- b
+
+		return
+	}
+
+	var responsePacketsLock sync.Mutex
+	responsePackets := map[string]chan []byte{}
+
+	handlers[DUDIREKTA_RESPONSES] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
+		connID := ctx.Value(ConnIDKey).(string)
+
+		responsePacketsLock.Lock()
+		p, ok := responsePackets[connID]
+		if !ok {
+			p = make(chan []byte)
+
+			responsePackets[connID] = p
+		}
+		responsePacketsLock.Unlock()
 
 		b := make([]byte, incoming.Metadata.ContentLength)
 		copy(b, incoming.Content.Bytes())
@@ -135,15 +136,25 @@ func main() {
 	server.SetOnClosed(func(a *frisbee.Async, err error) {
 		connID := a.RemoteAddr().String()
 
-		packetsLock.Lock()
-		defer packetsLock.Unlock()
+		requestPacketsLock.Lock()
+		defer requestPacketsLock.Unlock()
 
-		p, ok := packets[connID]
+		rqp, ok := requestPackets[connID]
 		if !ok {
 			return
 		}
 
-		close(p)
+		close(rqp)
+
+		responsePacketsLock.Lock()
+		defer responsePacketsLock.Unlock()
+
+		rsp, ok := responsePackets[connID]
+		if !ok {
+			return
+		}
+
+		close(rsp)
 	})
 
 	server.ConnContext = func(ctx context.Context, a *frisbee.Async) context.Context {
@@ -154,21 +165,48 @@ func main() {
 				func(b []byte) error {
 					pkg := packet.Get()
 
-					pkg.Metadata.Operation = DUDIREKTA
+					pkg.Metadata.Operation = DUDIREKTA_REQUESTS
 					pkg.Content.Write(b)
 					pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
 
 					return a.WritePacket(pkg)
 				},
+				func(b []byte) error {
+					pkg := packet.Get()
+
+					pkg.Metadata.Operation = DUDIREKTA_RESPONSES
+					pkg.Content.Write(b)
+					pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
+
+					return a.WritePacket(pkg)
+				},
+
 				func() ([]byte, error) {
-					packetsLock.Lock()
-					p, ok := packets[connID]
+					requestPacketsLock.Lock()
+					p, ok := requestPackets[connID]
 					if !ok {
 						p = make(chan []byte)
 
-						packets[connID] = p
+						requestPackets[connID] = p
 					}
-					packetsLock.Unlock()
+					requestPacketsLock.Unlock()
+
+					b, ok := <-p
+					if !ok {
+						return []byte{}, net.ErrClosed
+					}
+
+					return b, nil
+				},
+				func() ([]byte, error) {
+					responsePacketsLock.Lock()
+					p, ok := responsePackets[connID]
+					if !ok {
+						p = make(chan []byte)
+
+						responsePackets[connID] = p
+					}
+					responsePacketsLock.Unlock()
 
 					b, ok := <-p
 					if !ok {

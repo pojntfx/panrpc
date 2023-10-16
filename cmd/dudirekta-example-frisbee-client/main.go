@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"github.com/loopholelabs/frisbee-go"
@@ -17,7 +15,8 @@ import (
 )
 
 const (
-	DUDIREKTA = uint16(10)
+	DUDIREKTA_REQUESTS  = uint16(10)
+	DUDIREKTA_RESPONSES = uint16(11)
 )
 
 type local struct{}
@@ -66,57 +65,45 @@ func main() {
 	)
 
 	go func() {
-		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Increment remote counter by one
-- b: Decrement remote counter by one`)
-
-		stdin := bufio.NewReader(os.Stdin)
-
 		for {
-			line, err := stdin.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
-
-				switch line {
-				case "a\n":
-					new, err := peer.Increment(ctx, 1)
-					if err != nil {
-						log.Println("Got error for Increment func:", err)
-
-						continue
-					}
-
-					log.Println(new)
-				case "b\n":
-					new, err := peer.Increment(ctx, -1)
-					if err != nil {
-						log.Println("Got error for Increment func:", err)
-
-						continue
-					}
-
-					log.Println(new)
-				default:
-					log.Printf("Unknown letter %v, ignoring input", line)
+			for _, peer := range registry.Peers() {
+				new, err := peer.Increment(ctx, 1)
+				if err != nil {
+					log.Println("Got error for Increment func:", err)
 
 					continue
 				}
+
+				log.Println(new)
+
+				new, err = peer.Increment(ctx, -1)
+				if err != nil {
+					log.Println("Got error for Increment func:", err)
+
+					continue
+				}
+
+				log.Println(new)
 			}
 		}
 	}()
 
 	handlers := make(frisbee.HandlerTable)
 
-	packets := make(chan []byte)
-	handlers[DUDIREKTA] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
+	requestPackets := make(chan []byte)
+	handlers[DUDIREKTA_REQUESTS] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
 		b := make([]byte, incoming.Metadata.ContentLength)
 		copy(b, incoming.Content.Bytes())
-		packets <- b
+		requestPackets <- b
+
+		return
+	}
+
+	responsePackets := make(chan []byte)
+	handlers[DUDIREKTA_RESPONSES] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
+		b := make([]byte, incoming.Metadata.ContentLength)
+		copy(b, incoming.Content.Bytes())
+		responsePackets <- b
 
 		return
 	}
@@ -138,14 +125,32 @@ func main() {
 			func(b []byte) error {
 				pkg := packet.Get()
 
-				pkg.Metadata.Operation = DUDIREKTA
+				pkg.Metadata.Operation = DUDIREKTA_REQUESTS
 				pkg.Content.Write(b)
 				pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
 
 				return client.WritePacket(pkg)
 			},
+			func(b []byte) error {
+				pkg := packet.Get()
+
+				pkg.Metadata.Operation = DUDIREKTA_RESPONSES
+				pkg.Content.Write(b)
+				pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
+
+				return client.WritePacket(pkg)
+			},
+
 			func() ([]byte, error) {
-				b, ok := <-packets
+				b, ok := <-requestPackets
+				if !ok {
+					return []byte{}, net.ErrClosed
+				}
+
+				return b, nil
+			},
+			func() ([]byte, error) {
+				b, ok := <-responsePackets
 				if !ok {
 					return []byte{}, net.ErrClosed
 				}
@@ -159,5 +164,6 @@ func main() {
 
 	<-client.CloseChannel()
 
-	close(packets)
+	close(requestPackets)
+	close(responsePackets)
 }

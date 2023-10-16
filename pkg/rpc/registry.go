@@ -98,12 +98,12 @@ func (r Registry[R]) makeRPC(
 	errs chan error,
 	responseResolver *broadcast.Relay[response],
 
-	write func(b []byte) error,
+	writeRequest func(b []byte) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 		callID := uuid.NewString()
 
-		cmd := []any{true, callID, name}
+		cmd := []any{callID, name}
 
 		cmdArgs := []any{}
 		for i, arg := range args {
@@ -166,7 +166,7 @@ func (r Registry[R]) makeRPC(
 			}
 		}()
 
-		if err := write(b); err != nil {
+		if err := writeRequest(b); err != nil {
 			errs <- err
 
 			return
@@ -218,8 +218,10 @@ func (r Registry[R]) makeRPC(
 }
 
 func (r Registry[R]) Link(
-	write func(b []byte) error,
-	read func() ([]byte, error),
+	writeRequest,
+	writeResponse func(b []byte) error,
+	readRequest,
+	readResponse func() ([]byte, error),
 ) error {
 	responseResolver := broadcast.NewRelay[response]()
 
@@ -267,7 +269,7 @@ func (r Registry[R]) Link(
 					functionType,
 					errs,
 					responseResolver,
-					write,
+					writeRequest,
 				))
 		}
 
@@ -291,52 +293,50 @@ func (r Registry[R]) Link(
 			r.remotesLock.Unlock()
 		}()
 
-		for {
-			b, err := read()
-			if err != nil {
-				errs <- err
+		var wg sync.WaitGroup
 
-				return
-			}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-			var res []json.RawMessage
-			if err := json.Unmarshal(b, &res); err != nil {
-				errs <- err
+			for {
+				b, err := readRequest()
+				if err != nil {
+					errs <- err
 
-				return
-			}
+					return
+				}
 
-			if len(res) != 4 {
-				errs <- ErrInvalidRequest
+				var res []json.RawMessage
+				if err := json.Unmarshal(b, &res); err != nil {
+					errs <- err
 
-				return
-			}
+					return
+				}
 
-			var isCall bool
-			if err := json.Unmarshal(res[0], &isCall); err != nil {
-				errs <- err
+				if len(res) != 3 {
+					errs <- ErrInvalidRequest
 
-				return
-			}
+					return
+				}
 
-			var callID string
-			if err := json.Unmarshal(res[1], &callID); err != nil {
-				errs <- err
+				var callID string
+				if err := json.Unmarshal(res[0], &callID); err != nil {
+					errs <- err
 
-				return
-			}
+					return
+				}
 
-			if isCall {
 				go func() {
 					var functionName string
-					if err := json.Unmarshal(res[2], &functionName); err != nil {
+					if err := json.Unmarshal(res[1], &functionName); err != nil {
 						errs <- err
 
 						return
 					}
 
 					var functionArgs []json.RawMessage
-					if err := json.Unmarshal(res[3], &functionArgs); err != nil {
+					if err := json.Unmarshal(res[2], &functionArgs); err != nil {
 						errs <- err
 
 						return
@@ -388,7 +388,7 @@ func (r Registry[R]) Link(
 									reflect.TypeOf(callClosureType(nil)),
 									errs,
 									responseResolver,
-									write,
+									writeRequest,
 								)
 
 								rpcArgs := []interface{}{}
@@ -439,28 +439,28 @@ func (r Registry[R]) Link(
 
 						switch len(res) {
 						case 0:
-							b, err := json.Marshal([]interface{}{false, callID, nil, ""})
+							b, err := json.Marshal([]interface{}{callID, nil, ""})
 							if err != nil {
 								errs <- err
 
 								return
 							}
 
-							if err := write(b); err != nil {
+							if err := writeResponse(b); err != nil {
 								errs <- err
 
 								return
 							}
 						case 1:
 							if res[0].Type().Implements(errorType) && !res[0].IsNil() {
-								b, err := json.Marshal([]interface{}{false, callID, nil, res[0].Interface().(error).Error()})
+								b, err := json.Marshal([]interface{}{callID, nil, res[0].Interface().(error).Error()})
 								if err != nil {
 									errs <- err
 
 									return
 								}
 
-								if err := write(b); err != nil {
+								if err := writeResponse(b); err != nil {
 									errs <- err
 
 									return
@@ -473,14 +473,14 @@ func (r Registry[R]) Link(
 									return
 								}
 
-								b, err := json.Marshal([]interface{}{false, callID, json.RawMessage(string(v)), ""})
+								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
 								if err != nil {
 									errs <- err
 
 									return
 								}
 
-								if err := write(b); err != nil {
+								if err := writeResponse(b); err != nil {
 									errs <- err
 
 									return
@@ -495,27 +495,27 @@ func (r Registry[R]) Link(
 							}
 
 							if res[1].Interface() == nil {
-								b, err := json.Marshal([]interface{}{false, callID, json.RawMessage(string(v)), ""})
+								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
 								if err != nil {
 									errs <- err
 
 									return
 								}
 
-								if err := write(b); err != nil {
+								if err := writeResponse(b); err != nil {
 									errs <- err
 
 									return
 								}
 							} else {
-								b, err := json.Marshal([]interface{}{false, callID, json.RawMessage(string(v)), res[1].Interface().(error).Error()})
+								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), res[1].Interface().(error).Error()})
 								if err != nil {
 									errs <- err
 
 									return
 								}
 
-								if err := write(b); err != nil {
+								if err := writeResponse(b); err != nil {
 									errs <- err
 
 									return
@@ -524,23 +524,57 @@ func (r Registry[R]) Link(
 						}
 					}()
 				}()
-
-				continue
 			}
+		}()
 
-			var errMsg string
-			if err := json.Unmarshal(res[3], &errMsg); err != nil {
-				errs <- err
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-				return
+			for {
+				b, err := readResponse()
+				if err != nil {
+					errs <- err
+
+					return
+				}
+
+				var res []json.RawMessage
+				if err := json.Unmarshal(b, &res); err != nil {
+					errs <- err
+
+					return
+				}
+
+				if len(res) != 3 {
+					errs <- ErrInvalidRequest
+
+					return
+				}
+
+				var callID string
+				if err := json.Unmarshal(res[0], &callID); err != nil {
+					errs <- err
+
+					return
+				}
+
+				var errMsg string
+				if err := json.Unmarshal(res[2], &errMsg); err != nil {
+					errs <- err
+
+					return
+				}
+
+				if strings.TrimSpace(errMsg) != "" {
+					err = errors.New(errMsg)
+				}
+
+				responseResolver.Broadcast(response{callID, res[1], err, false})
 			}
+		}()
 
-			if strings.TrimSpace(errMsg) != "" {
-				err = errors.New(errMsg)
-			}
-
-			responseResolver.Broadcast(response{callID, res[2], err, false})
-		}
+		wg.Wait()
 	}()
 
 	return <-errs
