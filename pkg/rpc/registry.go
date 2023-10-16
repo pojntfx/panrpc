@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -21,7 +20,6 @@ var (
 	ErrInvalidReturn = errors.New("invalid return, can only return an error or a value and an error")
 	ErrInvalidArgs   = errors.New("invalid arguments, first argument needs to be a context.Context")
 
-	ErrInvalidRequest        = errors.New("invalid request")
 	ErrCannotCallNonFunction = errors.New("can not call non function")
 	ErrCallTimedOut          = errors.New("call timed out")
 )
@@ -34,9 +32,21 @@ const (
 	DefaultResponseBufferLen = 1024
 )
 
-type response struct {
+type Request struct {
+	Call     string   `json:"call"`
+	Function string   `json:"function"`
+	Args     [][]byte `json:"args"`
+}
+
+type Response struct {
+	Call  string `json:"call"`
+	Value []byte `json:"value"`
+	Err   string `json:"err"`
+}
+
+type callResponse struct {
 	id      string
-	value   json.RawMessage
+	value   []byte
 	err     error
 	timeout bool
 }
@@ -97,16 +107,22 @@ func (r Registry[R]) makeRPC(
 	name string,
 	functionType reflect.Type,
 	errs chan error,
-	responseResolver *broadcast.Relay[response],
+	responseResolver *broadcast.Relay[callResponse],
 
 	writeRequest func(b []byte) error,
+
+	marshal func(v any) ([]byte, error),
+	unmarshal func(data []byte, v any) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 		callID := uuid.NewString()
 
-		cmd := []any{callID, name}
+		cmd := Request{
+			Call:     callID,
+			Function: name,
+			Args:     [][]byte{},
+		}
 
-		cmdArgs := []any{}
 		for i, arg := range args {
 			if i == 0 {
 				// Don't sent the context over the wire
@@ -123,14 +139,25 @@ func (r Registry[R]) makeRPC(
 				}
 				defer freeClosure()
 
-				cmdArgs = append(cmdArgs, closureID)
+				b, err := marshal(closureID)
+				if err != nil {
+					errs <- err
+
+					return
+				}
+				cmd.Args = append(cmd.Args, b)
 			} else {
-				cmdArgs = append(cmdArgs, arg.Interface())
+				b, err := marshal(arg.Interface())
+				if err != nil {
+					errs <- err
+
+					return
+				}
+				cmd.Args = append(cmd.Args, b)
 			}
 		}
-		cmd = append(cmd, cmdArgs)
 
-		b, err := json.Marshal(cmd)
+		b, err := marshal(cmd)
 		if err != nil {
 			errs <- err
 
@@ -143,14 +170,14 @@ func (r Registry[R]) makeRPC(
 		t := time.NewTimer(r.timeout)
 		defer t.Stop()
 
-		res := make(chan response)
+		res := make(chan callResponse)
 		go func() {
 			for {
 				select {
 				case <-t.C:
 					t.Stop()
 
-					res <- response{"", nil, ErrCallTimedOut, true}
+					res <- callResponse{"", nil, ErrCallTimedOut, true}
 
 					return
 				case msg, ok := <-l.Ch():
@@ -182,7 +209,7 @@ func (r Registry[R]) makeRPC(
 				if rawReturnValue.err != nil {
 					returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
 				} else if !functionType.Out(0).Implements(errorType) {
-					if err := json.Unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
+					if err := unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
 						errs <- err
 
 						return
@@ -195,7 +222,7 @@ func (r Registry[R]) makeRPC(
 				errReturnValue := reflect.New(functionType.Out(1))
 
 				if !rawReturnValue.timeout {
-					if err := json.Unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
+					if err := unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
 						errs <- err
 
 						return
@@ -221,10 +248,14 @@ func (r Registry[R]) makeRPC(
 func (r Registry[R]) Link(
 	writeRequest,
 	writeResponse func(b []byte) error,
+
 	readRequest,
 	readResponse func() ([]byte, error),
+
+	marshal func(v any) ([]byte, error),
+	unmarshal func(data []byte, v any) error,
 ) error {
-	responseResolver := broadcast.NewRelay[response]()
+	responseResolver := broadcast.NewRelay[callResponse]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
@@ -274,7 +305,11 @@ func (r Registry[R]) Link(
 					functionType,
 					errs,
 					responseResolver,
+
 					writeRequest,
+
+					marshal,
+					unmarshal,
 				))
 		}
 
@@ -312,49 +347,22 @@ func (r Registry[R]) Link(
 					return
 				}
 
-				var res []json.RawMessage
-				if err := json.Unmarshal(b, &res); err != nil {
-					errs <- err
-
-					return
-				}
-
-				if len(res) != 3 {
-					errs <- ErrInvalidRequest
-
-					return
-				}
-
-				var callID string
-				if err := json.Unmarshal(res[0], &callID); err != nil {
+				var req Request
+				if err := unmarshal(b, &req); err != nil {
 					errs <- err
 
 					return
 				}
 
 				go func() {
-					var functionName string
-					if err := json.Unmarshal(res[1], &functionName); err != nil {
-						errs <- err
-
-						return
-					}
-
-					var functionArgs []json.RawMessage
-					if err := json.Unmarshal(res[2], &functionArgs); err != nil {
-						errs <- err
-
-						return
-					}
-
 					function := reflect.
 						ValueOf(r.local.wrappee).
-						MethodByName(functionName)
+						MethodByName(req.Function)
 
 					if function.Kind() != reflect.Func {
 						function = reflect.
 							ValueOf(r.local.wrapper).
-							MethodByName(functionName)
+							MethodByName(req.Function)
 
 						if function.Kind() != reflect.Func {
 							errs <- ErrCannotCallNonFunction
@@ -363,7 +371,7 @@ func (r Registry[R]) Link(
 						}
 					}
 
-					if function.Type().NumIn() != len(functionArgs)+1 {
+					if function.Type().NumIn() != len(req.Args)+1 {
 						errs <- ErrInvalidArgs
 
 						return
@@ -382,7 +390,7 @@ func (r Registry[R]) Link(
 						if functionType.Kind() == reflect.Func {
 							arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 								closureID := ""
-								if err := json.Unmarshal(functionArgs[i-2], &closureID); err != nil {
+								if err := unmarshal(req.Args[i-2], &closureID); err != nil {
 									errs <- err
 
 									return
@@ -393,7 +401,11 @@ func (r Registry[R]) Link(
 									reflect.TypeOf(callClosureType(nil)),
 									errs,
 									responseResolver,
+
 									writeRequest,
+
+									marshal,
+									unmarshal,
 								)
 
 								rpcArgs := []interface{}{}
@@ -434,7 +446,7 @@ func (r Registry[R]) Link(
 						} else {
 							arg := reflect.New(functionType)
 
-							if err := json.Unmarshal(functionArgs[i-1], arg.Interface()); err != nil {
+							if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
 								errs <- err
 
 								return
@@ -454,7 +466,11 @@ func (r Registry[R]) Link(
 
 						switch len(res) {
 						case 0:
-							b, err := json.Marshal([]interface{}{callID, nil, ""})
+							b, err := marshal(Response{
+								Call:  req.Call,
+								Value: nil,
+								Err:   "",
+							})
 							if err != nil {
 								errs <- err
 
@@ -468,7 +484,11 @@ func (r Registry[R]) Link(
 							}
 						case 1:
 							if res[0].Type().Implements(errorType) && !res[0].IsNil() {
-								b, err := json.Marshal([]interface{}{callID, nil, res[0].Interface().(error).Error()})
+								b, err := marshal(Response{
+									Call:  req.Call,
+									Value: nil,
+									Err:   res[0].Interface().(error).Error(),
+								})
 								if err != nil {
 									errs <- err
 
@@ -481,14 +501,18 @@ func (r Registry[R]) Link(
 									return
 								}
 							} else {
-								v, err := json.Marshal(res[0].Interface())
+								v, err := marshal(res[0].Interface())
 								if err != nil {
 									errs <- err
 
 									return
 								}
 
-								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
+								b, err := marshal(Response{
+									Call:  req.Call,
+									Value: v,
+									Err:   "",
+								})
 								if err != nil {
 									errs <- err
 
@@ -502,7 +526,7 @@ func (r Registry[R]) Link(
 								}
 							}
 						case 2:
-							v, err := json.Marshal(res[0].Interface())
+							v, err := marshal(res[0].Interface())
 							if err != nil {
 								errs <- err
 
@@ -510,7 +534,11 @@ func (r Registry[R]) Link(
 							}
 
 							if res[1].Interface() == nil {
-								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), ""})
+								b, err := marshal(Response{
+									Call:  req.Call,
+									Value: v,
+									Err:   "",
+								})
 								if err != nil {
 									errs <- err
 
@@ -523,7 +551,11 @@ func (r Registry[R]) Link(
 									return
 								}
 							} else {
-								b, err := json.Marshal([]interface{}{callID, json.RawMessage(string(v)), res[1].Interface().(error).Error()})
+								b, err := marshal(Response{
+									Call:  req.Call,
+									Value: v,
+									Err:   res[1].Interface().(error).Error(),
+								})
 								if err != nil {
 									errs <- err
 
@@ -554,38 +586,18 @@ func (r Registry[R]) Link(
 					return
 				}
 
-				var res []json.RawMessage
-				if err := json.Unmarshal(b, &res); err != nil {
+				var res Response
+				if err := unmarshal(b, &res); err != nil {
 					errs <- err
 
 					return
 				}
 
-				if len(res) != 3 {
-					errs <- ErrInvalidRequest
-
-					return
+				if strings.TrimSpace(res.Err) != "" {
+					err = errors.New(res.Err)
 				}
 
-				var callID string
-				if err := json.Unmarshal(res[0], &callID); err != nil {
-					errs <- err
-
-					return
-				}
-
-				var errMsg string
-				if err := json.Unmarshal(res[2], &errMsg); err != nil {
-					errs <- err
-
-					return
-				}
-
-				if strings.TrimSpace(errMsg) != "" {
-					err = errors.New(errMsg)
-				}
-
-				responseResolver.Broadcast(response{callID, res[1], err, false})
+				responseResolver.Broadcast(callResponse{res.Call, res.Value, err, false})
 			}
 		}()
 

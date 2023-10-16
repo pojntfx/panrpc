@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -157,6 +158,9 @@ func main() {
 
 				return b, nil
 			},
+
+			json.Marshal,
+			json.Unmarshal,
 		); err != nil && !utils.IsClosedErr(err) {
 			panic(err)
 		}
