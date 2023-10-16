@@ -227,7 +227,11 @@ func (r Registry[R]) Link(
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
-	errs := make(chan error)
+	// It is possible that both `readRequest` and `readResponse` are closed at the same time,
+	// but both need return in order for the `wg` to return on `Wait()`; by buffering here,
+	// we make sure that in this case the first error message gets returned, the second one gets
+	// written to the buffer, and the `Wait()` returns.
+	errs := make(chan error, 1)
 
 	go func() {
 		for i := 0; i < remote.NumField(); i++ {
