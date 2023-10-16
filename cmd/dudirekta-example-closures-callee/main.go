@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -90,7 +91,13 @@ func main() {
 						}
 					}()
 
-					if err := registry.Link(conn); err != nil {
+					if err := registry.LinkStream(
+						json.NewEncoder(conn).Encode,
+						json.NewDecoder(conn).Decode,
+
+						json.Marshal,
+						json.Unmarshal,
+					); err != nil {
 						panic(err)
 					}
 				}()
@@ -105,7 +112,13 @@ func main() {
 
 		log.Println("Connected to", conn.RemoteAddr())
 
-		if err := registry.Link(conn); err != nil {
+		if err := registry.LinkStream(
+			json.NewEncoder(conn).Encode,
+			json.NewDecoder(conn).Decode,
+
+			json.Marshal,
+			json.Unmarshal,
+		); err != nil {
 			panic(err)
 		}
 	}

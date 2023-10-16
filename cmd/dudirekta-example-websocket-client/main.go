@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -152,7 +153,13 @@ func main() {
 				defer conn.Close()
 
 				go func() {
-					if err := registry.Link(conn); err != nil {
+					if err := registry.LinkStream(
+						json.NewEncoder(conn).Encode,
+						json.NewDecoder(conn).Decode,
+
+						json.Marshal,
+						json.Unmarshal,
+					); err != nil {
 						errs <- err
 
 						return
@@ -181,7 +188,13 @@ func main() {
 
 		log.Println("Connected to", *addr)
 
-		if err := registry.Link(conn); err != nil {
+		if err := registry.LinkStream(
+			json.NewEncoder(conn).Encode,
+			json.NewDecoder(conn).Decode,
+
+			json.Marshal,
+			json.Unmarshal,
+		); err != nil {
 			panic(err)
 		}
 	}

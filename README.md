@@ -164,7 +164,13 @@ for {
 				}
 			}()
 
-			if err := registry.Link(conn); err != nil {
+			if err := registry.LinkStream(
+			json.NewEncoder(conn).Encode,
+			json.NewDecoder(conn).Decode,
+
+			json.Marshal,
+			json.Unmarshal,
+		); err != nil {
 				panic(err)
 			}
 		}()
@@ -183,7 +189,13 @@ if err != nil {
 }
 defer conn.Close()
 
-if err := registry.Link(conn); err != nil {
+if err := registry.LinkStream(
+			json.NewEncoder(conn).Encode,
+			json.NewDecoder(conn).Decode,
+
+			json.Marshal,
+			json.Unmarshal,
+		); err != nil {
 	panic(err)
 }
 ```

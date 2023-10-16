@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -217,7 +218,13 @@ func main() {
 					}
 				}()
 
-				if err := registry.Link(peer.Conn); err != nil {
+				if err := registry.LinkStream(
+					json.NewEncoder(peer.Conn).Encode,
+					json.NewDecoder(peer.Conn).Decode,
+
+					json.Marshal,
+					json.Unmarshal,
+				); err != nil {
 					panic(err)
 				}
 			}()

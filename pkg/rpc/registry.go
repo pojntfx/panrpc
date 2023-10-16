@@ -32,6 +32,11 @@ const (
 	DefaultResponseBufferLen = 1024
 )
 
+type Message struct {
+	Request  *[]byte
+	Response *[]byte
+}
+
 type Request struct {
 	Call     string   `json:"call"`
 	Function string   `json:"function"`
@@ -245,7 +250,76 @@ func (r Registry[R]) makeRPC(
 	})
 }
 
-func (r Registry[R]) Link(
+func (r Registry[R]) LinkStream(
+	encode func(v any) error,
+	decode func(v any) error,
+
+	marshal func(v any) ([]byte, error),
+	unmarshal func(data []byte, v any) error,
+) error {
+	var (
+		decodeDone = make(chan struct{})
+		decodeErr  error
+
+		requests  = make(chan []byte)
+		responses = make(chan []byte)
+	)
+	go func() {
+		for {
+			var msg Message
+			if err := decode(&msg); err != nil {
+				decodeErr = err
+
+				close(decodeDone)
+
+				break
+			}
+
+			if msg.Request != nil {
+				requests <- *msg.Request
+			}
+
+			if msg.Response != nil {
+				responses <- *msg.Response
+			}
+		}
+	}()
+
+	return r.LinkMessage(
+		func(b []byte) error {
+			return encode(Message{
+				Request: &b,
+			})
+		},
+		func(b []byte) error {
+			return encode(Message{
+				Response: &b,
+			})
+		},
+
+		func() ([]byte, error) {
+			select {
+			case <-decodeDone:
+				return []byte{}, decodeErr
+			case request := <-requests:
+				return request, nil
+			}
+		},
+		func() ([]byte, error) {
+			select {
+			case <-decodeDone:
+				return []byte{}, decodeErr
+			case response := <-responses:
+				return response, nil
+			}
+		},
+
+		marshal,
+		unmarshal,
+	)
+}
+
+func (r Registry[R]) LinkMessage(
 	writeRequest,
 	writeResponse func(b []byte) error,
 

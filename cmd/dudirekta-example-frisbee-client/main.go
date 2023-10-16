@@ -122,7 +122,7 @@ func main() {
 	log.Println("Connected to", *raddr)
 
 	go func() {
-		if err := registry.Link(
+		if err := registry.LinkMessage(
 			func(b []byte) error {
 				pkg := packet.Get()
 
