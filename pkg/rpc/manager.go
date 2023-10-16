@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/pojntfx/dudirekta/pkg/utils"
 )
 
 var (
@@ -55,7 +56,11 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 			}
 		}
 
-		out := reflect.ValueOf(fn).Call(in)
+		out, err := utils.Call(reflect.ValueOf(fn), in)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(out) == 1 {
 			if out[0].IsValid() && !out[0].IsNil() {
 				return nil, out[0].Interface().(error)
