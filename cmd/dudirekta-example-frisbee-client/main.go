@@ -6,18 +6,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"time"
 
 	"github.com/loopholelabs/frisbee-go"
-	"github.com/loopholelabs/frisbee-go/pkg/packet"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
+	iutils "github.com/pojntfx/dudirekta/pkg/utils"
 	"github.com/pojntfx/r3map/pkg/utils"
 )
 
 const (
-	DUDIREKTA_REQUESTS  = uint16(10)
-	DUDIREKTA_RESPONSES = uint16(11)
+	DUDIREKTA_REQUEST  = uint16(10)
+	DUDIREKTA_RESPONSE = uint16(11)
 )
 
 type local struct{}
@@ -89,85 +88,29 @@ func main() {
 		}
 	}()
 
-	handlers := make(frisbee.HandlerTable)
+	d := iutils.NewFrisbeeDialer(*raddr, DUDIREKTA_REQUEST, DUDIREKTA_RESPONSE)
 
-	requestPackets := make(chan []byte)
-	handlers[DUDIREKTA_REQUESTS] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
-		b := make([]byte, incoming.Metadata.ContentLength)
-		copy(b, incoming.Content.Bytes())
-		requestPackets <- b
-
-		return
-	}
-
-	responsePackets := make(chan []byte)
-	handlers[DUDIREKTA_RESPONSES] = func(ctx context.Context, incoming *packet.Packet) (outgoing *packet.Packet, action frisbee.Action) {
-		b := make([]byte, incoming.Metadata.ContentLength)
-		copy(b, incoming.Content.Bytes())
-		responsePackets <- b
-
-		return
-	}
-
-	client, err := frisbee.NewClient(handlers, ctx)
-	if err != nil {
+	if err := d.Connect(ctx); err != nil {
 		panic(err)
 	}
-	defer client.Close()
-
-	if err := client.Connect(*raddr); err != nil {
-		panic(err)
-	}
+	defer d.Close()
 
 	log.Println("Connected to", *raddr)
 
-	go func() {
-		if err := registry.LinkMessage(
-			func(b []byte) error {
-				pkg := packet.Get()
+	if err := d.Link(
+		ctx,
 
-				pkg.Metadata.Operation = DUDIREKTA_REQUESTS
-				pkg.Content.Write(b)
-				pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
+		registry.LinkMessage,
 
-				return client.WritePacket(pkg)
-			},
-			func(b []byte) error {
-				pkg := packet.Get()
+		json.Marshal,
+		json.Unmarshal,
 
-				pkg.Metadata.Operation = DUDIREKTA_RESPONSES
-				pkg.Content.Write(b)
-				pkg.Metadata.ContentLength = uint32(pkg.Content.Len())
-
-				return client.WritePacket(pkg)
-			},
-
-			func() ([]byte, error) {
-				b, ok := <-requestPackets
-				if !ok {
-					return []byte{}, net.ErrClosed
-				}
-
-				return b, nil
-			},
-			func() ([]byte, error) {
-				b, ok := <-responsePackets
-				if !ok {
-					return []byte{}, net.ErrClosed
-				}
-
-				return b, nil
-			},
-
-			json.Marshal,
-			json.Unmarshal,
-		); err != nil && !utils.IsClosedErr(err) {
-			panic(err)
-		}
-	}()
-
-	<-client.CloseChannel()
-
-	close(requestPackets)
-	close(responsePackets)
+		func(ctx context.Context, c *frisbee.Client, err error) {
+			if err != nil && !utils.IsClosedErr(err) {
+				log.Println("Could not link registry:", err)
+			}
+		},
+	); err != nil && !utils.IsClosedErr(err) {
+		panic(err)
+	}
 }
