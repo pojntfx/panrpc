@@ -66,7 +66,6 @@ func GetRemoteID(ctx context.Context) string {
 }
 
 type Options struct {
-	ResponseBufferLen  int
 	OnClientConnect    func(remoteID string)
 	OnClientDisconnect func(remoteID string)
 }
@@ -94,9 +93,7 @@ func NewRegistry[R any](
 	options *Options,
 ) *Registry[R] {
 	if options == nil {
-		options = &Options{
-			ResponseBufferLen: DefaultResponseBufferLen,
-		}
+		options = &Options{}
 	}
 
 	return &Registry[R]{wrappedChild{
@@ -187,7 +184,7 @@ func (r Registry[R]) makeRPC(
 			panic(err)
 		}
 
-		l := responseResolver.Listener(r.options.ResponseBufferLen)
+		l := responseResolver.Listener(0)
 		defer l.Close()
 
 		t := time.NewTimer(r.timeout)
@@ -707,7 +704,7 @@ func (r Registry[R]) LinkMessage(
 					err = errors.New(res.Err)
 				}
 
-				responseResolver.Broadcast(callResponse{res.Call, res.Value, err, false})
+				responseResolver.NotifyCtx(r.ctx, callResponse{res.Call, res.Value, err, false})
 			}
 		}()
 
