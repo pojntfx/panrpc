@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
 	"log"
 	"net"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -46,7 +44,6 @@ func main() {
 		time.Second*10,
 		ctx,
 		&rpc.Options{
-			ResponseBufferLen: rpc.DefaultResponseBufferLen,
 			OnClientConnect: func(remoteID string) {
 				clients++
 
@@ -61,30 +58,12 @@ func main() {
 	)
 
 	go func() {
-		log.Println(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Print "Hello, world!"`)
-
-		stdin := bufio.NewReader(os.Stdin)
-
 		for {
-			line, err := stdin.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
+			for _, peer := range registry.Peers() {
+				// log.Println("Calling functions for peer with ID", peerID)
 
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
-
-				switch line {
-				case "a\n":
-					if err := peer.Println(ctx, "Hello, world!"); err != nil {
-						log.Println("Got error for Println func:", err)
-
-						continue
-					}
-				default:
-					log.Printf("Unknown letter %v, ignoring input", line)
+				if err := peer.Println(ctx, "Hello, world!"); err != nil {
+					log.Println("Got error for Println func:", err)
 
 					continue
 				}

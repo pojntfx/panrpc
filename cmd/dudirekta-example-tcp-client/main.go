@@ -46,7 +46,6 @@ func main() {
 		time.Second*10,
 		ctx,
 		&rpc.Options{
-			ResponseBufferLen: rpc.DefaultResponseBufferLen,
 			OnClientConnect: func(remoteID string) {
 				clients++
 

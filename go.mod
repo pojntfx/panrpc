@@ -4,8 +4,6 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/loopholelabs/frisbee-go v0.7.2
-	github.com/pojntfx/r3map v0.0.0-20231005234146-0fb279ae31eb
 	github.com/pojntfx/weron v0.2.4
 	github.com/rs/zerolog v1.30.0
 	github.com/teivah/broadcast v0.1.0
@@ -13,11 +11,10 @@ require (
 )
 
 require (
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.13 // indirect
-	github.com/loopholelabs/common v0.4.9 // indirect
-	github.com/loopholelabs/polyglot v1.1.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -40,12 +37,10 @@ require (
 	github.com/pion/turn/v2 v2.0.9 // indirect
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.50 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 )
-
-replace github.com/loopholelabs/frisbee-go => ../frisbee-go
