@@ -111,7 +111,7 @@ func NewRegistry[R any](
 func (r Registry[R]) makeRPC(
 	name string,
 	functionType reflect.Type,
-	errs chan error,
+	setErr func(err error),
 	responseResolver *broadcast.Relay[callResponse],
 
 	writeRequest func(b []byte) error,
@@ -120,6 +120,32 @@ func (r Registry[R]) makeRPC(
 	unmarshal func(data []byte, v any) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+		defer func() {
+			var err error
+			if e := recover(); e != nil {
+				var ok bool
+				err, ok = e.(error)
+				if !ok {
+					err = utils.ErrPanickedWithNonErrorValue
+				}
+
+				setErr(err)
+			}
+
+			// If we tried to return with an invalid results count, set them so that the call doesn't panic
+			if len(results) != functionType.NumOut() {
+				errReturnValue := reflect.ValueOf(err)
+
+				if functionType.NumOut() == 1 {
+					results = []reflect.Value{errReturnValue}
+				} else if functionType.NumOut() == 2 {
+					valueReturnValue := reflect.Zero(functionType.Out(0))
+
+					results = []reflect.Value{valueReturnValue, errReturnValue}
+				}
+			}
+		}()
+
 		callID := uuid.NewString()
 
 		cmd := Request{
@@ -138,25 +164,19 @@ func (r Registry[R]) makeRPC(
 			if arg.Kind() == reflect.Func {
 				closureID, freeClosure, err := registerClosure(r.local.wrapper, arg.Interface())
 				if err != nil {
-					errs <- err
-
-					return
+					panic(err)
 				}
 				defer freeClosure()
 
 				b, err := marshal(closureID)
 				if err != nil {
-					errs <- err
-
-					return
+					panic(err)
 				}
 				cmd.Args = append(cmd.Args, b)
 			} else {
 				b, err := marshal(arg.Interface())
 				if err != nil {
-					errs <- err
-
-					return
+					panic(err)
 				}
 				cmd.Args = append(cmd.Args, b)
 			}
@@ -164,9 +184,7 @@ func (r Registry[R]) makeRPC(
 
 		b, err := marshal(cmd)
 		if err != nil {
-			errs <- err
-
-			return
+			panic(err)
 		}
 
 		l := responseResolver.Listener(r.options.ResponseBufferLen)
@@ -200,9 +218,7 @@ func (r Registry[R]) makeRPC(
 		}()
 
 		if err := writeRequest(b); err != nil {
-			errs <- err
-
-			return
+			panic(err)
 		}
 
 		returnValues := []reflect.Value{}
@@ -215,9 +231,7 @@ func (r Registry[R]) makeRPC(
 					returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
 				} else if !functionType.Out(0).Implements(errorType) {
 					if err := unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
-						errs <- err
-
-						return
+						panic(err)
 					}
 				}
 
@@ -228,9 +242,7 @@ func (r Registry[R]) makeRPC(
 
 				if !rawReturnValue.timeout {
 					if err := unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
-						errs <- err
-
-						return
+						panic(err)
 					}
 				}
 
@@ -241,9 +253,7 @@ func (r Registry[R]) makeRPC(
 				returnValues = append(returnValues, valueReturnValue.Elem(), errReturnValue.Elem())
 			}
 		case <-r.ctx.Done():
-			errs <- r.ctx.Err()
-
-			return
+			panic(r.ctx.Err())
 		}
 
 		return returnValues
@@ -333,11 +343,15 @@ func (r Registry[R]) LinkMessage(
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
-	// It is possible that both `readRequest` and `readResponse` are closed at the same time,
-	// but both need return in order for the `wg` to return on `Wait()`; by buffering here,
-	// we make sure that in this case the first error message gets returned, the second one gets
-	// written to the buffer, and the `Wait()` returns.
-	errs := make(chan error, 1)
+	var fatalErr error
+	fatalErrLock := sync.NewCond(&sync.Mutex{})
+
+	setErr := func(err error) {
+		fatalErrLock.L.Lock()
+		fatalErr = err
+		fatalErrLock.Broadcast()
+		fatalErrLock.L.Unlock()
+	}
 
 	go func() {
 		for i := 0; i < remote.NumField(); i++ {
@@ -349,25 +363,25 @@ func (r Registry[R]) LinkMessage(
 			}
 
 			if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
-				errs <- ErrInvalidReturn
+				setErr(ErrInvalidReturn)
 
 				break
 			}
 
 			if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
-				errs <- ErrInvalidReturn
+				setErr(ErrInvalidReturn)
 
 				break
 			}
 
 			if functionType.NumIn() < 1 {
-				errs <- ErrInvalidArgs
+				setErr(ErrInvalidArgs)
 
 				break
 			}
 
 			if !functionType.In(0).Implements(contextType) {
-				errs <- ErrInvalidArgs
+				setErr(ErrInvalidArgs)
 
 				break
 			}
@@ -377,7 +391,7 @@ func (r Registry[R]) LinkMessage(
 				Set(r.makeRPC(
 					functionField.Name,
 					functionType,
-					errs,
+					setErr,
 					responseResolver,
 
 					writeRequest,
@@ -416,14 +430,14 @@ func (r Registry[R]) LinkMessage(
 			for {
 				b, err := readRequest()
 				if err != nil {
-					errs <- err
+					setErr(err)
 
 					return
 				}
 
 				var req Request
 				if err := unmarshal(b, &req); err != nil {
-					errs <- err
+					setErr(err)
 
 					return
 				}
@@ -439,14 +453,14 @@ func (r Registry[R]) LinkMessage(
 							MethodByName(req.Function)
 
 						if function.Kind() != reflect.Func {
-							errs <- ErrCannotCallNonFunction
+							setErr(ErrCannotCallNonFunction)
 
 							return
 						}
 					}
 
 					if function.Type().NumIn() != len(req.Args)+1 {
-						errs <- ErrInvalidArgs
+						setErr(ErrInvalidArgs)
 
 						return
 					}
@@ -463,17 +477,41 @@ func (r Registry[R]) LinkMessage(
 						functionType := function.Type().In(i)
 						if functionType.Kind() == reflect.Func {
 							arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+								defer func() {
+									var err error
+									if e := recover(); e != nil {
+										var ok bool
+										err, ok = e.(error)
+										if !ok {
+											err = utils.ErrPanickedWithNonErrorValue
+										}
+
+										setErr(err)
+									}
+
+									// If we tried to return with an invalid results count, set them so that the call doesn't panic
+									if len(results) != functionType.NumOut() {
+										errReturnValue := reflect.ValueOf(err)
+
+										if functionType.NumOut() == 1 {
+											results = []reflect.Value{errReturnValue}
+										} else if functionType.NumOut() == 2 {
+											valueReturnValue := reflect.Zero(functionType.Out(0))
+
+											results = []reflect.Value{valueReturnValue, errReturnValue}
+										}
+									}
+								}()
+
 								closureID := ""
 								if err := unmarshal(req.Args[i-2], &closureID); err != nil {
-									errs <- err
-
-									return
+									panic(err)
 								}
 
 								rpc := r.makeRPC(
 									"CallClosure",
 									reflect.TypeOf(callClosureType(nil)),
-									errs,
+									setErr,
 									responseResolver,
 
 									writeRequest,
@@ -489,9 +527,7 @@ func (r Registry[R]) LinkMessage(
 
 								rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(r.ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
 								if err != nil {
-									errs <- err
-
-									return
+									panic(err)
 								}
 
 								rv := []reflect.Value{}
@@ -521,7 +557,7 @@ func (r Registry[R]) LinkMessage(
 							arg := reflect.New(functionType)
 
 							if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
-								errs <- err
+								setErr(err)
 
 								return
 							}
@@ -533,7 +569,7 @@ func (r Registry[R]) LinkMessage(
 					go func() {
 						res, err := utils.Call(function, args)
 						if err != nil {
-							errs <- err
+							setErr(err)
 
 							return
 						}
@@ -546,13 +582,13 @@ func (r Registry[R]) LinkMessage(
 								Err:   "",
 							})
 							if err != nil {
-								errs <- err
+								setErr(err)
 
 								return
 							}
 
 							if err := writeResponse(b); err != nil {
-								errs <- err
+								setErr(err)
 
 								return
 							}
@@ -564,20 +600,20 @@ func (r Registry[R]) LinkMessage(
 									Err:   res[0].Interface().(error).Error(),
 								})
 								if err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
 
 								if err := writeResponse(b); err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
 							} else {
 								v, err := marshal(res[0].Interface())
 								if err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
@@ -588,13 +624,13 @@ func (r Registry[R]) LinkMessage(
 									Err:   "",
 								})
 								if err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
 
 								if err := writeResponse(b); err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
@@ -602,7 +638,7 @@ func (r Registry[R]) LinkMessage(
 						case 2:
 							v, err := marshal(res[0].Interface())
 							if err != nil {
-								errs <- err
+								setErr(err)
 
 								return
 							}
@@ -614,13 +650,13 @@ func (r Registry[R]) LinkMessage(
 									Err:   "",
 								})
 								if err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
 
 								if err := writeResponse(b); err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
@@ -631,13 +667,13 @@ func (r Registry[R]) LinkMessage(
 									Err:   res[1].Interface().(error).Error(),
 								})
 								if err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
 
 								if err := writeResponse(b); err != nil {
-									errs <- err
+									setErr(err)
 
 									return
 								}
@@ -655,14 +691,14 @@ func (r Registry[R]) LinkMessage(
 			for {
 				b, err := readResponse()
 				if err != nil {
-					errs <- err
+					setErr(err)
 
 					return
 				}
 
 				var res Response
 				if err := unmarshal(b, &res); err != nil {
-					errs <- err
+					setErr(err)
 
 					return
 				}
@@ -678,7 +714,13 @@ func (r Registry[R]) LinkMessage(
 		wg.Wait()
 	}()
 
-	return <-errs
+	fatalErrLock.L.Lock()
+	if fatalErr == nil {
+		fatalErrLock.Wait()
+	}
+	fatalErrLock.L.Unlock()
+
+	return fatalErr
 }
 
 func (r Registry[R]) Peers() map[string]R {
