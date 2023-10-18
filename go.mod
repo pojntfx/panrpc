@@ -5,12 +5,15 @@ go 1.18
 require (
 	github.com/google/uuid v1.3.0
 	github.com/pojntfx/weron v0.2.4
+	github.com/redis/go-redis/v9 v9.2.1
 	github.com/rs/zerolog v1.30.0
 	github.com/teivah/broadcast v0.1.0
 	nhooyr.io/websocket v1.8.7
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

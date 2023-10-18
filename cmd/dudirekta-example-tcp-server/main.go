@@ -59,8 +59,8 @@ func main() {
 
 	go func() {
 		for {
-			for _, peer := range registry.Peers() {
-				// log.Println("Calling functions for peer with ID", peerID)
+			for peerID, peer := range registry.Peers() {
+				log.Println("Calling functions for peer with ID", peerID)
 
 				if err := peer.Println(ctx, "Hello, world!"); err != nil {
 					log.Println("Got error for Println func:", err)
