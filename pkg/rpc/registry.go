@@ -33,8 +33,8 @@ const (
 )
 
 type Message struct {
-	Request  *[]byte
-	Response *[]byte
+	Request  *[]byte `json:"request"`
+	Response *[]byte `json:"response"`
 }
 
 type Request struct {
