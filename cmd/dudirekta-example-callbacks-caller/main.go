@@ -16,7 +16,7 @@ import (
 type local struct{}
 
 func (s *local) Println(ctx context.Context, msg string) error {
-	log.Printf("Printing message for peer with ID %v: %v", rpc.GetRemoteID(ctx), msg)
+	log.Printf("Printing message for remote with ID %v: %v", rpc.GetRemoteID(ctx), msg)
 
 	return nil
 }
@@ -27,7 +27,7 @@ type remote struct {
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", false, "Whether to allow connecting to peers by listening or dialing")
+	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
 
 	flag.Parse()
 
@@ -70,33 +70,37 @@ func main() {
 				panic(err)
 			}
 
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
+			if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+				log.Println("Calling functions for remote with ID", remoteID)
 
 				switch line {
 				case "a\n":
-					new, err := peer.Increment(ctx, 1)
+					new, err := remote.Increment(ctx, 1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				case "b\n":
-					new, err := peer.Increment(ctx, -1)
+					new, err := remote.Increment(ctx, -1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
-					continue
+					return nil
 				}
+
+				return nil
+			}); err != nil {
+				panic(err)
 			}
 		}
 	}()

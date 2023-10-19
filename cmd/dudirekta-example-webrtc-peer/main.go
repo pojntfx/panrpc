@@ -23,13 +23,13 @@ type local struct {
 }
 
 func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
-	log.Println("Incrementing counter by", delta, "for peer with ID", rpc.GetRemoteID(ctx))
+	log.Println("Incrementing counter by", delta, "for remote with ID", rpc.GetRemoteID(ctx))
 
 	return atomic.AddInt64(&s.counter, delta), nil
 }
 
 func (s *local) Println(ctx context.Context, msg string) error {
-	log.Println("Printing message", msg, "for peer with ID", rpc.GetRemoteID(ctx))
+	log.Println("Printing message", msg, "for remote with ID", rpc.GetRemoteID(ctx))
 
 	fmt.Println(msg)
 
@@ -93,39 +93,43 @@ func main() {
 				panic(err)
 			}
 
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
+			if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+				log.Println("Calling functions for remote with ID", remoteID)
 
 				switch line {
 				case "a\n":
-					new, err := peer.Increment(ctx, 1)
+					new, err := remote.Increment(ctx, 1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				case "b\n":
-					new, err := peer.Increment(ctx, -1)
+					new, err := remote.Increment(ctx, -1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				case "c\n":
-					if err := peer.Println(ctx, "Hello, world!"); err != nil {
+					if err := remote.Println(ctx, "Hello, world!"); err != nil {
 						log.Println("Got error for Println func:", err)
 
-						continue
+						return nil
 					}
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
-					continue
+					return nil
 				}
+
+				return nil
+			}); err != nil {
+				panic(err)
 			}
 		}
 	}()
@@ -205,12 +209,12 @@ func main() {
 			panic(err)
 		case rid := <-ids:
 			log.Println("Listening with ID", rid)
-		case peer := <-adapter.Accept():
-			log.Println("Connected to peer with ID", peer.PeerID)
+		case remote := <-adapter.Accept():
+			log.Println("Connected to remote with ID", remote.PeerID)
 
 			go func() {
 				defer func() {
-					_ = peer.Conn.Close()
+					_ = remote.Conn.Close()
 
 					if err := recover(); err != nil {
 						log.Printf("Client disconnected with error: %v", err)
@@ -218,8 +222,8 @@ func main() {
 				}()
 
 				if err := registry.LinkStream(
-					json.NewEncoder(peer.Conn).Encode,
-					json.NewDecoder(peer.Conn).Decode,
+					json.NewEncoder(remote.Conn).Encode,
+					json.NewDecoder(remote.Conn).Decode,
 
 					json.Marshal,
 					json.Unmarshal,

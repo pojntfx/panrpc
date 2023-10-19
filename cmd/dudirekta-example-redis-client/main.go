@@ -26,7 +26,7 @@ const (
 type local struct{}
 
 func (s *local) Println(ctx context.Context, msg string) error {
-	log.Println("Printing message", msg, "for peer with ID", rpc.GetRemoteID(ctx))
+	log.Println("Printing message", msg, "for remote with ID", rpc.GetRemoteID(ctx))
 
 	fmt.Println(msg)
 
@@ -89,33 +89,37 @@ func main() {
 				panic(err)
 			}
 
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
+			if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+				log.Println("Calling functions for remote with ID", remoteID)
 
 				switch line {
 				case "a\n":
-					new, err := peer.Increment(ctx, 1)
+					new, err := remote.Increment(ctx, 1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				case "b\n":
-					new, err := peer.Increment(ctx, -1)
+					new, err := remote.Increment(ctx, -1)
 					if err != nil {
 						log.Println("Got error for Increment func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(new)
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
-					continue
+					return nil
 				}
+
+				return nil
+			}); err != nil {
+				panic(err)
 			}
 		}
 	}()

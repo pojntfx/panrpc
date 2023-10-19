@@ -16,16 +16,24 @@ import (
 type local struct {
 	counter int64
 
-	Peers func() map[string]remote
+	ForRemotes func(
+		cb func(remoteID string, remote remote) error,
+	) error
 }
 
 func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
-	peerID := rpc.GetRemoteID(ctx)
+	targetID := rpc.GetRemoteID(ctx)
 
-	for candidateIP, peer := range s.Peers() {
-		if candidateIP == peerID {
-			peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
+	if err := s.ForRemotes(func(remoteID string, remote remote) error {
+		if remoteID == targetID {
+			if err := remote.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta)); err != nil {
+				return err
+			}
 		}
+
+		return nil
+	}); err != nil {
+		return -1, err
 	}
 
 	return atomic.AddInt64(&s.counter, delta), nil
@@ -37,7 +45,7 @@ type remote struct {
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", true, "Whether to allow connecting to peers by listening or dialing")
+	listen := flag.Bool("listen", true, "Whether to allow connecting to remotes by listening or dialing")
 
 	flag.Parse()
 
@@ -66,7 +74,7 @@ func main() {
 			},
 		},
 	)
-	service.Peers = registry.Peers
+	service.ForRemotes = registry.ForRemotes
 
 	if *listen {
 		lis, err := net.Listen("tcp", *addr)

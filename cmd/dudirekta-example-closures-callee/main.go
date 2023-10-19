@@ -34,7 +34,7 @@ type remote struct{}
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", true, "Whether to allow connecting to peers by listening or dialing")
+	listen := flag.Bool("listen", true, "Whether to allow connecting to remotes by listening or dialing")
 
 	flag.Parse()
 

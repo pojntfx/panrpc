@@ -29,7 +29,7 @@ func Iterate(callee remote, ctx context.Context, length int, onIteration func(i 
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", false, "Whether to allow connecting to peers by listening or dialing")
+	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
 
 	flag.Parse()
 
@@ -71,12 +71,12 @@ func main() {
 				panic(err)
 			}
 
-			for peerID, peer := range registry.Peers() {
-				log.Println("Calling functions for peer with ID", peerID)
+			if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+				log.Println("Calling functions for remote with ID", remoteID)
 
 				switch line {
 				case "a\n":
-					length, err := Iterate(peer, ctx, 5, func(i int, b string) (string, error) {
+					length, err := Iterate(remote, ctx, 5, func(i int, b string) (string, error) {
 						log.Println("In iteration", i, b)
 
 						return "This is from the caller", nil
@@ -84,12 +84,12 @@ func main() {
 					if err != nil {
 						log.Println("Got error for Iterate func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(length)
 				case "b\n":
-					length, err := Iterate(peer, ctx, 10, func(i int, b string) (string, error) {
+					length, err := Iterate(remote, ctx, 10, func(i int, b string) (string, error) {
 						log.Println("In iteration", i, b)
 
 						return "This is from the caller", nil
@@ -97,15 +97,19 @@ func main() {
 					if err != nil {
 						log.Println("Got error for Iterate func:", err)
 
-						continue
+						return nil
 					}
 
 					log.Println(length)
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
 
-					continue
+					return nil
 				}
+
+				return nil
+			}); err != nil {
+				panic(err)
 			}
 		}
 	}()

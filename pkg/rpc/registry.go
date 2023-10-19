@@ -720,6 +720,17 @@ func (r Registry[R]) LinkMessage(
 	return fatalErr
 }
 
-func (r Registry[R]) Peers() map[string]R {
-	return r.remotes
+func (r Registry[R]) ForRemotes(
+	cb func(remoteID string, remote R) error,
+) error {
+	r.remotesLock.Lock()
+	defer r.remotesLock.Unlock()
+
+	for remoteID, remote := range r.remotes {
+		if err := cb(remoteID, remote); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
