@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
@@ -52,6 +53,17 @@ func main() {
 
 		marshal = json.Marshal
 		unmarshal = json.Unmarshal
+
+	case "json-iterator":
+		getEncoder = func(conn net.Conn) func(v any) error {
+			return jsoniter.ConfigCompatibleWithStandardLibrary.NewEncoder(conn).Encode
+		}
+		getDecoder = func(conn net.Conn) func(v any) error {
+			return jsoniter.ConfigCompatibleWithStandardLibrary.NewDecoder(conn).Decode
+		}
+
+		marshal = jsoniter.ConfigCompatibleWithStandardLibrary.Marshal
+		unmarshal = jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal
 
 	default:
 		panic(errUnknownSerializer)
