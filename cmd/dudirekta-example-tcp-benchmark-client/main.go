@@ -11,8 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 var (
@@ -65,6 +67,28 @@ func main() {
 
 		marshal = jsoniter.ConfigCompatibleWithStandardLibrary.Marshal
 		unmarshal = jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal
+
+	case "cbor":
+		getEncoder = func(conn net.Conn) func(v any) error {
+			return cbor.NewEncoder(conn).Encode
+		}
+		getDecoder = func(conn net.Conn) func(v any) error {
+			return cbor.NewDecoder(conn).Decode
+		}
+
+		marshal = json.Marshal
+		unmarshal = json.Unmarshal
+
+	case "msgpack":
+		getEncoder = func(conn net.Conn) func(v any) error {
+			return msgpack.NewEncoder(conn).Encode
+		}
+		getDecoder = func(conn net.Conn) func(v any) error {
+			return msgpack.NewDecoder(conn).Decode
+		}
+
+		marshal = msgpack.Marshal
+		unmarshal = msgpack.Unmarshal
 
 	default:
 		panic(errUnknownSerializer)
