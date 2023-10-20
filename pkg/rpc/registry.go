@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pojntfx/dudirekta/pkg/utils"
-	"github.com/teivah/broadcast"
 )
 
 var (
@@ -50,7 +49,6 @@ type Response struct {
 }
 
 type callResponse struct {
-	id      string
 	value   []byte
 	err     error
 	timeout bool
@@ -109,7 +107,7 @@ func (r Registry[R]) makeRPC(
 	name string,
 	functionType reflect.Type,
 	setErr func(err error),
-	responseResolver *broadcast.Relay[callResponse],
+	responseResolver *utils.Broadcaster[callResponse],
 
 	writeRequest func(b []byte) error,
 
@@ -184,34 +182,16 @@ func (r Registry[R]) makeRPC(
 			panic(err)
 		}
 
-		l := responseResolver.Listener(0)
-		defer l.Close()
-
-		t := time.NewTimer(r.timeout)
-		defer t.Stop()
-
 		res := make(chan callResponse)
 		go func() {
-			for {
-				select {
-				case <-t.C:
-					t.Stop()
+			defer responseResolver.Close(callID)
 
-					res <- callResponse{"", nil, ErrCallTimedOut, true}
-
-					return
-				case msg, ok := <-l.Ch():
-					if !ok {
-						return
-					}
-
-					if msg.id == callID {
-						res <- msg
-
-						return
-					}
-				}
+			r, ok := responseResolver.Receive(callID, r.timeout)
+			if !ok {
+				r = &callResponse{nil, ErrCallTimedOut, true}
 			}
+
+			res <- *r
 		}()
 
 		if err := writeRequest(b); err != nil {
@@ -336,7 +316,7 @@ func (r Registry[R]) LinkMessage(
 	marshal func(v any) ([]byte, error),
 	unmarshal func(data []byte, v any) error,
 ) error {
-	responseResolver := broadcast.NewRelay[callResponse]()
+	responseResolver := utils.NewBroadcaster[callResponse]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
@@ -704,7 +684,11 @@ func (r Registry[R]) LinkMessage(
 					err = errors.New(res.Err)
 				}
 
-				responseResolver.NotifyCtx(r.ctx, callResponse{res.Call, res.Value, err, false})
+				go func() {
+					if ok := responseResolver.Publish(res.Call, callResponse{res.Value, err, false}, r.timeout); !ok {
+						responseResolver.Close(res.Call)
+					}
+				}()
 			}
 		}()
 

@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 var (
@@ -30,7 +28,7 @@ type remote struct{}
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
 	listen := flag.Bool("listen", true, "Whether to allow connecting to remotes by listening or dialing")
-	serializer := flag.String("serializer", "json", "Serializer to use (one of json, json-iterator, cbor or msgpack)")
+	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
 
 	flag.Parse()
 
@@ -56,17 +54,6 @@ func main() {
 		marshal = json.Marshal
 		unmarshal = json.Unmarshal
 
-	case "json-iterator":
-		getEncoder = func(conn net.Conn) func(v any) error {
-			return jsoniter.ConfigCompatibleWithStandardLibrary.NewEncoder(conn).Encode
-		}
-		getDecoder = func(conn net.Conn) func(v any) error {
-			return jsoniter.ConfigCompatibleWithStandardLibrary.NewDecoder(conn).Decode
-		}
-
-		marshal = jsoniter.ConfigCompatibleWithStandardLibrary.Marshal
-		unmarshal = jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal
-
 	case "cbor":
 		getEncoder = func(conn net.Conn) func(v any) error {
 			return cbor.NewEncoder(conn).Encode
@@ -77,17 +64,6 @@ func main() {
 
 		marshal = json.Marshal
 		unmarshal = json.Unmarshal
-
-	case "msgpack":
-		getEncoder = func(conn net.Conn) func(v any) error {
-			return msgpack.NewEncoder(conn).Encode
-		}
-		getDecoder = func(conn net.Conn) func(v any) error {
-			return msgpack.NewDecoder(conn).Decode
-		}
-
-		marshal = msgpack.Marshal
-		unmarshal = msgpack.Unmarshal
 
 	default:
 		panic(errUnknownSerializer)

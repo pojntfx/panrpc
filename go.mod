@@ -5,12 +5,9 @@ go 1.18
 require (
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/google/uuid v1.3.0
-	github.com/json-iterator/go v1.1.12
 	github.com/pojntfx/weron v0.2.4
 	github.com/redis/go-redis/v9 v9.2.1
 	github.com/rs/zerolog v1.30.0
-	github.com/teivah/broadcast v0.1.0
-	github.com/vmihailenco/msgpack/v5 v5.4.0
 	nhooyr.io/websocket v1.8.7
 )
 
@@ -19,6 +16,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.13 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
@@ -43,7 +41,6 @@ require (
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.50 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
