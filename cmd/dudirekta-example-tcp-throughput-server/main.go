@@ -7,8 +7,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -19,17 +17,21 @@ var (
 	errUnknownSerializer = errors.New("unknown serializer")
 )
 
-type local struct{}
-
-type remote struct {
-	Example func(ctx context.Context, in int64) (int64, error)
+type local struct {
+	buf []byte
 }
+
+func (s *local) GetBytes(ctx context.Context) ([]byte, error) {
+	return s.buf, nil
+}
+
+type remote struct{}
 
 func main() {
 	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
-	concurrency := flag.Int("concurrency", 512, "Amount of concurrent calls to allow per client")
+	listen := flag.Bool("listen", true, "Whether to allow connecting to remotes by listening or dialing")
 	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
+	buffer := flag.Int("buffer", 1*1024*1024, "Length of the buffer to return for each RPC")
 
 	flag.Parse()
 
@@ -72,9 +74,10 @@ func main() {
 
 	clients := 0
 
-	var registry *rpc.Registry[remote]
-	registry = rpc.NewRegistry(
-		&local{},
+	registry := rpc.NewRegistry(
+		&local{
+			buf: make([]byte, *buffer),
+		},
 		remote{},
 
 		time.Second*10,
@@ -84,47 +87,6 @@ func main() {
 				clients++
 
 				log.Printf("%v clients connected", clients)
-
-				go func() {
-					rps := new(atomic.Int64)
-					go func() {
-						ticker := time.NewTicker(time.Second)
-						defer ticker.Stop()
-
-						for range ticker.C {
-							log.Println(rps.Load(), "requests/second")
-
-							rps.Store(0)
-
-							time.Sleep(time.Second)
-						}
-					}()
-
-					var wg sync.WaitGroup
-					if err := registry.ForRemotes(func(remoteID string, r remote) error {
-						for i := 0; i < *concurrency; i++ {
-							wg.Add(1)
-
-							go func(r remote) {
-								defer wg.Done()
-
-								for {
-									if _, err := r.Example(ctx, 1); err != nil {
-										panic(err)
-									}
-
-									rps.Add(1)
-								}
-							}(r)
-						}
-
-						return nil
-					}); err != nil {
-						panic(err)
-					}
-
-					wg.Wait()
-				}()
 			},
 			OnClientDisconnect: func(remoteID string) {
 				clients--
