@@ -19,8 +19,92 @@ var (
 
 type local struct{}
 
-func (s *local) Example(ctx context.Context, in int64) (int64, error) {
+func (s *local) ZeroInt(ctx context.Context) (int, error) {
 	return 0, nil
+}
+
+func (s *local) ZeroInt8(ctx context.Context) (int8, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroInt16(ctx context.Context) (int16, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroInt32(ctx context.Context) (int32, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroRune(ctx context.Context) (rune, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroInt64(ctx context.Context) (int64, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUint(ctx context.Context) (uint, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUint8(ctx context.Context) (uint8, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroByte(ctx context.Context) (byte, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUint16(ctx context.Context) (uint16, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUint32(ctx context.Context) (uint32, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUint64(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroUintptr(ctx context.Context) (uintptr, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroFloat32(ctx context.Context) (float32, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroFloat64(ctx context.Context) (float64, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroComplex64(ctx context.Context) (complex64, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroComplex128(ctx context.Context) (complex128, error) {
+	return 0, nil
+}
+
+func (s *local) ZeroBool(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
+func (s *local) ZeroString(ctx context.Context) (string, error) {
+	return "", nil
+}
+
+func (s *local) ZeroArray(ctx context.Context) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (s *local) ZeroSlice(ctx context.Context) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (s *local) ZeroStruct(ctx context.Context) (interface{}, error) {
+	return struct{}{}, nil
 }
 
 type remote struct{}
