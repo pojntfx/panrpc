@@ -1,9 +1,0 @@
-{
-  "extends": "@parcel/config-default",
-  "validators": {
-    "*.ts": [
-      "@parcel/validator-typescript",
-      "@parcel/validator-eslint"
-    ]
-  }
-}

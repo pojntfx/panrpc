@@ -11,7 +11,7 @@
     "project": "./tsconfig.json"
   },
   "plugins": ["@typescript-eslint", "eslint-plugin-prettier"],
-  "ignorePatterns": ["node_modules"],
+  "ignorePatterns": ["node_modules", "typedoc", "dist"],
   "rules": {
     "prettier/prettier": "error",
     "import/export": "off",

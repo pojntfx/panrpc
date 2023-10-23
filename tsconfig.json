@@ -1,16 +1,12 @@
 {
   "include": ["ts/**/*.ts"],
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "types": ["bun-types"],
+    "target": "es2017",
+    "module": "es2022",
     "strict": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "dudirekta": ["."]
-    },
-    "types": ["node", "jest"]
+    "declaration": true,
+    "outDir": "dist"
   }
 }

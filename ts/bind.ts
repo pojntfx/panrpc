@@ -1,4 +1,5 @@
 import { v4 } from "uuid";
+import { EventEmitter } from "events";
 
 export interface IBindConfig {
   onOpen?: () => void;
@@ -25,6 +26,8 @@ export const bind = (
 
   config?: IBindConfig
 ) => {
+  const broker = new EventEmitter();
+
   const socket = getSocket();
 
   socket.addEventListener("open", () => {
@@ -61,10 +64,10 @@ export const bind = (
             res(rv);
           }
 
-          window.removeEventListener(`rpc:${id}`, handleReturn);
+          broker.removeListener(`rpc:${id}`, handleReturn);
         };
 
-        window.addEventListener(`rpc:${id}`, handleReturn);
+        broker.addListener(`rpc:${id}`, handleReturn);
 
         socket.send(JSON.stringify([true, id, functionName, args]));
       });
@@ -72,7 +75,7 @@ export const bind = (
   setRemote(r);
 
   socket.addEventListener("message", async (event) => {
-    const msg = JSON.parse(event.data);
+    const msg = JSON.parse(event.data as string);
 
     if (msg[0]) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/naming-convention
@@ -86,11 +89,9 @@ export const bind = (
         socket.send(JSON.stringify([false, id, "", (e as Error).message]));
       }
     } else {
-      window.dispatchEvent(
-        new CustomEvent(`rpc:${msg[1]}`, {
-          detail: msg.slice(2),
-        })
-      );
+      broker.emit(`rpc:${msg[1]}`, {
+        detail: msg.slice(2),
+      });
     }
   });
 };
