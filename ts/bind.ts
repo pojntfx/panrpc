@@ -8,6 +8,28 @@ export interface IBindConfig {
   reconnectDelay?: number;
 }
 
+interface IMessage {
+  request?: string;
+  response?: string;
+}
+
+interface IRequest {
+  call: string;
+  function: string;
+  args: string[];
+}
+
+interface IResponse {
+  call: string;
+  value: string;
+  err: string;
+}
+
+interface ICallResponse {
+  value: any;
+  err: string;
+}
+
 /**
  * Expose local functions and bind remote ones
  * @param getSocket Function that returns the WebSocket to use
@@ -55,13 +77,11 @@ export const bind = (
       new Promise((res, rej) => {
         const id = v4();
 
-        const handleReturn = ({ detail }: any) => {
-          const [rv, err] = detail;
-
+        const handleReturn = ({ value, err }: ICallResponse) => {
           if (err) {
             rej(new Error(err));
           } else {
-            res(rv);
+            res(value);
           }
 
           broker.removeListener(`rpc:${id}`, handleReturn);
@@ -69,29 +89,59 @@ export const bind = (
 
         broker.addListener(`rpc:${id}`, handleReturn);
 
-        socket.send(JSON.stringify([true, id, functionName, args]));
+        const req: IRequest = {
+          call: id,
+          function: functionName,
+          args: args.map((arg) => btoa(JSON.stringify(arg))),
+        };
+
+        const outMsg: IMessage = {
+          request: btoa(JSON.stringify(req)),
+        };
+
+        socket.send(JSON.stringify(outMsg));
       });
   }
   setRemote(r);
 
   socket.addEventListener("message", async (event) => {
-    const msg = JSON.parse(event.data as string);
+    const inMsg: IMessage = JSON.parse(event.data as string);
 
-    if (msg[0]) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/naming-convention
-      const [_, id, functionName, args] = msg;
+    if (inMsg.request) {
+      const req: IRequest = JSON.parse(atob(inMsg.request));
+
+      const args = req.args.map((arg) => JSON.parse(atob(arg)));
+
+      const res: IResponse = {
+        call: req.call,
+        value: "",
+        err: "",
+      };
 
       try {
-        const res = await (local as any)[functionName](...args);
+        const rv = await (local as any)[req.function](...args);
 
-        socket.send(JSON.stringify([false, id, res, ""]));
+        res.value = btoa(JSON.stringify(rv));
       } catch (e) {
-        socket.send(JSON.stringify([false, id, "", (e as Error).message]));
+        res.err = (e as Error).message;
       }
-    } else {
-      broker.emit(`rpc:${msg[1]}`, {
-        detail: msg.slice(2),
-      });
+
+      const outMsg: IMessage = {
+        response: btoa(JSON.stringify(res)),
+      };
+
+      socket.send(JSON.stringify(outMsg));
+    } else if (inMsg.response) {
+      const res: IResponse = JSON.parse(atob(inMsg.response));
+
+      const value = JSON.parse(atob(res.value));
+
+      const callResponse: ICallResponse = {
+        value,
+        err: res.err,
+      };
+
+      broker.emit(`rpc:${res.call}`, callResponse);
     }
   });
 };
