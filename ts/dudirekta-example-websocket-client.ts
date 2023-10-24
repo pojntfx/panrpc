@@ -25,6 +25,7 @@ await new Promise<void>((res, rej) => {
     {
       onOpen: res,
       onError: rej,
+      onClose: rej,
     }
   );
 });
@@ -40,5 +41,28 @@ while (true) {
 - b: Decrement remote counter by one
 `);
 
-  console.log(line, remote);
+  switch (line) {
+    case "a":
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await remote.Increment(1);
+      } catch (e) {
+        console.error(`Got error for Increment func: ${e}`);
+      }
+
+      break;
+
+    case "b":
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await remote.Increment(-1);
+      } catch (e) {
+        console.error(`Got error for Increment func: ${e}`);
+      }
+
+      break;
+
+    default:
+      console.log(`Unknown letter ${line}, ignoring input`);
+  }
 }
