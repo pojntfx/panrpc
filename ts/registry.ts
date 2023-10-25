@@ -23,6 +23,8 @@ interface ICallResponse {
   err: string;
 }
 
+export const ErrorCallTimedOut = "call timed out";
+
 /**
  * Expose local functions and link remote ones to a WebSocket
  * @param socket WebSocket to use
@@ -33,7 +35,9 @@ export const linkWebSocket = <R>(
   socket: WebSocket,
 
   local: any,
-  remote: R
+  remote: R,
+
+  timeout: number
 ) => {
   const broker = new EventEmitter();
 
@@ -54,7 +58,20 @@ export const linkWebSocket = <R>(
           broker.removeListener(`rpc:${id}`, handleReturn);
         };
 
-        broker.addListener(`rpc:${id}`, handleReturn);
+        const t = setTimeout(() => {
+          const callResponse: ICallResponse = {
+            value: "",
+            err: ErrorCallTimedOut,
+          };
+
+          broker.emit(`rpc:${id}`, callResponse);
+        }, timeout);
+
+        broker.addListener(`rpc:${id}`, (e) => {
+          clearTimeout(t);
+
+          handleReturn(e);
+        });
 
         const req: IRequest = {
           call: id,

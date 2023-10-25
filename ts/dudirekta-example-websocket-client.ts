@@ -29,7 +29,9 @@ const remote = linkWebSocket(
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Increment: async (delta: number): Promise<number> => 0,
-  }
+  },
+
+  1000 * 10
 );
 
 console.log("Connected to", raddr);
