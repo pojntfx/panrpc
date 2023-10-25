@@ -1,34 +1,36 @@
 /* eslint-disable no-alert */
 /* eslint-disable no-console */
-import { env } from "process";
-import { bind } from "./bind";
-
-let remote = {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Increment: async (delta: number): Promise<number> => 0,
-};
+import { env, exit } from "process";
+import { linkWebSocket } from "./index";
 
 const raddr = env.RADDR || "ws://127.0.0.1:1337";
 
-await new Promise<void>((res, rej) => {
-  bind(
-    () => new WebSocket(raddr),
-    {
-      Println: async (msg: string) => {
-        console.log(msg);
-      },
-    },
-    remote,
-    (r) => {
-      remote = r;
-    },
-    {
-      onOpen: res,
-      onError: rej,
-      onClose: rej,
-    }
-  );
+const socket = new WebSocket(raddr);
+
+socket.addEventListener("close", (e) => {
+  console.error("Disconnected with error:", e.reason);
+
+  exit(1);
 });
+
+await new Promise<void>((res, rej) => {
+  socket.addEventListener("open", () => res());
+  socket.addEventListener("error", rej);
+});
+
+const remote = linkWebSocket(
+  socket,
+
+  {
+    Println: async (msg: string) => {
+      console.log(msg);
+    },
+  },
+  {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Increment: async (delta: number): Promise<number> => 0,
+  }
+);
 
 console.log("Connected to", raddr);
 

@@ -1,13 +1,6 @@
 import { v4 } from "uuid";
 import { EventEmitter } from "events";
 
-export interface IBindConfig {
-  onOpen?: () => void;
-  onError?: (e: Event) => void;
-  onClose?: () => void;
-  reconnectDelay?: number;
-}
-
 interface IMessage {
   request?: string;
   response?: string;
@@ -31,44 +24,18 @@ interface ICallResponse {
 }
 
 /**
- * Expose local functions and bind remote ones
- * @param getSocket Function that returns the WebSocket to use
+ * Expose local functions and link remote ones to a WebSocket
+ * @param socket WebSocket to use
  * @param local Local functions to expose
- * @param remote Object with expected remote function signatures
- * @param setRemote Function to set the generated remote functions with
- * @param config Additional configuration
+ * @returns Remote functions
  */
-export const bind = (
-  getSocket: () => WebSocket,
+export const linkWebSocket = <R>(
+  socket: WebSocket,
 
   local: any,
-
-  remote: any,
-  setRemote: (remote: any) => void,
-
-  config?: IBindConfig
+  remote: R
 ) => {
   const broker = new EventEmitter();
-
-  const socket = getSocket();
-
-  socket.addEventListener("open", () => {
-    config?.onOpen?.();
-  });
-
-  socket.addEventListener("error", (e) => {
-    config?.onError?.(e);
-  });
-
-  socket.addEventListener("close", async () => {
-    config?.onClose?.();
-
-    await new Promise((res) => {
-      setTimeout(res, config?.reconnectDelay || 1000);
-    });
-
-    bind(getSocket, local, remote, setRemote);
-  });
 
   const r = { ...remote };
   // eslint-disable-next-line no-restricted-syntax, guard-for-in
@@ -102,7 +69,6 @@ export const bind = (
         socket.send(JSON.stringify(outMsg));
       });
   }
-  setRemote(r);
 
   socket.addEventListener("message", async (event) => {
     const inMsg: IMessage = JSON.parse(event.data as string);
@@ -144,4 +110,6 @@ export const bind = (
       broker.emit(`rpc:${res.call}`, callResponse);
     }
   });
+
+  return r;
 };
