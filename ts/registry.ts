@@ -6,17 +6,84 @@ interface IMessage {
   response?: string;
 }
 
+const marshalMessage = (
+  request: string | undefined,
+  response: string | undefined
+): string => {
+  const msg: IMessage = { request, response };
+
+  return JSON.stringify(msg);
+};
+
+const unmarshalMessage = (msg: string): IMessage => JSON.parse(msg);
+
 interface IRequest {
   call: string;
   function: string;
   args: string[];
 }
 
+const marshalRequest = (
+  call: string,
+  functionName: string,
+  args: any[]
+): string => {
+  const req: IRequest = {
+    call,
+    function: functionName,
+    args: args.map((arg) => btoa(JSON.stringify(arg))),
+  };
+
+  return btoa(JSON.stringify(req));
+};
+
+const unmarshalRequest = (
+  request: string
+): {
+  call: string;
+  functionName: string;
+  args: any[];
+} => {
+  const req: IRequest = JSON.parse(atob(request));
+
+  return {
+    call: req.call,
+    functionName: req.function,
+    args: req.args.map((arg) => JSON.parse(atob(arg))),
+  };
+};
+
 interface IResponse {
   call: string;
   value: string;
   err: string;
 }
+
+const marshalResponse = (call: string, value: any, err: string): string => {
+  const res: IResponse = {
+    call,
+    value: btoa(JSON.stringify(value)),
+    err,
+  };
+
+  return btoa(JSON.stringify(res));
+};
+
+const unmarshalResponse = (
+  response: string
+): {
+  call: string;
+  value: any;
+  err: string;
+} => {
+  const res: IResponse = JSON.parse(atob(response));
+
+  return {
+    call: res.call,
+    value: JSON.parse(atob(res.value)),
+    err: res.err,
+  };
+};
 
 interface ICallResponse {
   value: any;
@@ -73,58 +140,37 @@ export const linkWebSocket = <R>(
           handleReturn(e);
         });
 
-        const req: IRequest = {
-          call: id,
-          function: functionName,
-          args: args.map((arg) => btoa(JSON.stringify(arg))),
-        };
-
-        const outMsg: IMessage = {
-          request: btoa(JSON.stringify(req)),
-        };
-
-        socket.send(JSON.stringify(outMsg));
+        socket.send(
+          marshalMessage(marshalRequest(id, functionName, args), undefined)
+        );
       });
   }
 
   socket.addEventListener("message", async (event) => {
-    const inMsg: IMessage = JSON.parse(event.data as string);
+    const inMsg: IMessage = unmarshalMessage(event.data as string);
 
     if (inMsg.request) {
-      const req: IRequest = JSON.parse(atob(inMsg.request));
+      const { call, functionName, args } = unmarshalRequest(inMsg.request);
 
-      const args = req.args.map((arg) => JSON.parse(atob(arg)));
-
-      const res: IResponse = {
-        call: req.call,
-        value: "",
-        err: "",
-      };
-
+      let res = "";
       try {
-        const rv = await (local as any)[req.function](...args);
+        const rv = await (local as any)[functionName](...args);
 
-        res.value = btoa(JSON.stringify(rv));
+        res = marshalResponse(call, rv, "");
       } catch (e) {
-        res.err = (e as Error).message;
+        res = marshalResponse(call, undefined, (e as Error).message);
       }
 
-      const outMsg: IMessage = {
-        response: btoa(JSON.stringify(res)),
-      };
-
-      socket.send(JSON.stringify(outMsg));
+      socket.send(marshalMessage(undefined, res));
     } else if (inMsg.response) {
-      const res: IResponse = JSON.parse(atob(inMsg.response));
-
-      const value = JSON.parse(atob(res.value));
+      const { call, value, err } = unmarshalResponse(inMsg.response);
 
       const callResponse: ICallResponse = {
         value,
-        err: res.err,
+        err,
       };
 
-      broker.emit(`rpc:${res.call}`, callResponse);
+      broker.emit(`rpc:${call}`, callResponse);
     }
   });
 
