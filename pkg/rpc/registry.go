@@ -31,25 +31,25 @@ const (
 	DefaultResponseBufferLen = 1024
 )
 
-type Message struct {
-	Request  *[]byte `json:"request"`
-	Response *[]byte `json:"response"`
+type Message[T any] struct {
+	Request  *T `json:"request"`
+	Response *T `json:"response"`
 }
 
-type Request struct {
+type Request[T any] struct {
 	Call     string `json:"call"`
 	Function string `json:"function"`
-	Args     []any  `json:"args"`
+	Args     []T    `json:"args"`
 }
 
-type Response struct {
+type Response[T any] struct {
 	Call  string `json:"call"`
-	Value any    `json:"value"`
+	Value T      `json:"value"`
 	Err   string `json:"err"`
 }
 
-type callResponse struct {
-	value   any
+type callResponse[T any] struct {
+	value   T
 	err     error
 	timeout bool
 }
@@ -68,7 +68,7 @@ type Options struct {
 	OnClientDisconnect func(remoteID string)
 }
 
-type Registry[R any] struct {
+type Registry[R, T any] struct {
 	local  wrappedChild
 	remote R
 
@@ -81,41 +81,37 @@ type Registry[R any] struct {
 	options *Options
 }
 
-func NewRegistry[R any](
+func NewRegistry[R, T any](
 	local any,
-	remote R,
 
 	timeout time.Duration,
 	ctx context.Context,
 
 	options *Options,
-) *Registry[R] {
+) *Registry[R, T] {
 	if options == nil {
 		options = &Options{}
 	}
 
-	return &Registry[R]{wrappedChild{
+	return &Registry[R, T]{wrappedChild{
 		local,
 		&closureManager{
 			closuresLock: sync.Mutex{},
 			closures:     map[string]func(args ...interface{}) (interface{}, error){},
 		},
-	}, remote, map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
+	}, *new(R), map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
 }
 
-func (r Registry[R]) makeRPC(
+func (r Registry[R, T]) makeRPC(
 	name string,
 	functionType reflect.Type,
 	setErr func(err error),
-	responseResolver *utils.Broadcaster[callResponse],
+	responseResolver *utils.Broadcaster[callResponse[T]],
 
-	writeRequest func(b []byte) error,
+	writeRequest func(b T) error,
 
-	marshal func(v any) ([]byte, error),
-	unmarshal func(data []byte, v any) error,
-
-	marshalNested func(v any) (any, error),
-	unmarshalNested func(data any, v any) error,
+	marshalNested func(v any) (T, error),
+	unmarshalNested func(data T, v any) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 		defer func() {
@@ -146,10 +142,10 @@ func (r Registry[R]) makeRPC(
 
 		callID := uuid.NewString()
 
-		cmd := Request{
+		cmd := Request[T]{
 			Call:     callID,
 			Function: name,
-			Args:     []any{},
+			Args:     []T{},
 		}
 
 		for i, arg := range args {
@@ -180,18 +176,18 @@ func (r Registry[R]) makeRPC(
 			}
 		}
 
-		b, err := marshal(cmd)
+		b, err := marshalNested(cmd)
 		if err != nil {
 			panic(err)
 		}
 
-		res := make(chan callResponse)
+		res := make(chan callResponse[T])
 		go func() {
 			defer responseResolver.Close(callID)
 
 			r, ok := responseResolver.Receive(callID, r.timeout)
 			if !ok {
-				r = &callResponse{nil, ErrCallTimedOut, true}
+				r = &callResponse[T]{*new(T), ErrCallTimedOut, true}
 			}
 
 			res <- *r
@@ -240,26 +236,26 @@ func (r Registry[R]) makeRPC(
 	})
 }
 
-func (r Registry[R]) LinkStream(
+func (r Registry[R, T]) LinkStream(
 	encode func(v any) error,
 	decode func(v any) error,
 
 	marshal func(v any) ([]byte, error),
 	unmarshal func(data []byte, v any) error,
 
-	marshalNested func(v any) (any, error),
-	unmarshalNested func(data any, v any) error,
+	marshalNested func(v any) (T, error),
+	unmarshalNested func(data T, v any) error,
 ) error {
 	var (
 		decodeDone = make(chan struct{})
 		decodeErr  error
 
-		requests  = make(chan []byte)
-		responses = make(chan []byte)
+		requests  = make(chan T)
+		responses = make(chan T)
 	)
 	go func() {
 		for {
-			var msg Message
+			var msg Message[T]
 			if err := decode(&msg); err != nil {
 				decodeErr = err
 
@@ -279,56 +275,50 @@ func (r Registry[R]) LinkStream(
 	}()
 
 	return r.LinkMessage(
-		func(b []byte) error {
-			return encode(Message{
+		func(b T) error {
+			return encode(Message[T]{
 				Request: &b,
 			})
 		},
-		func(b []byte) error {
-			return encode(Message{
+		func(b T) error {
+			return encode(Message[T]{
 				Response: &b,
 			})
 		},
 
-		func() ([]byte, error) {
+		func() (T, error) {
 			select {
 			case <-decodeDone:
-				return []byte{}, decodeErr
+				return *new(T), decodeErr
 			case request := <-requests:
 				return request, nil
 			}
 		},
-		func() ([]byte, error) {
+		func() (T, error) {
 			select {
 			case <-decodeDone:
-				return []byte{}, decodeErr
+				return *new(T), decodeErr
 			case response := <-responses:
 				return response, nil
 			}
 		},
-
-		marshal,
-		unmarshal,
 
 		marshalNested,
 		unmarshalNested,
 	)
 }
 
-func (r Registry[R]) LinkMessage(
+func (r Registry[R, T]) LinkMessage(
 	writeRequest,
-	writeResponse func(b []byte) error,
+	writeResponse func(b T) error,
 
 	readRequest,
-	readResponse func() ([]byte, error),
+	readResponse func() (T, error),
 
-	marshal func(v any) ([]byte, error),
-	unmarshal func(data []byte, v any) error,
-
-	marshalNested func(v any) (any, error),
-	unmarshalNested func(data any, v any) error,
+	marshalNested func(v any) (T, error),
+	unmarshalNested func(data T, v any) error,
 ) error {
-	responseResolver := utils.NewBroadcaster[callResponse]()
+	responseResolver := utils.NewBroadcaster[callResponse[T]]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
 
@@ -385,9 +375,6 @@ func (r Registry[R]) LinkMessage(
 
 					writeRequest,
 
-					marshal,
-					unmarshal,
-
 					marshalNested,
 					unmarshalNested,
 				))
@@ -427,8 +414,8 @@ func (r Registry[R]) LinkMessage(
 					return
 				}
 
-				var req Request
-				if err := unmarshal(b, &req); err != nil {
+				var req Request[T]
+				if err := unmarshalNested(b, &req); err != nil {
 					setErr(err)
 
 					return
@@ -508,9 +495,6 @@ func (r Registry[R]) LinkMessage(
 
 									writeRequest,
 
-									marshal,
-									unmarshal,
-
 									marshalNested,
 									unmarshalNested,
 								)
@@ -578,7 +562,7 @@ func (r Registry[R]) LinkMessage(
 								return
 							}
 
-							b, err := marshal(Response{
+							b, err := marshalNested(Response[T]{
 								Call:  req.Call,
 								Value: v,
 								Err:   "",
@@ -603,7 +587,7 @@ func (r Registry[R]) LinkMessage(
 									return
 								}
 
-								b, err := marshal(Response{
+								b, err := marshalNested(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[0].Interface().(error).Error(),
@@ -627,7 +611,7 @@ func (r Registry[R]) LinkMessage(
 									return
 								}
 
-								b, err := marshal(Response{
+								b, err := marshalNested(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
@@ -653,7 +637,7 @@ func (r Registry[R]) LinkMessage(
 							}
 
 							if res[1].Interface() == nil {
-								b, err := marshal(Response{
+								b, err := marshalNested(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
@@ -670,7 +654,7 @@ func (r Registry[R]) LinkMessage(
 									return
 								}
 							} else {
-								b, err := marshal(Response{
+								b, err := marshalNested(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[1].Interface().(error).Error(),
@@ -705,8 +689,8 @@ func (r Registry[R]) LinkMessage(
 					return
 				}
 
-				var res Response
-				if err := unmarshal(b, &res); err != nil {
+				var res Response[T]
+				if err := unmarshalNested(b, &res); err != nil {
 					setErr(err)
 
 					return
@@ -717,7 +701,7 @@ func (r Registry[R]) LinkMessage(
 				}
 
 				go func() {
-					if ok := responseResolver.Publish(res.Call, callResponse{res.Value, err, false}, r.timeout); !ok {
+					if ok := responseResolver.Publish(res.Call, callResponse[T]{res.Value, err, false}, r.timeout); !ok {
 						responseResolver.Close(res.Call)
 					}
 				}()
@@ -736,7 +720,7 @@ func (r Registry[R]) LinkMessage(
 	return fatalErr
 }
 
-func (r Registry[R]) ForRemotes(
+func (r Registry[R, T]) ForRemotes(
 	cb func(remoteID string, remote R) error,
 ) error {
 	r.remotesLock.Lock()

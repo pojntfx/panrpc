@@ -3,8 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -12,11 +10,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/rpc"
-)
+	"github.com/fxamacker/cbor/v2"
 
-var (
-	errNotRawMessage = errors.New("received non-raw message")
+	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
 type local struct{}
@@ -44,9 +40,8 @@ func main() {
 
 	clients := 0
 
-	registry := rpc.NewRegistry(
+	registry := rpc.NewRegistry[remote, cbor.RawMessage](
 		&local{},
-		remote{},
 
 		time.Second*10,
 		ctx,
@@ -141,14 +136,23 @@ func main() {
 					}()
 
 					if err := registry.LinkStream(
-						json.NewEncoder(conn).Encode,
-						json.NewDecoder(conn).Decode,
+						cbor.NewEncoder(conn).Encode,
+						cbor.NewDecoder(conn).Decode,
 
-						json.Marshal,
-						json.Unmarshal,
+						cbor.Marshal,
+						cbor.Unmarshal,
 
-						nil,
-						nil,
+						func(v any) (cbor.RawMessage, error) {
+							b, err := cbor.Marshal(v)
+							if err != nil {
+								return nil, err
+							}
+
+							return cbor.RawMessage(b), nil
+						},
+						func(data cbor.RawMessage, v any) error {
+							return cbor.Unmarshal([]byte(data), v)
+						},
 					); err != nil {
 						panic(err)
 					}
@@ -165,27 +169,22 @@ func main() {
 		log.Println("Connected to", conn.RemoteAddr())
 
 		if err := registry.LinkStream(
-			json.NewEncoder(conn).Encode,
-			json.NewDecoder(conn).Decode,
+			cbor.NewEncoder(conn).Encode,
+			cbor.NewDecoder(conn).Decode,
 
-			json.Marshal,
-			json.Unmarshal,
+			cbor.Marshal,
+			cbor.Unmarshal,
 
-			func(v any) (any, error) {
-				b, err := json.Marshal(v)
+			func(v any) (cbor.RawMessage, error) {
+				b, err := cbor.Marshal(v)
 				if err != nil {
 					return nil, err
 				}
 
-				return string(json.RawMessage(b)), nil
+				return cbor.RawMessage(b), nil
 			},
-			func(data, v any) error {
-				b, ok := data.(string)
-				if !ok {
-					return errNotRawMessage
-				}
-
-				return json.Unmarshal(json.RawMessage(b), v)
+			func(data cbor.RawMessage, v any) error {
+				return cbor.Unmarshal([]byte(data), v)
 			},
 		); err != nil {
 			panic(err)
