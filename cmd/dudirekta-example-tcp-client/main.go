@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +13,10 @@ import (
 	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
+)
+
+var (
+	errNotRawMessage = errors.New("received non-raw message")
 )
 
 type local struct{}
@@ -141,6 +146,9 @@ func main() {
 
 						json.Marshal,
 						json.Unmarshal,
+
+						nil,
+						nil,
 					); err != nil {
 						panic(err)
 					}
@@ -162,6 +170,23 @@ func main() {
 
 			json.Marshal,
 			json.Unmarshal,
+
+			func(v any) (any, error) {
+				b, err := json.Marshal(v)
+				if err != nil {
+					return nil, err
+				}
+
+				return string(json.RawMessage(b)), nil
+			},
+			func(data, v any) error {
+				b, ok := data.(string)
+				if !ok {
+					return errNotRawMessage
+				}
+
+				return json.Unmarshal(json.RawMessage(b), v)
+			},
 		); err != nil {
 			panic(err)
 		}
