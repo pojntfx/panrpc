@@ -110,8 +110,8 @@ func (r Registry[R, T]) makeRPC(
 
 	writeRequest func(b T) error,
 
-	marshalNested func(v any) (T, error),
-	unmarshalNested func(data T, v any) error,
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
 ) reflect.Value {
 	return reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 		defer func() {
@@ -162,13 +162,13 @@ func (r Registry[R, T]) makeRPC(
 				}
 				defer freeClosure()
 
-				b, err := marshalNested(closureID)
+				b, err := marshal(closureID)
 				if err != nil {
 					panic(err)
 				}
 				cmd.Args = append(cmd.Args, b)
 			} else {
-				b, err := marshalNested(arg.Interface())
+				b, err := marshal(arg.Interface())
 				if err != nil {
 					panic(err)
 				}
@@ -176,7 +176,7 @@ func (r Registry[R, T]) makeRPC(
 			}
 		}
 
-		b, err := marshalNested(cmd)
+		b, err := marshal(cmd)
 		if err != nil {
 			panic(err)
 		}
@@ -206,7 +206,7 @@ func (r Registry[R, T]) makeRPC(
 				if rawReturnValue.err != nil {
 					returnValue.Elem().Set(reflect.ValueOf(rawReturnValue.err))
 				} else if !functionType.Out(0).Implements(errorType) {
-					if err := unmarshalNested(rawReturnValue.value, returnValue.Interface()); err != nil {
+					if err := unmarshal(rawReturnValue.value, returnValue.Interface()); err != nil {
 						panic(err)
 					}
 				}
@@ -217,7 +217,7 @@ func (r Registry[R, T]) makeRPC(
 				errReturnValue := reflect.New(functionType.Out(1))
 
 				if !rawReturnValue.timeout {
-					if err := unmarshalNested(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
+					if err := unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
 						panic(err)
 					}
 				}
@@ -237,14 +237,11 @@ func (r Registry[R, T]) makeRPC(
 }
 
 func (r Registry[R, T]) LinkStream(
-	encode func(v any) error,
-	decode func(v any) error,
+	encode func(v Message[T]) error,
+	decode func(v *Message[T]) error,
 
-	marshal func(v any) ([]byte, error),
-	unmarshal func(data []byte, v any) error,
-
-	marshalNested func(v any) (T, error),
-	unmarshalNested func(data T, v any) error,
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
 ) error {
 	var (
 		decodeDone = make(chan struct{})
@@ -303,8 +300,8 @@ func (r Registry[R, T]) LinkStream(
 			}
 		},
 
-		marshalNested,
-		unmarshalNested,
+		marshal,
+		unmarshal,
 	)
 }
 
@@ -315,8 +312,8 @@ func (r Registry[R, T]) LinkMessage(
 	readRequest,
 	readResponse func() (T, error),
 
-	marshalNested func(v any) (T, error),
-	unmarshalNested func(data T, v any) error,
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
 ) error {
 	responseResolver := utils.NewBroadcaster[callResponse[T]]()
 
@@ -375,8 +372,8 @@ func (r Registry[R, T]) LinkMessage(
 
 					writeRequest,
 
-					marshalNested,
-					unmarshalNested,
+					marshal,
+					unmarshal,
 				))
 		}
 
@@ -415,7 +412,7 @@ func (r Registry[R, T]) LinkMessage(
 				}
 
 				var req Request[T]
-				if err := unmarshalNested(b, &req); err != nil {
+				if err := unmarshal(b, &req); err != nil {
 					setErr(err)
 
 					return
@@ -483,7 +480,7 @@ func (r Registry[R, T]) LinkMessage(
 								}()
 
 								closureID := ""
-								if err := unmarshalNested(req.Args[i-2], &closureID); err != nil {
+								if err := unmarshal(req.Args[i-2], &closureID); err != nil {
 									panic(err)
 								}
 
@@ -495,8 +492,8 @@ func (r Registry[R, T]) LinkMessage(
 
 									writeRequest,
 
-									marshalNested,
-									unmarshalNested,
+									marshal,
+									unmarshal,
 								)
 
 								rpcArgs := []interface{}{}
@@ -535,7 +532,7 @@ func (r Registry[R, T]) LinkMessage(
 						} else {
 							arg := reflect.New(functionType)
 
-							if err := unmarshalNested(req.Args[i-1], arg.Interface()); err != nil {
+							if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
 								setErr(err)
 
 								return
@@ -555,14 +552,14 @@ func (r Registry[R, T]) LinkMessage(
 
 						switch len(res) {
 						case 0:
-							v, err := marshalNested(nil)
+							v, err := marshal(nil)
 							if err != nil {
 								setErr(err)
 
 								return
 							}
 
-							b, err := marshalNested(Response[T]{
+							b, err := marshal(Response[T]{
 								Call:  req.Call,
 								Value: v,
 								Err:   "",
@@ -580,14 +577,14 @@ func (r Registry[R, T]) LinkMessage(
 							}
 						case 1:
 							if res[0].Type().Implements(errorType) && !res[0].IsNil() {
-								v, err := marshalNested(nil)
+								v, err := marshal(nil)
 								if err != nil {
 									setErr(err)
 
 									return
 								}
 
-								b, err := marshalNested(Response[T]{
+								b, err := marshal(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[0].Interface().(error).Error(),
@@ -604,14 +601,14 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 							} else {
-								v, err := marshalNested(res[0].Interface())
+								v, err := marshal(res[0].Interface())
 								if err != nil {
 									setErr(err)
 
 									return
 								}
 
-								b, err := marshalNested(Response[T]{
+								b, err := marshal(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
@@ -629,7 +626,7 @@ func (r Registry[R, T]) LinkMessage(
 								}
 							}
 						case 2:
-							v, err := marshalNested(res[0].Interface())
+							v, err := marshal(res[0].Interface())
 							if err != nil {
 								setErr(err)
 
@@ -637,7 +634,7 @@ func (r Registry[R, T]) LinkMessage(
 							}
 
 							if res[1].Interface() == nil {
-								b, err := marshalNested(Response[T]{
+								b, err := marshal(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
@@ -654,7 +651,7 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 							} else {
-								b, err := marshalNested(Response[T]{
+								b, err := marshal(Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[1].Interface().(error).Error(),
@@ -690,7 +687,7 @@ func (r Registry[R, T]) LinkMessage(
 				}
 
 				var res Response[T]
-				if err := unmarshalNested(b, &res); err != nil {
+				if err := unmarshal(b, &res); err != nil {
 					setErr(err)
 
 					return

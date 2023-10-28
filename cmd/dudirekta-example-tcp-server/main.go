@@ -121,12 +121,16 @@ func main() {
 						}
 					}()
 
-					if err := registry.LinkStream(
-						json.NewEncoder(conn).Encode,
-						json.NewDecoder(conn).Decode,
+					encoder := json.NewEncoder(conn)
+					decoder := json.NewDecoder(conn)
 
-						json.Marshal,
-						json.Unmarshal,
+					if err := registry.LinkStream(
+						func(v rpc.Message[json.RawMessage]) error {
+							return encoder.Encode(v)
+						},
+						func(v *rpc.Message[json.RawMessage]) error {
+							return decoder.Decode(v)
+						},
 
 						func(v any) (json.RawMessage, error) {
 							b, err := json.Marshal(v)
@@ -154,12 +158,16 @@ func main() {
 
 		log.Println("Connected to", conn.RemoteAddr())
 
-		if err := registry.LinkStream(
-			json.NewEncoder(conn).Encode,
-			json.NewDecoder(conn).Decode,
+		encoder := json.NewEncoder(conn)
+		decoder := json.NewDecoder(conn)
 
-			json.Marshal,
-			json.Unmarshal,
+		if err := registry.LinkStream(
+			func(v rpc.Message[json.RawMessage]) error {
+				return encoder.Encode(v)
+			},
+			func(v *rpc.Message[json.RawMessage]) error {
+				return decoder.Decode(v)
+			},
 
 			func(v any) (json.RawMessage, error) {
 				b, err := json.Marshal(v)
