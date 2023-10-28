@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -10,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
 
@@ -39,7 +39,7 @@ func main() {
 
 	clients := 0
 
-	registry := rpc.NewRegistry[remote, cbor.RawMessage](
+	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
 
 		time.Second*10,
@@ -122,22 +122,22 @@ func main() {
 					}()
 
 					if err := registry.LinkStream(
-						cbor.NewEncoder(conn).Encode,
-						cbor.NewDecoder(conn).Decode,
+						json.NewEncoder(conn).Encode,
+						json.NewDecoder(conn).Decode,
 
-						cbor.Marshal,
-						cbor.Unmarshal,
+						json.Marshal,
+						json.Unmarshal,
 
-						func(v any) (cbor.RawMessage, error) {
-							b, err := cbor.Marshal(v)
+						func(v any) (json.RawMessage, error) {
+							b, err := json.Marshal(v)
 							if err != nil {
 								return nil, err
 							}
 
-							return cbor.RawMessage(b), nil
+							return json.RawMessage(b), nil
 						},
-						func(data cbor.RawMessage, v any) error {
-							return cbor.Unmarshal([]byte(data), v)
+						func(data json.RawMessage, v any) error {
+							return json.Unmarshal([]byte(data), v)
 						},
 					); err != nil {
 						panic(err)
@@ -155,22 +155,22 @@ func main() {
 		log.Println("Connected to", conn.RemoteAddr())
 
 		if err := registry.LinkStream(
-			cbor.NewEncoder(conn).Encode,
-			cbor.NewDecoder(conn).Decode,
+			json.NewEncoder(conn).Encode,
+			json.NewDecoder(conn).Decode,
 
-			cbor.Marshal,
-			cbor.Unmarshal,
+			json.Marshal,
+			json.Unmarshal,
 
-			func(v any) (cbor.RawMessage, error) {
-				b, err := cbor.Marshal(v)
+			func(v any) (json.RawMessage, error) {
+				b, err := json.Marshal(v)
 				if err != nil {
 					return nil, err
 				}
 
-				return cbor.RawMessage(b), nil
+				return json.RawMessage(b), nil
 			},
-			func(data cbor.RawMessage, v any) error {
-				return cbor.Unmarshal([]byte(data), v)
+			func(data json.RawMessage, v any) error {
+				return json.Unmarshal([]byte(data), v)
 			},
 		); err != nil {
 			panic(err)
