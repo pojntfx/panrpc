@@ -1,87 +1,101 @@
-interface IMessage {
-  request?: string;
-  response?: string;
+interface IMessage<T> {
+  request?: T;
+  response?: T;
 }
 
-export const marshalMessage = (
-  request: string | undefined,
-  response: string | undefined
-): string => {
-  const msg: IMessage = { request, response };
+export const marshalMessage = <T>(
+  request: T | undefined,
+  response: T | undefined,
 
-  return JSON.stringify(msg);
+  stringify: (value: any) => string
+): string => {
+  const msg: IMessage<T> = { request, response };
+
+  return stringify(msg);
 };
 
-export const unmarshalMessage = (msg: string): IMessage => JSON.parse(msg);
+export const unmarshalMessage = <T>(
+  msg: string,
 
-interface IRequest {
+  parse: (text: string) => any
+): IMessage<T> => parse(msg);
+
+interface IRequest<T> {
   call: string;
   function: string;
-  args: string[];
+  args: T[];
 }
 
-export const marshalRequest = (
+export const marshalRequest = <T>(
   call: string,
   functionName: string,
-  args: any[]
-): string => {
-  const req: IRequest = {
+  args: any[],
+
+  stringifyNested: (value: any) => T
+): T => {
+  const req: IRequest<T> = {
     call,
     function: functionName,
-    args: args.map((arg) => btoa(JSON.stringify(arg))),
+    args: args.map((arg) => stringifyNested(arg)),
   };
 
-  return btoa(JSON.stringify(req));
+  return stringifyNested(req);
 };
 
-export const unmarshalRequest = (
-  request: string
+export const unmarshalRequest = <T>(
+  request: T,
+
+  parseNested: (text: T) => any
 ): {
   call: string;
   functionName: string;
   args: any[];
 } => {
-  const req: IRequest = JSON.parse(atob(request));
+  const req: IRequest<T> = parseNested(request);
 
   return {
     call: req.call,
     functionName: req.function,
-    args: req.args.map((arg) => JSON.parse(atob(arg))),
+    args: req.args.map((arg) => parseNested(arg)),
   };
 };
 
-interface IResponse {
+interface IResponse<T> {
   call: string;
-  value: string;
+  value: T;
   err: string;
 }
 
-export const marshalResponse = (
+export const marshalResponse = <T>(
   call: string,
   value: any,
-  err: string
-): string => {
-  const res: IResponse = {
+  err: string,
+
+  stringifyNested: (value: any) => T
+): T => {
+  const res: IResponse<T> = {
     call,
-    value: btoa(JSON.stringify(value)),
+    value: stringifyNested(value),
     err,
   };
 
-  return btoa(JSON.stringify(res));
+  return stringifyNested(res);
 };
 
-export const unmarshalResponse = (
-  response: string
+export const unmarshalResponse = <T>(
+  response: T,
+
+  parseNested: (text: T) => any
 ): {
   call: string;
   value: any;
   err: string;
 } => {
-  const res: IResponse = JSON.parse(atob(response));
+  const res: IResponse<T> = parseNested(response);
 
   return {
     call: res.call,
-    value: JSON.parse(atob(res.value)),
+    value: parseNested(res.value),
     err: res.err,
   };
 };

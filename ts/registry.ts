@@ -10,7 +10,7 @@ import {
 } from "./messages";
 
 interface ICallResponse {
-  value: any;
+  value?: any;
   err: string;
 }
 
@@ -22,13 +22,19 @@ export const ErrorCallTimedOut = "call timed out";
  * @param local Local functions to expose
  * @returns Remote functions
  */
-export const linkWebSocket = <R>(
+export const linkWebSocket = <R, T>(
   socket: WebSocket,
 
   local: any,
   remote: R,
 
-  timeout: number
+  timeout: number,
+
+  stringify: (value: any) => string,
+  parse: (text: string) => any,
+
+  stringifyNested: (value: any) => T,
+  parseNested: (text: T) => any
 ) => {
   const broker = new EventEmitter();
 
@@ -51,7 +57,6 @@ export const linkWebSocket = <R>(
 
         const t = setTimeout(() => {
           const callResponse: ICallResponse = {
-            value: "",
             err: ErrorCallTimedOut,
           };
 
@@ -65,29 +70,44 @@ export const linkWebSocket = <R>(
         });
 
         socket.send(
-          marshalMessage(marshalRequest(id, functionName, args), undefined)
+          marshalMessage<T>(
+            marshalRequest<T>(id, functionName, args, stringifyNested),
+            undefined,
+            stringify
+          )
         );
       });
   }
 
   socket.addEventListener("message", async (event) => {
-    const msg = unmarshalMessage(event.data as string);
+    const msg = unmarshalMessage<T>(event.data as string, parse);
 
     if (msg.request) {
-      const { call, functionName, args } = unmarshalRequest(msg.request);
+      const { call, functionName, args } = unmarshalRequest<T>(
+        msg.request,
+        parseNested
+      );
 
-      let res = "";
+      let res: T;
       try {
         const rv = await (local as any)[functionName](...args);
 
-        res = marshalResponse(call, rv, "");
+        res = marshalResponse<T>(call, rv, "", stringifyNested);
       } catch (e) {
-        res = marshalResponse(call, undefined, (e as Error).message);
+        res = marshalResponse<T>(
+          call,
+          undefined,
+          (e as Error).message,
+          stringifyNested
+        );
       }
 
-      socket.send(marshalMessage(undefined, res));
+      socket.send(marshalMessage<T>(undefined, res, stringify));
     } else if (msg.response) {
-      const { call, value, err } = unmarshalResponse(msg.response);
+      const { call, value, err } = unmarshalResponse<T>(
+        msg.response,
+        parseNested
+      );
 
       const callResponse: ICallResponse = {
         value,

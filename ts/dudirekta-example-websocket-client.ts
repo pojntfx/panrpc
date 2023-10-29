@@ -31,7 +31,13 @@ const remote = linkWebSocket(
     Increment: async (delta: number): Promise<number> => 0,
   },
 
-  1000 * 10
+  1000 * 10,
+
+  JSON.stringify,
+  JSON.parse,
+
+  (v) => v,
+  (v) => v
 );
 
 console.log("Connected to", raddr);
