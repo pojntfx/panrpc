@@ -24,23 +24,14 @@ type reducedResponse struct {
 }
 
 func main() {
-	raddr := flag.String("raddr", "localhost:1337", "Remote address")
+	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
+	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
 	function := flag.String("function", "", "Remote function name to call")
 	rawArgs := flag.String("args", `[]`, "JSON-encoded Array of arguments to call remote function with (i.e. `[1, \"Hello, world\", { \"nested:\": true }])")
 	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response")
 	verbose := flag.Bool("verbose", false, "Whether to enable verbose logging")
 
 	flag.Parse()
-
-	conn, err := net.Dial("tcp", *raddr)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	if *verbose {
-		log.Println("Connected to", conn.RemoteAddr())
-	}
 
 	if strings.TrimSpace(*function) == "" {
 		panic(errMissingFunctionName)
@@ -62,6 +53,37 @@ func main() {
 	}
 
 	callID := uuid.NewString()
+
+	var (
+		conn net.Conn
+		err  error
+	)
+	if *listen {
+		lis, err := net.Listen("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+		defer lis.Close()
+
+		if *verbose {
+			log.Println("Listening on", lis.Addr())
+		}
+
+		conn, err = lis.Accept()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		conn, err = net.Dial("tcp", *addr)
+		if err != nil {
+			panic(err)
+		}
+
+		if *verbose {
+			log.Println("Connected to", conn.RemoteAddr())
+		}
+	}
+	defer conn.Close()
 
 	var req json.RawMessage
 	req, err = json.Marshal(rpc.Request[json.RawMessage]{
