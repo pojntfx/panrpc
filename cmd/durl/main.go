@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
@@ -26,6 +27,7 @@ func main() {
 	raddr := flag.String("raddr", "localhost:1337", "Remote address")
 	function := flag.String("function", "", "Remote function name to call")
 	rawArgs := flag.String("args", `[]`, "JSON-encoded Array of arguments to call remote function with (i.e. `[1, \"Hello, world\", { \"nested:\": true }])")
+	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response")
 	verbose := flag.Bool("verbose", false, "Whether to enable verbose logging")
 
 	flag.Parse()
@@ -78,36 +80,53 @@ func main() {
 		panic(err)
 	}
 
-	decoder := json.NewDecoder(conn)
-	for {
-		var msg rpc.Message[json.RawMessage]
-		if err := decoder.Decode(&msg); err != nil {
-			panic(err)
-		}
+	var (
+		timeoutChan  = time.After(*timeout)
+		responseChan = make(chan rpc.Response[json.RawMessage])
+	)
 
-		if msg.Response == nil {
-			if *verbose {
-				log.Println("Received request, skipping:", msg)
+	go func() {
+		decoder := json.NewDecoder(conn)
+		for {
+			var msg rpc.Message[json.RawMessage]
+			if err := decoder.Decode(&msg); err != nil {
+				panic(err)
 			}
 
-			continue
-		}
+			if msg.Response == nil {
+				if *verbose {
+					log.Println("Received request, skipping:", msg)
+				}
 
-		var response rpc.Response[json.RawMessage]
-		if err := json.Unmarshal(*msg.Response, &response); err != nil {
-			panic(err)
-		}
+				continue
+			}
 
+			var response rpc.Response[json.RawMessage]
+			if err := json.Unmarshal(*msg.Response, &response); err != nil {
+				panic(err)
+			}
+
+			responseChan <- response
+
+			break
+		}
+	}()
+
+	select {
+	case <-timeoutChan:
+		log.Fatal(rpc.ErrCallTimedOut)
+
+	case response := <-responseChan:
 		var value any
 		if err := json.Unmarshal(response.Value, &value); err != nil {
 			panic(err)
 		}
 
-		json.NewEncoder(os.Stdout).Encode(reducedResponse{
+		if err := json.NewEncoder(os.Stdout).Encode(reducedResponse{
 			Value: value,
 			Err:   response.Err,
-		})
-
-		break
+		}); err != nil {
+			panic(err)
+		}
 	}
 }
