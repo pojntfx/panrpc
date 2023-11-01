@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -33,6 +34,12 @@ func main() {
 	rawArgs := flag.String("args", `[]`, "JSON-encoded Array of arguments to call remote function with (i.e. `[1, \"Hello, world\", { \"nested:\": true }])")
 	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response")
 	ws := flag.Bool("websocket", false, "Whether to use WebSockets instead of TCP")
+
+	tlsEnabled := flag.Bool("tls-enabled", false, "Whether to use TLS/WebSocket Secure")
+	tlsCert := flag.String("tls-cert", "", "TLS certificate")
+	tlsKey := flag.String("tls-key", "", "TLS key")
+	tlsVerify := flag.Bool("tls-verify", true, "Whether to verify TLS peer certificates")
+
 	verbose := flag.Bool("verbose", false, "Whether to enable verbose logging")
 
 	flag.Parse()
@@ -59,6 +66,19 @@ func main() {
 		encodedArgs = append(encodedArgs, encodedArg)
 	}
 
+	var tlsConfig *tls.Config
+	if *tlsEnabled && strings.TrimSpace(*tlsCert) != "" && strings.TrimSpace(*tlsKey) != "" {
+		cert, err := tls.LoadX509KeyPair(*tlsCert, *tlsKey)
+		if err != nil {
+			panic(err)
+		}
+
+		tlsConfig = &tls.Config{
+			Certificates:       []tls.Certificate{cert},
+			InsecureSkipVerify: *tlsVerify,
+		}
+	}
+
 	callID := uuid.NewString()
 
 	var (
@@ -66,9 +86,17 @@ func main() {
 		err  error
 	)
 	if *listen {
-		lis, err := net.Listen("tcp", *addr)
-		if err != nil {
-			panic(err)
+		var lis net.Listener
+		if tlsConfig == nil {
+			lis, err = net.Listen("tcp", *addr)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			lis, err = tls.Listen("tcp", *addr, tlsConfig)
+			if err != nil {
+				panic(err)
+			}
 		}
 		defer lis.Close()
 
@@ -104,16 +132,29 @@ func main() {
 		}
 	} else {
 		if *ws {
-			c, _, err := websocket.Dial(ctx, *addr, nil)
+			c, _, err := websocket.Dial(ctx, *addr, &websocket.DialOptions{
+				HTTPClient: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: tlsConfig,
+					},
+				},
+			})
 			if err != nil {
 				panic(err)
 			}
 
 			conn = websocket.NetConn(ctx, c, websocket.MessageText)
 		} else {
-			conn, err = net.Dial("tcp", *addr)
-			if err != nil {
-				panic(err)
+			if tlsConfig == nil {
+				conn, err = net.Dial("tcp", *addr)
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				conn, err = tls.Dial("tcp", *addr, tlsConfig)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 	}
