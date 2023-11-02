@@ -6,10 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,7 +23,9 @@ import (
 )
 
 var (
-	errMissingFunctionName = errors.New("missing function name")
+	errMissingURL      = errors.New("missing URL")
+	errMissingArgs     = errors.New("missing args")
+	errMissingFunction = errors.New("missing function")
 )
 
 type reducedResponse struct {
@@ -28,17 +34,29 @@ type reducedResponse struct {
 }
 
 func main() {
-	addr := flag.String("addr", "localhost:1337", "Listen or remote address")
-	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
-	function := flag.String("function", "", "Remote function name to call")
-	rawArgs := flag.String("args", `[]`, "JSON-encoded Array of arguments to call remote function with (i.e. `[1, \"Hello, world\", { \"nested:\": true }])")
-	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response")
-	ws := flag.Bool("websocket", false, "Whether to use WebSockets instead of TCP")
+	flag.Usage = func() {
+		bin := filepath.Base(os.Args[0])
 
-	tlsEnabled := flag.Bool("tls-enabled", false, "Whether to use TLS/WebSocket Secure")
-	tlsCert := flag.String("tls-cert", "", "TLS certificate")
-	tlsKey := flag.String("tls-key", "", "TLS key")
-	tlsVerify := flag.Bool("tls-verify", true, "Whether to verify TLS peer certificates")
+		fmt.Fprintf(os.Stderr, `Like cURL, but for Dudirekta: Command-line tool for interacting with Dudirekta servers
+
+Usage of %v:
+	%v [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
+
+Example:
+	%v wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+
+Flags:
+`, bin, bin, bin)
+
+		flag.PrintDefaults()
+	}
+
+	listen := flag.Bool("listen", false, "Whether to connect to remotes by listening or dialing")
+	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response to a call")
+
+	cert := flag.String("cert", "", "TLS certificate")
+	key := flag.String("key", "", "TLS key")
+	verify := flag.Bool("verify", true, "Whether to verify TLS peer certificates")
 
 	verbose := flag.Bool("verbose", false, "Whether to enable verbose logging")
 
@@ -47,35 +65,104 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if strings.TrimSpace(*function) == "" {
-		panic(errMissingFunctionName)
+	var (
+		flagArgs = flag.Args()
+
+		wsEnabled  = false
+		tlsEnabled = false
+		addr       = ""
+
+		callFunctionName = ""
+		callArgsRaw      = ""
+	)
+	switch len(flagArgs) {
+	case 1:
+		flag.Usage()
+
+		panic(errMissingArgs)
+
+	case 2:
+		u, err := url.Parse(flag.Arg(0))
+		if err != nil {
+			panic(err)
+		}
+		p := u.Port()
+
+		switch u.Scheme {
+		case "ws":
+			wsEnabled = true
+			tlsEnabled = false
+
+			if p == "" {
+				p = "80"
+			}
+
+		case "wss":
+			wsEnabled = true
+			tlsEnabled = true
+
+			if p == "" {
+				p = "443"
+			}
+
+		case "tcp":
+			wsEnabled = false
+			tlsEnabled = false
+
+			if p == "" {
+				p = "80"
+			}
+
+		case "tls":
+			wsEnabled = false
+			tlsEnabled = true
+
+			if p == "" {
+				p = "443"
+			}
+		}
+		addr = net.JoinHostPort(u.Hostname(), p)
+
+		callFunctionName = path.Base(u.Path)
+		callArgsRaw = flag.Arg(1)
+
+	default:
+		flag.Usage()
+
+		panic(errMissingURL)
 	}
 
-	args := []any{}
-	if err := json.Unmarshal([]byte(*rawArgs), &args); err != nil {
+	if strings.TrimSpace(callFunctionName) == "" {
+		flag.Usage()
+
+		panic(errMissingFunction)
+	}
+
+	callArgs := []any{}
+	if err := json.Unmarshal([]byte(callArgsRaw), &callArgs); err != nil {
 		panic(err)
 	}
 
-	encodedArgs := []json.RawMessage{}
-	for _, arg := range args {
-		encodedArg, err := json.Marshal(arg)
+	callArgsEncoded := []json.RawMessage{}
+	for _, callArg := range callArgs {
+		callArgEncoded, err := json.Marshal(callArg)
 		if err != nil {
 			panic(err)
 		}
 
-		encodedArgs = append(encodedArgs, encodedArg)
+		callArgsEncoded = append(callArgsEncoded, callArgEncoded)
 	}
 
 	var tlsConfig *tls.Config
-	if *tlsEnabled && strings.TrimSpace(*tlsCert) != "" && strings.TrimSpace(*tlsKey) != "" {
-		cert, err := tls.LoadX509KeyPair(*tlsCert, *tlsKey)
+	if tlsEnabled && strings.TrimSpace(*cert) != "" && strings.TrimSpace(*key) != "" {
+		cert, err := tls.LoadX509KeyPair(*cert, *key)
 		if err != nil {
 			panic(err)
 		}
 
 		tlsConfig = &tls.Config{
 			Certificates:       []tls.Certificate{cert},
-			InsecureSkipVerify: *tlsVerify,
+			InsecureSkipVerify: *verify,
 		}
 	}
 
@@ -88,12 +175,12 @@ func main() {
 	if *listen {
 		var lis net.Listener
 		if tlsConfig == nil {
-			lis, err = net.Listen("tcp", *addr)
+			lis, err = net.Listen("tcp", addr)
 			if err != nil {
 				panic(err)
 			}
 		} else {
-			lis, err = tls.Listen("tcp", *addr, tlsConfig)
+			lis, err = tls.Listen("tcp", addr, tlsConfig)
 			if err != nil {
 				panic(err)
 			}
@@ -104,7 +191,7 @@ func main() {
 			log.Println("Listening on", lis.Addr())
 		}
 
-		if *ws {
+		if wsEnabled {
 			connChan := make(chan net.Conn)
 
 			go http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -131,8 +218,18 @@ func main() {
 			}
 		}
 	} else {
-		if *ws {
-			c, _, err := websocket.Dial(ctx, *addr, &websocket.DialOptions{
+		if wsEnabled {
+			scheme := "ws://"
+			if tlsEnabled {
+				scheme = "wss://"
+			}
+
+			u, err := url.Parse(scheme + addr)
+			if err != nil {
+				panic(err)
+			}
+
+			c, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
 				HTTPClient: &http.Client{
 					Transport: &http.Transport{
 						TLSClientConfig: tlsConfig,
@@ -146,12 +243,12 @@ func main() {
 			conn = websocket.NetConn(ctx, c, websocket.MessageText)
 		} else {
 			if tlsConfig == nil {
-				conn, err = net.Dial("tcp", *addr)
+				conn, err = net.Dial("tcp", addr)
 				if err != nil {
 					panic(err)
 				}
 			} else {
-				conn, err = tls.Dial("tcp", *addr, tlsConfig)
+				conn, err = tls.Dial("tcp", addr, tlsConfig)
 				if err != nil {
 					panic(err)
 				}
@@ -167,15 +264,14 @@ func main() {
 	var req json.RawMessage
 	req, err = json.Marshal(rpc.Request[json.RawMessage]{
 		Call:     callID,
-		Function: *function,
-		Args:     encodedArgs,
+		Function: callFunctionName,
+		Args:     callArgsEncoded,
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	encoder := json.NewEncoder(conn)
-	if err := encoder.Encode(rpc.Message[json.RawMessage]{
+	if err := json.NewEncoder(conn).Encode(rpc.Message[json.RawMessage]{
 		Request: &req,
 	}); err != nil {
 		panic(err)
@@ -185,7 +281,6 @@ func main() {
 		timeoutChan  = time.After(*timeout)
 		responseChan = make(chan rpc.Response[json.RawMessage])
 	)
-
 	go func() {
 		decoder := json.NewDecoder(conn)
 		for {
