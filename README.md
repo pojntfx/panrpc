@@ -6,7 +6,8 @@ Transport-agnostic framework that allows exposing and calling functions on both 
 
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/dudirekta.svg)](https://pkg.go.dev/github.com/pojntfx/dudirekta)
-[![npm CI](https://github.com/pojntfx/dudirekta/actions/workflows/bun.yaml/badge.svg)](https://github.com/pojntfx/dudirekta/actions/workflows/bun.yaml)
+[![hydrun CI](https://github.com/pojntfx/dudirekta/actions/workflows/hydrun.yaml/badge.svg)](https://github.com/pojntfx/dudirekta/actions/workflows/hydrun.yaml)
+[![npm CI](https://github.com/pojntfx/dudirekta/actions/workflows/npm.yaml/badge.svg)](https://github.com/pojntfx/dudirekta/actions/workflows/npm.yaml)
 [![npm: @pojntfx/dudirekta](https://img.shields.io/npm/v/@pojntfx/dudirekta)](https://www.npmjs.com/package/@pojntfx/dudirekta)
 [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/dudirekta)
 [![Matrix](https://img.shields.io/matrix/dudirekta:matrix.org)](https://matrix.to/#/#dudirekta:matrix.org?via=matrix.org)
