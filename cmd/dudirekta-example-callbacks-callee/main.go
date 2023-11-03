@@ -55,9 +55,8 @@ func main() {
 	service := &local{}
 
 	clients := 0
-	registry := rpc.NewRegistry(
+	registry := rpc.NewRegistry[remote, json.RawMessage](
 		service,
-		remote{},
 
 		time.Second*10,
 		ctx,
@@ -104,12 +103,28 @@ func main() {
 						}
 					}()
 
-					if err := registry.LinkStream(
-						json.NewEncoder(conn).Encode,
-						json.NewDecoder(conn).Decode,
+					encoder := json.NewEncoder(conn)
+					decoder := json.NewDecoder(conn)
 
-						json.Marshal,
-						json.Unmarshal,
+					if err := registry.LinkStream(
+						func(v rpc.Message[json.RawMessage]) error {
+							return encoder.Encode(v)
+						},
+						func(v *rpc.Message[json.RawMessage]) error {
+							return decoder.Decode(v)
+						},
+
+						func(v any) (json.RawMessage, error) {
+							b, err := json.Marshal(v)
+							if err != nil {
+								return nil, err
+							}
+
+							return json.RawMessage(b), nil
+						},
+						func(data json.RawMessage, v any) error {
+							return json.Unmarshal([]byte(data), v)
+						},
 					); err != nil {
 						panic(err)
 					}
@@ -125,12 +140,28 @@ func main() {
 
 		log.Println("Connected to", conn.RemoteAddr())
 
-		if err := registry.LinkStream(
-			json.NewEncoder(conn).Encode,
-			json.NewDecoder(conn).Decode,
+		encoder := json.NewEncoder(conn)
+		decoder := json.NewDecoder(conn)
 
-			json.Marshal,
-			json.Unmarshal,
+		if err := registry.LinkStream(
+			func(v rpc.Message[json.RawMessage]) error {
+				return encoder.Encode(v)
+			},
+			func(v *rpc.Message[json.RawMessage]) error {
+				return decoder.Decode(v)
+			},
+
+			func(v any) (json.RawMessage, error) {
+				b, err := json.Marshal(v)
+				if err != nil {
+					return nil, err
+				}
+
+				return json.RawMessage(b), nil
+			},
+			func(data json.RawMessage, v any) error {
+				return json.Unmarshal([]byte(data), v)
+			},
 		); err != nil {
 			panic(err)
 		}
