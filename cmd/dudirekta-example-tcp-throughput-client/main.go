@@ -37,104 +37,150 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var (
-		getEncoder func(conn net.Conn) func(v any) error
-		getDecoder func(conn net.Conn) func(v any) error
+	clients := 0
+	onClientConnect := func(forRemotes func(func(remoteID string, r remote) error) error, remoteID string) {
+		clients++
 
-		marshal   func(v any) ([]byte, error)
-		unmarshal func(data []byte, v any) error
-	)
+		log.Printf("%v clients connected", clients)
+
+		go func() {
+			bytesTransferred := new(atomic.Int64)
+			go func() {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
+
+				for range ticker.C {
+					log.Println(math.RoundToEven(float64(bytesTransferred.Load())/float64(1024*1024)), "MB/s")
+
+					bytesTransferred.Store(0)
+
+					time.Sleep(time.Second)
+				}
+			}()
+
+			var wg sync.WaitGroup
+			if err := forRemotes(func(remoteID string, r remote) error {
+				for i := 0; i < *concurrency; i++ {
+					wg.Add(1)
+
+					go func(r remote) {
+						defer wg.Done()
+
+						for {
+							buf, err := r.GetBytes(ctx)
+							if err != nil {
+								panic(err)
+							}
+
+							bytesTransferred.Add(int64(len(buf)))
+						}
+					}(r)
+				}
+
+				return nil
+			}); err != nil {
+				panic(err)
+			}
+
+			wg.Wait()
+		}()
+	}
+
+	var handleConn func(conn net.Conn) error
 	switch *serializer {
 	case "json":
-		getEncoder = func(conn net.Conn) func(v any) error {
-			return json.NewEncoder(conn).Encode
-		}
-		getDecoder = func(conn net.Conn) func(v any) error {
-			return json.NewDecoder(conn).Decode
-		}
+		var registry *rpc.Registry[remote, json.RawMessage]
+		registry = rpc.NewRegistry[remote, json.RawMessage](
+			&local{},
 
-		marshal = json.Marshal
-		unmarshal = json.Unmarshal
+			time.Second*10,
+			ctx,
+			&rpc.Options{
+				OnClientConnect: func(remoteID string) {
+					onClientConnect(registry.ForRemotes, remoteID)
+				},
+				OnClientDisconnect: func(remoteID string) {
+					clients--
+
+					log.Printf("%v clients connected", clients)
+				},
+			},
+		)
+
+		handleConn = func(conn net.Conn) error {
+			encoder := json.NewEncoder(conn)
+			decoder := json.NewDecoder(conn)
+
+			return registry.LinkStream(
+				func(v rpc.Message[json.RawMessage]) error {
+					return encoder.Encode(v)
+				},
+				func(v *rpc.Message[json.RawMessage]) error {
+					return decoder.Decode(v)
+				},
+
+				func(v any) (json.RawMessage, error) {
+					b, err := json.Marshal(v)
+					if err != nil {
+						return nil, err
+					}
+
+					return json.RawMessage(b), nil
+				},
+				func(data json.RawMessage, v any) error {
+					return json.Unmarshal([]byte(data), v)
+				},
+			)
+		}
 
 	case "cbor":
-		getEncoder = func(conn net.Conn) func(v any) error {
-			return cbor.NewEncoder(conn).Encode
-		}
-		getDecoder = func(conn net.Conn) func(v any) error {
-			return cbor.NewDecoder(conn).Decode
-		}
+		var registry *rpc.Registry[remote, cbor.RawMessage]
+		registry = rpc.NewRegistry[remote, cbor.RawMessage](
+			&local{},
 
-		marshal = json.Marshal
-		unmarshal = json.Unmarshal
+			time.Second*10,
+			ctx,
+			&rpc.Options{
+				OnClientConnect: func(remoteID string) {
+					onClientConnect(registry.ForRemotes, remoteID)
+				},
+				OnClientDisconnect: func(remoteID string) {
+					clients--
+
+					log.Printf("%v clients connected", clients)
+				},
+			},
+		)
+
+		handleConn = func(conn net.Conn) error {
+			encoder := cbor.NewEncoder(conn)
+			decoder := cbor.NewDecoder(conn)
+
+			return registry.LinkStream(
+				func(v rpc.Message[cbor.RawMessage]) error {
+					return encoder.Encode(v)
+				},
+				func(v *rpc.Message[cbor.RawMessage]) error {
+					return decoder.Decode(v)
+				},
+
+				func(v any) (cbor.RawMessage, error) {
+					b, err := cbor.Marshal(v)
+					if err != nil {
+						return nil, err
+					}
+
+					return cbor.RawMessage(b), nil
+				},
+				func(data cbor.RawMessage, v any) error {
+					return cbor.Unmarshal([]byte(data), v)
+				},
+			)
+		}
 
 	default:
 		panic(errUnknownSerializer)
 	}
-
-	clients := 0
-
-	var registry *rpc.Registry[remote]
-	registry = rpc.NewRegistry(
-		&local{},
-		remote{},
-
-		time.Second*10,
-		ctx,
-		&rpc.Options{
-			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v clients connected", clients)
-
-				go func() {
-					bytesTransferred := new(atomic.Int64)
-					go func() {
-						ticker := time.NewTicker(time.Second)
-						defer ticker.Stop()
-
-						for range ticker.C {
-							log.Println(math.RoundToEven(float64(bytesTransferred.Load())/float64(1024*1024)), "MB/s")
-
-							bytesTransferred.Store(0)
-
-							time.Sleep(time.Second)
-						}
-					}()
-
-					var wg sync.WaitGroup
-					if err := registry.ForRemotes(func(remoteID string, r remote) error {
-						for i := 0; i < *concurrency; i++ {
-							wg.Add(1)
-
-							go func(r remote) {
-								defer wg.Done()
-
-								for {
-									buf, err := r.GetBytes(ctx)
-									if err != nil {
-										panic(err)
-									}
-
-									bytesTransferred.Add(int64(len(buf)))
-								}
-							}(r)
-						}
-
-						return nil
-					}); err != nil {
-						panic(err)
-					}
-
-					wg.Wait()
-				}()
-			},
-			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v clients connected", clients)
-			},
-		},
-	)
 
 	if *listen {
 		lis, err := net.Listen("tcp", *addr)
@@ -163,13 +209,7 @@ func main() {
 						}
 					}()
 
-					if err := registry.LinkStream(
-						getEncoder(conn),
-						getDecoder(conn),
-
-						marshal,
-						unmarshal,
-					); err != nil {
+					if err := handleConn(conn); err != nil {
 						panic(err)
 					}
 				}()
@@ -184,13 +224,7 @@ func main() {
 
 		log.Println("Connected to", conn.RemoteAddr())
 
-		if err := registry.LinkStream(
-			getEncoder(conn),
-			getDecoder(conn),
-
-			marshal,
-			unmarshal,
-		); err != nil {
+		if err := handleConn(conn); err != nil {
 			panic(err)
 		}
 	}
