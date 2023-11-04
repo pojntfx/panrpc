@@ -21,9 +21,12 @@ It enables you to ...
 - **Call remote functions transparently**: dudirekta makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
 - **Call functions on the client from the server**: Unlike most RPC frameworks, dudirekta allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
 - **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser`, you can build services using dudirekta on pretty much any transport layer such as TCP, WebSockets or even WebRTC, meaning it can run in the browser!
+- **Implement RPCs using any encoding/decoding layer**: Instead of depending on Protobuf or another fixed format for serialization, dudirekta supports almost any serialization framework, such as JSON or CBOR.
 - **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, dudirekta can use closures and callbacks transparently, just like a local function call!
 
 ## Installation
+
+### Library
 
 You can add dudirekta to your Go project by running the following:
 
@@ -31,13 +34,41 @@ You can add dudirekta to your Go project by running the following:
 $ go get github.com/pojntfx/dudirekta/...@latest
 ```
 
-There is also a minimal TypeScript version for browser support (without transparent support for closures); you can install it like so:
+There is also a TypeScript version for browser and Node.js support (without transparent support for closures); you can install it like so:
 
 ```shell
 $ npm i -s @pojntfx/dudirekta
 ```
 
-This README's documentation only covers the Go version. For the browser version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses dudirekta in its examples. You can find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/dudirekta).
+This README's documentation only covers the Go version. For the TypeScript version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses dudirekta in its examples; you can also find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/dudirekta) as well as example in [ts/dudirekta-example-websocket-client.ts](./ts/dudirekta-example-websocket-client.ts).
+
+### `durl` Tool
+
+In addition to the library, the CLI tool `durl` is also available; `durl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for dudirekta: A command-line tool for interacting with dudirekta servers.
+
+Static binaries are available on [GitHub releases](https://github.com/pojntfx/dudirekta/releases).
+
+On Linux, you can install them like so:
+
+```shell
+$ curl -L -o /tmp/durl "https://github.com/pojntfx/dudirekta/releases/latest/download/durl.linux-$(uname -m)"
+$ sudo install /tmp/durl /usr/local/bin
+```
+
+On macOS, you can use the following:
+
+```shell
+$ curl -L -o /tmp/durl "https://github.com/pojntfx/dudirekta/releases/latest/download/durl.darwin-$(uname -m)"
+$ sudo install /tmp/durl /usr/local/bin
+```
+
+On Windows, the following should work (using PowerShell as administrator):
+
+```shell
+PS> Invoke-WebRequest https://github.com/pojntfx/dudirekta/releases/latest/download/durl.windows-x86_64.exe -OutFile \Windows\System32\durl.exe
+```
+
+You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/dudirekta/releases).
 
 ## Usage
 
@@ -112,9 +143,8 @@ For the server, you can now create the registry, which will expose its functions
 ```go
 // server.go
 
-registry := rpc.NewRegistry(
+registry := rpc.NewRegistry[remote, json.RawMessage](
 	&local{},
-	remote{},
 
 	time.Second*10,
 	context.Background(),
@@ -127,9 +157,8 @@ And do the same for the client:
 ```go
 // client.go
 
-registry := rpc.NewRegistry(
+registry := rpc.NewRegistry[remote, json.RawMessage](
 	&local{},
-	remote{},
 
 	time.Second*10,
 	context.Background(),
@@ -137,9 +166,11 @@ registry := rpc.NewRegistry(
 )
 ```
 
-### 4. Link the Registry to a Transport
+Note the second generic parameter; it is the type that should be used for encoding nested messages. For JSON, this is typically `json.RawMessage`, for CBOR, this is `cbor.RawMessage`. Using such a nested message type is recommended, as it leads to a faster encoding/decoding since it doesn't require multiple encoding/decoding steps in order to function, but using `[]byte` (which will use multiple encoding/decoding steps) is also possible if this is not an option (for more infromation, see [Protocol](#protocol)).
 
-Next, expose the functions by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`):
+### 4. Link the Registry to a Transport and Serializer
+
+Next, expose the functions by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`) and passing in your serialization framework:
 
 ```go
 // server.go
@@ -166,16 +197,32 @@ for {
 				}
 			}()
 
-			if err := registry.LinkStream(
-			json.NewEncoder(conn).Encode,
-			json.NewDecoder(conn).Decode,
+			encoder := json.NewEncoder(conn)
+			decoder := json.NewDecoder(conn)
 
-			json.Marshal,
-			json.Unmarshal,
-		); err != nil {
-				panic(err)
-			}
-		}()
+			if err := registry.LinkStream(
+				func(v rpc.Message[json.RawMessage]) error {
+					return encoder.Encode(v)
+				},
+				func(v *rpc.Message[json.RawMessage]) error {
+					return decoder.Decode(v)
+				},
+
+				func(v any) (json.RawMessage, error) {
+					b, err := json.Marshal(v)
+					if err != nil {
+						return nil, err
+					}
+
+					return json.RawMessage(b), nil
+				},
+				func(data json.RawMessage, v any) error {
+					return json.Unmarshal([]byte(data), v)
+				},
+			); err != nil {
+					panic(err)
+				}
+			}()
 	}()
 }
 ```
@@ -191,13 +238,29 @@ if err != nil {
 }
 defer conn.Close()
 
-if err := registry.LinkStream(
-			json.NewEncoder(conn).Encode,
-			json.NewDecoder(conn).Decode,
+encoder := json.NewEncoder(conn)
+decoder := json.NewDecoder(conn)
 
-			json.Marshal,
-			json.Unmarshal,
-		); err != nil {
+if err := registry.LinkStream(
+	func(v rpc.Message[json.RawMessage]) error {
+		return encoder.Encode(v)
+	},
+	func(v *rpc.Message[json.RawMessage]) error {
+		return decoder.Decode(v)
+	},
+
+	func(v any) (json.RawMessage, error) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+
+		return json.RawMessage(b), nil
+	},
+	func(data json.RawMessage, v any) error {
+		return json.Unmarshal([]byte(data), v)
+	},
+); err != nil {
 	panic(err)
 }
 ```

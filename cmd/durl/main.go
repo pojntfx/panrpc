@@ -37,7 +37,7 @@ func main() {
 	flag.Usage = func() {
 		bin := filepath.Base(os.Args[0])
 
-		fmt.Fprintf(os.Stderr, `Like cURL, but for Dudirekta: Command-line tool for interacting with Dudirekta servers
+		fmt.Fprintf(os.Stderr, `Like cURL, but for dudirekta: Command-line tool for interacting with dudirekta servers
 
 Usage of %v:
 	%v [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
