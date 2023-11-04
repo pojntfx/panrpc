@@ -2,7 +2,7 @@
 
 ![Logo](./docs/logo-readme.png)
 
-Transport-agnostic framework that allows exposing and calling functions on both clients and servers.
+Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.
 
 [![hydrun CI](https://github.com/pojntfx/dudirekta/actions/workflows/hydrun.yaml/badge.svg)](https://github.com/pojntfx/dudirekta/actions/workflows/hydrun.yaml)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg)
@@ -272,10 +272,10 @@ Now you can call the functions exposed on the server from the client and vise ve
 ```go
 // server.go
 
-for _, peer := range registry.Peers() {
-	if err := peer.Println(ctx, "Hello, world!"); err != nil {
-		panic(err)
-	}
+if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+	return remote.Println(ctx, "Hello, world!")
+}); err != nil {
+	panic(err)
 }
 ```
 
@@ -284,17 +284,19 @@ Or to call the `Increment` function exposed by the server on the client:
 ```go
 // client.go
 
-for _, peer := range registry.Peers() {
-	new, err := peer.Increment(ctx, 1)
+if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+	new, err := remote.Increment(ctx, 1)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	log.Println(new)
+}); err != nil {
+	panic(err)
 }
 ```
 
-By passing the `Peers()` method to the local service itself, you can also access remote functions in the other direction:
+By passing the `ForRemotes()` method to the local service itself, you can also access remote functions in the other direction:
 
 ```go
 // server.go
@@ -302,16 +304,18 @@ By passing the `Peers()` method to the local service itself, you can also access
 type local struct {
 	counter int64
 
-	Peers func() map[string]remote
+	ForRemotes func(cb func(remoteID string, remote R) error) error
 }
 
 func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
-	peerID := rpc.GetRemoteID(ctx)
+	remoteID := rpc.GetRemoteID(ctx)
 
-	for candidateIP, peer := range s.Peers() {
-		if candidateIP == peerID {
-			peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
+	if err := registry.ForRemotes(func(candidateID string, remote remote) error {
+		if candidateID == remoteID {
+			return peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
 		}
+	}); err != nil {
+		return -1, err
 	}
 
 	return atomic.AddInt64(&s.counter, delta), nil
@@ -319,15 +323,14 @@ func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
 
 // In `main`:
 service := &local{}
-registry := rpc.NewRegistry(
+registry := rpc.NewRegistry[remote, json.RawMessage](
 	service,
-	remote{},
 
 	time.Second*10,
 	context.Background(),
 	nil,
 )
-service.Peers = registry.Peers
+service.ForRemotes = registry.ForRemotes
 ```
 
 ### 6. Using Closures and Callbacks
@@ -380,17 +383,19 @@ When you call `peer.Iterate`, you can now pass in a closure:
 ```go
 // client.go
 
-for _, peer := range registry.Peers() {
-	length, err := Iterate(peer, ctx, 5, func(i int, b string) (string, error) {
+if err := registry.ForRemotes(func(remoteID string, remote remote) error {
+	length, err := remote.Iterate(ctx, 5, func(i int, b string) (string, error) {
 		log.Println("In iteration", i, b)
 
 		return "This is from the caller", nil
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	log.Println(length)
+}); err != nil {
+	panic(err)
 }
 ```
 
@@ -438,6 +443,33 @@ A function return looks like this:
 Here, the first element specifies that the message is a function return (`false`). The second element is the ID of the function call from above, the third element is the function's return value serialized to JSON, and the last element is the error message; `nil` errors are represented by the empty string.
 
 Keep in mind that dudirekta is bidirectional, meaning that both the client and server can send and receive both types of messages to each other.
+
+## Reference
+
+```shell
+$ durl --help
+Like cURL, but for dudirekta: Command-line tool for interacting with dudirekta servers
+
+Usage of durl:
+	durl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
+
+Example:
+	durl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+
+Flags:
+  -cert string
+    	TLS certificate
+  -key string
+    	TLS key
+  -listen
+    	Whether to connect to remotes by listening or dialing
+  -timeout duration
+    	Time to wait for a response to a call (default 10s)
+  -verbose
+    	Whether to enable verbose logging
+  -verify
+    	Whether to verify TLS peer certificates (default true)
+```
 
 ## Acknowledgements
 

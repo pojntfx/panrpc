@@ -1,7 +1,7 @@
 {
   "name": "@pojntfx/dudirekta",
-  "version": "0.5.1",
-  "description": "Transport-agnostic framework that allows exposing and calling functions on both clients and servers.",
+  "version": "0.6.0",
+  "description": "Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.",
   "source": "ts/index.ts",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
