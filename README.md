@@ -407,20 +407,29 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 
 To make getting started with dudirekta easier, take a look at the following examples:
 
-- **TCP Transport**
-  - [TCP Server](./cmd/dudirekta-example-tcp-server/main.go)
-  - [TCP Client](./cmd/dudirekta-example-tcp-client/main.go)
-- **WebSocket Transport**
-  - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
-  - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
-- **WebRTC Transport**
-  - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
+- **Transports**
+	- **TCP (Stream-Oriented API)**
+	  - [TCP Server](./cmd/dudirekta-example-tcp-server/main.go)
+	  - [TCP Client](./cmd/dudirekta-example-tcp-client/main.go)
+	- **WebSocket (Stream-Oriented API)**
+	  - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
+	  - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
+	- **WebRTC (Stream-Oriented API)**
+	  - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
+	- **Redis (Message-Oriented API)**
+	  - [Redis Server](./cmd/dudirekta-example-redis-server/main.go)
+	  - [Redis Client](./cmd/dudirekta-example-redis-client/main.go)
 - **Callbacks**
   - [Callbacks Demo Server](./cmd/dudirekta-example-callbacks-callee/main.go)
   - [Callbacks Demo Client](./cmd/dudirekta-example-callbacks-caller/main.go)
 - **Closures**
   - [Closures Demo Server](./cmd/dudirekta-example-closures-callee/main.go)
   - [Closures Demo Client](./cmd/dudirekta-example-closures-caller/main.go)
+- **Benchmarks**
+  - [Requests/Second Benchmark Server](./cmd/dudirekta-example-tcp-rps-server/main.go)
+  - [Requests/Second Benchmark Client](./cmd/dudirekta-example-tcp-rps-client/main.go)
+  - [Throughput Benchmark Server](./cmd/dudirekta-example-tcp-throughput-server/main.go)
+  - [Throughput Benchmark Client](./cmd/dudirekta-example-tcp-throughput-client/main.go)
 
 ### Protocol
 
