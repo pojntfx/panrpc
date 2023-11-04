@@ -20,9 +20,9 @@ It enables you to ...
 
 - **Call remote functions transparently**: dudirekta makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
 - **Call functions on the client from the server**: Unlike most RPC frameworks, dudirekta allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
-- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser`, you can build services using dudirekta on pretty much any transport layer such as TCP, WebSockets or even WebRTC, meaning it can run in the browser!
-- **Implement RPCs using any encoding/decoding layer**: Instead of depending on Protobuf or another fixed format for serialization, dudirekta supports almost any serialization framework, such as JSON or CBOR.
-- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, dudirekta can use closures and callbacks transparently, just like a local function call!
+- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser` such as TCP, WebSocket or WebRTC with the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/dudirekta/pkg/rpc#LinkStream), or any message-based transport such as Redis or NATS with the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/dudirekta/pkg/rpc#LinkMessage), you can use dudirekta to build services that run in almost any environment, including the browser!
+- **Use an encoding/decoding layer of your choice**: Instead of depending on Protobuf or another fixed format for serialization, dudirekta can work with every serialization framework that implements the basic `Marshal`/`Unmarshal` interface, such as JSON or CBOR.
+- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, dudirekta can handle closures and callbacks transparently, just like with local function calls!
 
 ## Installation
 
@@ -170,7 +170,11 @@ Note the second generic parameter; it is the type that should be used for encodi
 
 ### 4. Link the Registry to a Transport and Serializer
 
-Next, expose the functions by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`) and passing in your serialization framework:
+Next, expose the functions by linking them to a transport. There are two available transport APIs; the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/dudirekta/pkg/rpc#LinkStream) (which is useful for stream-like transports such as TCP, WebSockets, WebRTC or anything else that provides an `io.ReadWriteCloser`), and the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/dudirekta/pkg/rpc#LinkMessage) (which is useful for transports that use messages, such as message brokers like Redis, UDP or other packet-based protocols). In this example, we'll use the stream-oriented API; for more information on using the m, meaning it can run in the browser!essage-oriented API, see [Examples](#examples).
+
+Similarly so, as mentioned in [Add Functions to a Registry](#3-add-functions-to-a-registry), it is possible to use almost any serialization framework you want, as long as it can provide the necessary import interface. In this example, we'll be using the `encoding/json` package from the Go standard library, but in most cases, a more performant and compact framework such as CBOR is the better choice. See [Benchmarks](#benchmarks) for usage examples with other serialization frameworks and a performance comparison.
+
+Start by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`) and passing in your serialization framework:
 
 ```go
 // server.go
