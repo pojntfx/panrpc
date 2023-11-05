@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,6 +55,7 @@ func main() {
 	concurrency := flag.Int("concurrency", 512, "Amount of concurrent calls to allow per client")
 	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
 	dataType := flag.String("data-type", "int", "Data type to test one of int, int8, int16, int32, rune, int64, uint, uint8, byte, uint16, uint32, uint64, uintptr, float32, float64, complex64, complex128, bool, string, array, slice, struct")
+	runs := flag.Int("runs", 10, "Amount of test runs to do before exiting")
 
 	flag.Parse()
 
@@ -67,14 +70,22 @@ func main() {
 
 		go func() {
 			rps := new(atomic.Int64)
+			currentRuns := 0
 			go func() {
 				ticker := time.NewTicker(time.Second)
 				defer ticker.Stop()
 
 				for range ticker.C {
-					log.Println(rps.Load(), "requests/s")
+					fmt.Println(rps.Load(), "requests/s")
 
 					rps.Store(0)
+
+					currentRuns++
+					if currentRuns >= *runs {
+						os.Exit(0)
+
+						return
+					}
 
 					time.Sleep(time.Second)
 				}

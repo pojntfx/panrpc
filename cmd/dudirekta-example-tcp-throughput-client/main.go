@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"math"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,6 +33,7 @@ func main() {
 	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
 	concurrency := flag.Int("concurrency", 512, "Amount of concurrent calls to allow per client")
 	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
+	runs := flag.Int("runs", 10, "Amount of test runs to do before exiting")
 
 	flag.Parse()
 
@@ -45,14 +48,22 @@ func main() {
 
 		go func() {
 			bytesTransferred := new(atomic.Int64)
+			currentRuns := 0
 			go func() {
 				ticker := time.NewTicker(time.Second)
 				defer ticker.Stop()
 
 				for range ticker.C {
-					log.Println(math.RoundToEven(float64(bytesTransferred.Load())/float64(1024*1024)), "MB/s")
+					fmt.Println(math.RoundToEven(float64(bytesTransferred.Load())/float64(1024*1024)), "MB/s")
 
 					bytesTransferred.Store(0)
+
+					currentRuns++
+					if currentRuns >= *runs {
+						os.Exit(0)
+
+						return
+					}
 
 					time.Sleep(time.Second)
 				}
