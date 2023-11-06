@@ -435,6 +435,46 @@ To make getting started with dudirekta easier, take a look at the following exam
   - [Throughput Benchmark Server](./cmd/dudirekta-example-tcp-throughput-server/main.go)
   - [Throughput Benchmark Client](./cmd/dudirekta-example-tcp-throughput-client/main.go)
 
+### Benchmarks
+
+All benchmarks were conducted on a test machine with the following specifications:
+
+| Property      | Value                                  |
+|---------------|----------------------------------------|
+| Device Model  | Dell XPS 9320                          |
+| OS            | Fedora release 38 (Thirty Eight) x86_64|
+| Kernel        | 6.3.11-200.fc38.x86_64                 |
+| CPU           | 12th Gen Intel i7-1280P (20) @ 4.700GHz|
+| Memory        | 31687MiB LPDDR5, 6400 MT/s             |
+
+To reproduce the tests, see the [benchmark source code](./cmd/) and the [visualization source code](./docs/).
+
+#### Requests/Second
+
+<img src="./docs/rps.png" alt="Bar chart of the benchmark results for JSON and CBOR" width="550px">
+
+| Data Type   |   JSON |   CBOR |
+|:------------|-------:|-------:|
+| uint8       |  93634 | 123122 |
+| uint64      |  94733 | 117978 |
+| uint32      |  94182 | 116764 |
+| uint16      |  94629 | 118126 |
+| uint        |  93584 | 122450 |
+| struct      |  90980 | 116290 |
+| string      |  87398 | 117085 |
+| slice       |  88604 | 117843 |
+| rune        |  94625 | 120375 |
+| int8        |  99581 | 133133 |
+| int64       |  93243 | 120311 |
+| int32       |  95189 | 122630 |
+| int16       |  94048 | 133136 |
+| int         | 107469 | 130494 |
+| float64     |  88636 | 113678 |
+| float32     |  92018 | 116722 |
+| byte        |  94230 | 125744 |
+| bool        |  88509 | 116449 |
+| array       |  89869 | 118470 |
+
 ### Protocol
 
 The protocol used by dudirekta is simple and based on JSONL.
