@@ -203,6 +203,150 @@
 </li>
 </ul>
 
+<a href="#benchmarks" id="benchmarks" style="color: inherit; text-decoration: none;">
+  <h3>Benchmarks</h3>
+</a>
+<p>All benchmarks were conducted on a test machine with the following specifications:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Device Model</td>
+<td>Dell XPS 9320</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Fedora release 38 (Thirty Eight) x86_64</td>
+</tr>
+<tr>
+<td>Kernel</td>
+<td>6.3.11-200.fc38.x86_64</td>
+</tr>
+<tr>
+<td>CPU</td>
+<td>12th Gen Intel i7-1280P (20) @ 4.700GHz</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>31687MiB LPDDR5, 6400 MT/s</td>
+</tr>
+</tbody></table>
+<p>To reproduce the tests, see the <a href="./cmd/">benchmark source code</a> and the <a href="./docs/">visualization source code</a>.</p>
+
+<a href="#requestssecond" id="requestssecond" style="color: inherit; text-decoration: none;">
+  <h4>Requests/Second</h4>
+</a>
+<img src="./docs/rps.png" alt="Bar chart of the benchmark results for JSON and CBOR" width="550px">
+
+<table>
+<thead>
+<tr>
+<th align="left">Data Type</th>
+<th align="right">JSON</th>
+<th align="right">CBOR</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">uint8</td>
+<td align="right">93634</td>
+<td align="right">123122</td>
+</tr>
+<tr>
+<td align="left">uint64</td>
+<td align="right">94733</td>
+<td align="right">117978</td>
+</tr>
+<tr>
+<td align="left">uint32</td>
+<td align="right">94182</td>
+<td align="right">116764</td>
+</tr>
+<tr>
+<td align="left">uint16</td>
+<td align="right">94629</td>
+<td align="right">118126</td>
+</tr>
+<tr>
+<td align="left">uint</td>
+<td align="right">93584</td>
+<td align="right">122450</td>
+</tr>
+<tr>
+<td align="left">struct</td>
+<td align="right">90980</td>
+<td align="right">116290</td>
+</tr>
+<tr>
+<td align="left">string</td>
+<td align="right">87398</td>
+<td align="right">117085</td>
+</tr>
+<tr>
+<td align="left">slice</td>
+<td align="right">88604</td>
+<td align="right">117843</td>
+</tr>
+<tr>
+<td align="left">rune</td>
+<td align="right">94625</td>
+<td align="right">120375</td>
+</tr>
+<tr>
+<td align="left">int8</td>
+<td align="right">99581</td>
+<td align="right">133133</td>
+</tr>
+<tr>
+<td align="left">int64</td>
+<td align="right">93243</td>
+<td align="right">120311</td>
+</tr>
+<tr>
+<td align="left">int32</td>
+<td align="right">95189</td>
+<td align="right">122630</td>
+</tr>
+<tr>
+<td align="left">int16</td>
+<td align="right">94048</td>
+<td align="right">133136</td>
+</tr>
+<tr>
+<td align="left">int</td>
+<td align="right">107469</td>
+<td align="right">130494</td>
+</tr>
+<tr>
+<td align="left">float64</td>
+<td align="right">88636</td>
+<td align="right">113678</td>
+</tr>
+<tr>
+<td align="left">float32</td>
+<td align="right">92018</td>
+<td align="right">116722</td>
+</tr>
+<tr>
+<td align="left">byte</td>
+<td align="right">94230</td>
+<td align="right">125744</td>
+</tr>
+<tr>
+<td align="left">bool</td>
+<td align="right">88509</td>
+<td align="right">116449</td>
+</tr>
+<tr>
+<td align="left">array</td>
+<td align="right">89869</td>
+<td align="right">118470</td>
+</tr>
+</tbody></table>
+
 <a href="#protocol" id="protocol" style="color: inherit; text-decoration: none;">
   <h3>Protocol</h3>
 </a>
