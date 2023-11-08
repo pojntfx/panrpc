@@ -451,6 +451,8 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 
 #### Requests/Second
 
+> This is measured by calling RPCs with the different data types as the arguments.
+
 <img src="./docs/rps.png" alt="Bar chart of the requests/second benchmark results for JSON and CBOR" width="550px">
 
 | Data Type   |   JSON |   CBOR |
@@ -480,6 +482,11 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 > This is measured by calling an RPC with `[]byte` as the argument.
 
 <img src="./docs/throughput.png" alt="Bar chart of the throughput benchmark results for JSON and CBOR" width="550px">
+
+| Serializer | Average Throughput |
+|-----------|--------------------|
+| JSON      | 98 MB/s |
+| CBOR      | 1351 MB/s |
 
 ### Protocol
 
