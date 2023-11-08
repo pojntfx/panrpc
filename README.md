@@ -451,7 +451,7 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 
 #### Requests/Second
 
-<img src="./docs/rps.png" alt="Bar chart of the benchmark results for JSON and CBOR" width="550px">
+<img src="./docs/rps.png" alt="Bar chart of the requests/second benchmark results for JSON and CBOR" width="550px">
 
 | Data Type   |   JSON |   CBOR |
 |:------------|-------:|-------:|
@@ -474,6 +474,12 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 | byte        |  94230 | 125744 |
 | bool        |  88509 | 116449 |
 | array       |  89869 | 118470 |
+
+#### Throughput
+
+> This is measured by calling an RPC with `[]byte` as the argument.
+
+<img src="./docs/throughput.png" alt="Bar chart of the throughput benchmark results for JSON and CBOR" width="550px">
 
 ### Protocol
 
