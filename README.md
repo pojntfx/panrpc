@@ -577,4 +577,4 @@ Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#d
 
 dudirekta (c) 2023 Felicitas Pojtinger and contributors
 
-SPDX-License-Identifier: Apache-2.0
+SPDX-License-Identifier: AGPL-3.0
