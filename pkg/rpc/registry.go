@@ -185,7 +185,7 @@ func (r Registry[R, T]) makeRPC(
 
 		res := make(chan callResponse[T])
 		go func() {
-			defer responseResolver.Close(callID)
+			defer responseResolver.Free(callID, context.Canceled)
 
 			r, err := responseResolver.Receive(callID, ctx)
 			if err != nil {
@@ -325,6 +325,12 @@ func (r Registry[R, T]) LinkMessage(
 	fatalErrLock := sync.NewCond(&sync.Mutex{})
 
 	setErr := func(err error) {
+		if err == nil {
+			responseResolver.Close(context.Canceled)
+		} else {
+			responseResolver.Close(err)
+		}
+
 		fatalErrLock.L.Lock()
 		fatalErr = err
 		fatalErrLock.Broadcast()

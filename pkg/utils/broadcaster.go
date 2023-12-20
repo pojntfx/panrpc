@@ -2,38 +2,49 @@ package utils
 
 import (
 	"context"
-	"net"
+	"errors"
 	"sync"
+)
+
+var (
+	ErrClosed = errors.New("closed")
 )
 
 type channelWithContext[T any] struct {
 	channel chan T
 
 	ctx    context.Context
-	cancel func()
+	cancel func(cause error)
 }
 
 type Broadcaster[T any] struct {
-	channels     map[string]channelWithContext[T]
-	channelsLock *sync.Mutex
+	channels map[string]channelWithContext[T]
+	closed   bool
+	lock     *sync.Mutex
 }
 
 func NewBroadcaster[T any]() *Broadcaster[T] {
 	return &Broadcaster[T]{
-		channels:     map[string]channelWithContext[T]{},
-		channelsLock: &sync.Mutex{},
+		channels: map[string]channelWithContext[T]{},
+		lock:     &sync.Mutex{},
 	}
 }
 
 func (b *Broadcaster[T]) Publish(channel string, v T) {
-	b.channelsLock.Lock()
-	c, ok := b.channels[channel]
-	if !ok {
-		b.channelsLock.Unlock()
+	b.lock.Lock()
+	if b.closed {
+		b.lock.Unlock()
 
 		return
 	}
-	b.channelsLock.Unlock()
+
+	c, ok := b.channels[channel]
+	if !ok {
+		b.lock.Unlock()
+
+		return
+	}
+	b.lock.Unlock()
 
 	select {
 	case c.channel <- v:
@@ -45,10 +56,16 @@ func (b *Broadcaster[T]) Publish(channel string, v T) {
 }
 
 func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error) {
-	b.channelsLock.Lock()
+	b.lock.Lock()
+	if b.closed {
+		b.lock.Unlock()
+
+		return nil, ErrClosed
+	}
+
 	c, ok := b.channels[channel]
 	if !ok {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancelCause(ctx)
 		c = channelWithContext[T]{
 			channel: make(chan T),
 
@@ -57,12 +74,12 @@ func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error
 		}
 		b.channels[channel] = c
 	}
-	b.channelsLock.Unlock()
+	b.lock.Unlock()
 
 	select {
 	case v, ok := <-c.channel:
 		if !ok {
-			return nil, net.ErrClosed
+			return nil, ErrClosed
 		}
 		return &v, nil
 
@@ -71,13 +88,24 @@ func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error
 	}
 }
 
-func (b *Broadcaster[T]) Close(channel string) {
-	b.channelsLock.Lock()
+func (b *Broadcaster[T]) Free(channel string, err error) {
+	b.lock.Lock()
 	c, ok := b.channels[channel]
 	if ok {
-		c.cancel()
+		c.cancel(err)
 		close(c.channel)
 	}
 	delete(b.channels, channel)
-	b.channelsLock.Unlock()
+	b.lock.Unlock()
+}
+
+func (b *Broadcaster[T]) Close(err error) {
+	b.lock.Lock()
+	for _, c := range b.channels {
+		c.cancel(err)
+		close(c.channel)
+	}
+	b.channels = map[string]channelWithContext[T]{}
+	b.closed = true
+	b.lock.Unlock()
 }
