@@ -236,8 +236,8 @@ func main() {
 		registry = rpc.NewRegistry[remote, json.RawMessage](
 			&local{},
 
-			time.Second*10,
 			ctx,
+
 			&rpc.Options{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)
@@ -281,8 +281,8 @@ func main() {
 		registry = rpc.NewRegistry[remote, cbor.RawMessage](
 			&local{},
 
-			time.Second*10,
 			ctx,
+
 			&rpc.Options{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)

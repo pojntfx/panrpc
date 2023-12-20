@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pojntfx/dudirekta/pkg/utils"
@@ -20,7 +19,6 @@ var (
 	ErrInvalidArgs   = errors.New("invalid arguments, first argument needs to be a context.Context")
 
 	ErrCannotCallNonFunction = errors.New("can not call non function")
-	ErrCallTimedOut          = errors.New("call timed out")
 )
 
 type key int
@@ -49,9 +47,9 @@ type Response[T any] struct {
 }
 
 type callResponse[T any] struct {
-	value   T
-	err     error
-	timeout bool
+	value     T
+	err       error
+	cancelled bool
 }
 
 type wrappedChild struct {
@@ -75,8 +73,7 @@ type Registry[R, T any] struct {
 	remotes     map[string]R
 	remotesLock *sync.Mutex
 
-	timeout time.Duration
-	ctx     context.Context
+	ctx context.Context
 
 	options *Options
 }
@@ -84,7 +81,6 @@ type Registry[R, T any] struct {
 func NewRegistry[R, T any](
 	local any,
 
-	timeout time.Duration,
 	ctx context.Context,
 
 	options *Options,
@@ -99,7 +95,7 @@ func NewRegistry[R, T any](
 			closuresLock: sync.Mutex{},
 			closures:     map[string]func(args ...interface{}) (interface{}, error){},
 		},
-	}, *new(R), map[string]R{}, &sync.Mutex{}, timeout, ctx, options}
+	}, *new(R), map[string]R{}, &sync.Mutex{}, ctx, options}
 }
 
 func (r Registry[R, T]) makeRPC(
@@ -148,10 +144,16 @@ func (r Registry[R, T]) makeRPC(
 			Args:     []T{},
 		}
 
+		var ctx context.Context
 		for i, arg := range args {
 			if i == 0 {
-				// Don't sent the context over the wire
+				v, ok := arg.Interface().(context.Context)
+				if !ok {
+					panic(ErrInvalidArgs)
+				}
+				ctx = v
 
+				// Don't sent the context over the wire
 				continue
 			}
 
@@ -185,9 +187,9 @@ func (r Registry[R, T]) makeRPC(
 		go func() {
 			defer responseResolver.Close(callID)
 
-			r, ok := responseResolver.Receive(callID, r.timeout)
-			if !ok {
-				r = &callResponse[T]{*new(T), ErrCallTimedOut, true}
+			r, err := responseResolver.Receive(callID, ctx)
+			if err != nil {
+				r = &callResponse[T]{*new(T), err, true}
 			}
 
 			res <- *r
@@ -216,7 +218,7 @@ func (r Registry[R, T]) makeRPC(
 				valueReturnValue := reflect.New(functionType.Out(0))
 				errReturnValue := reflect.New(functionType.Out(1))
 
-				if !rawReturnValue.timeout {
+				if !rawReturnValue.cancelled {
 					if err := unmarshal(rawReturnValue.value, valueReturnValue.Interface()); err != nil {
 						panic(err)
 					}
@@ -697,11 +699,7 @@ func (r Registry[R, T]) LinkMessage(
 					err = errors.New(res.Err)
 				}
 
-				go func() {
-					if ok := responseResolver.Publish(res.Call, callResponse[T]{res.Value, err, false}, r.timeout); !ok {
-						responseResolver.Close(res.Call)
-					}
-				}()
+				go responseResolver.Publish(res.Call, callResponse[T]{res.Value, err, false})
 			}
 		}()
 

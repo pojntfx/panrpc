@@ -146,8 +146,8 @@ For the server, you can now create the registry, which will expose its functions
 registry := rpc.NewRegistry[remote, json.RawMessage](
 	&local{},
 
-	time.Second*10,
 	context.Background(),
+
 	nil,
 )
 ```
@@ -160,8 +160,8 @@ And do the same for the client:
 registry := rpc.NewRegistry[remote, json.RawMessage](
 	&local{},
 
-	time.Second*10,
 	context.Background(),
+
 	nil,
 )
 ```
@@ -330,8 +330,8 @@ service := &local{}
 registry := rpc.NewRegistry[remote, json.RawMessage](
 	service,
 
-	time.Second*10,
 	context.Background(),
+
 	nil,
 )
 service.ForRemotes = registry.ForRemotes
@@ -412,17 +412,17 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 To make getting started with dudirekta easier, take a look at the following examples:
 
 - **Transports**
-	- **TCP (Stream-Oriented API)**
-	  - [TCP Server](./cmd/dudirekta-example-tcp-server/main.go)
-	  - [TCP Client](./cmd/dudirekta-example-tcp-client/main.go)
-	- **WebSocket (Stream-Oriented API)**
-	  - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
-	  - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
-	- **WebRTC (Stream-Oriented API)**
-	  - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
-	- **Redis (Message-Oriented API)**
-	  - [Redis Server](./cmd/dudirekta-example-redis-server/main.go)
-	  - [Redis Client](./cmd/dudirekta-example-redis-client/main.go)
+  - **TCP (Stream-Oriented API)**
+    - [TCP Server](./cmd/dudirekta-example-tcp-server/main.go)
+    - [TCP Client](./cmd/dudirekta-example-tcp-client/main.go)
+  - **WebSocket (Stream-Oriented API)**
+    - [WebSocket Server](./cmd/dudirekta-example-websocket-server/main.go)
+    - [WebSocket Client](./cmd/dudirekta-example-websocket-client/main.go)
+  - **WebRTC (Stream-Oriented API)**
+    - [WebRTC Peer](./cmd/dudirekta-example-webrtc-peer/main.go)
+  - **Redis (Message-Oriented API)**
+    - [Redis Server](./cmd/dudirekta-example-redis-server/main.go)
+    - [Redis Client](./cmd/dudirekta-example-redis-client/main.go)
 - **Callbacks**
   - [Callbacks Demo Server](./cmd/dudirekta-example-callbacks-callee/main.go)
   - [Callbacks Demo Client](./cmd/dudirekta-example-callbacks-caller/main.go)
@@ -439,13 +439,13 @@ To make getting started with dudirekta easier, take a look at the following exam
 
 All benchmarks were conducted on a test machine with the following specifications:
 
-| Property      | Value                                  |
-|---------------|----------------------------------------|
-| Device Model  | Dell XPS 9320                          |
-| OS            | Fedora release 38 (Thirty Eight) x86_64|
-| Kernel        | 6.3.11-200.fc38.x86_64                 |
-| CPU           | 12th Gen Intel i7-1280P (20) @ 4.700GHz|
-| Memory        | 31687MiB LPDDR5, 6400 MT/s             |
+| Property     | Value                                   |
+| ------------ | --------------------------------------- |
+| Device Model | Dell XPS 9320                           |
+| OS           | Fedora release 38 (Thirty Eight) x86_64 |
+| Kernel       | 6.3.11-200.fc38.x86_64                  |
+| CPU          | 12th Gen Intel i7-1280P (20) @ 4.700GHz |
+| Memory       | 31687MiB LPDDR5, 6400 MT/s              |
 
 To reproduce the tests, see the [benchmark source code](./cmd/) and the [visualization source code](./docs/).
 
@@ -455,27 +455,27 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 
 <img src="./docs/rps.png" alt="Bar chart of the requests/second benchmark results for JSON and CBOR" width="550px">
 
-| Data Type   |   JSON |   CBOR |
-|:------------|-------:|-------:|
-| uint8       |  93634 | 123122 |
-| uint64      |  94733 | 117978 |
-| uint32      |  94182 | 116764 |
-| uint16      |  94629 | 118126 |
-| uint        |  93584 | 122450 |
-| struct      |  90980 | 116290 |
-| string      |  87398 | 117085 |
-| slice       |  88604 | 117843 |
-| rune        |  94625 | 120375 |
-| int8        |  99581 | 133133 |
-| int64       |  93243 | 120311 |
-| int32       |  95189 | 122630 |
-| int16       |  94048 | 133136 |
-| int         | 107469 | 130494 |
-| float64     |  88636 | 113678 |
-| float32     |  92018 | 116722 |
-| byte        |  94230 | 125744 |
-| bool        |  88509 | 116449 |
-| array       |  89869 | 118470 |
+| Data Type |   JSON |   CBOR |
+| :-------- | -----: | -----: |
+| uint8     |  93634 | 123122 |
+| uint64    |  94733 | 117978 |
+| uint32    |  94182 | 116764 |
+| uint16    |  94629 | 118126 |
+| uint      |  93584 | 122450 |
+| struct    |  90980 | 116290 |
+| string    |  87398 | 117085 |
+| slice     |  88604 | 117843 |
+| rune      |  94625 | 120375 |
+| int8      |  99581 | 133133 |
+| int64     |  93243 | 120311 |
+| int32     |  95189 | 122630 |
+| int16     |  94048 | 133136 |
+| int       | 107469 | 130494 |
+| float64   |  88636 | 113678 |
+| float32   |  92018 | 116722 |
+| byte      |  94230 | 125744 |
+| bool      |  88509 | 116449 |
+| array     |  89869 | 118470 |
 
 #### Throughput
 
@@ -484,9 +484,9 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 <img src="./docs/throughput.png" alt="Bar chart of the throughput benchmark results for JSON and CBOR" width="550px">
 
 | Serializer | Average Throughput |
-|-----------|--------------------|
-| JSON      | 98 MB/s |
-| CBOR      | 1351 MB/s |
+| ---------- | ------------------ |
+| JSON       | 98 MB/s            |
+| CBOR       | 1351 MB/s          |
 
 ### Protocol
 
@@ -499,9 +499,7 @@ A function call to e.g. the `Println` function from above looks like this:
   "request": {
     "call": "b3332cf0-4e50-4684-a909-05772e14595e",
     "function": "Println",
-    "args": [
-      "Hello, world!"
-    ]
+    "args": ["Hello, world!"]
   },
   "response": null
 }

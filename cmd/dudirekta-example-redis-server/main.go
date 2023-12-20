@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
@@ -46,8 +45,6 @@ func main() {
 	serverRequestsStream := flag.String("server-requests-stream", "/conn1/requests/server", "Redis stream to read requests from client from")
 	serverResponsesStream := flag.String("server-responses-stream", "/conn1/responses/server", "Redis stream to read responses from client from")
 
-	timeout := flag.Duration("timeout", time.Minute, "Time to wait for responses (since the stream is reliable & guaranteed, you typically use high values)")
-
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,8 +55,8 @@ func main() {
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
 
-		*timeout,
 		ctx,
+
 		&rpc.Options{
 			OnClientConnect: func(remoteID string) {
 				clients++

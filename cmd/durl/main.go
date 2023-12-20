@@ -26,6 +26,7 @@ var (
 	errMissingURL      = errors.New("missing URL")
 	errMissingArgs     = errors.New("missing args")
 	errMissingFunction = errors.New("missing function")
+	errCallTimedOut    = errors.New("call timed out")
 )
 
 type reducedResponse struct {
@@ -310,7 +311,7 @@ Flags:
 
 	select {
 	case <-timeoutChan:
-		log.Fatal(rpc.ErrCallTimedOut)
+		log.Fatal(errCallTimedOut)
 
 	case response := <-responseChan:
 		var value any

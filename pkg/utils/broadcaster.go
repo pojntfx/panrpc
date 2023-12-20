@@ -1,58 +1,73 @@
 package utils
 
 import (
+	"context"
+	"net"
 	"sync"
-	"time"
 )
 
+type channelWithContext[T any] struct {
+	channel chan T
+
+	ctx    context.Context
+	cancel func()
+}
+
 type Broadcaster[T any] struct {
-	channels     map[string]chan T
+	channels     map[string]channelWithContext[T]
 	channelsLock *sync.Mutex
 }
 
 func NewBroadcaster[T any]() *Broadcaster[T] {
 	return &Broadcaster[T]{
-		channels:     map[string]chan T{},
+		channels:     map[string]channelWithContext[T]{},
 		channelsLock: &sync.Mutex{},
 	}
 }
 
-func (b *Broadcaster[T]) Publish(channel string, v T, timeout time.Duration) bool {
+func (b *Broadcaster[T]) Publish(channel string, v T) {
 	b.channelsLock.Lock()
 	c, ok := b.channels[channel]
 	if !ok {
-		c = make(chan T)
-		b.channels[channel] = c
+		b.channelsLock.Unlock()
+
+		return
 	}
 	b.channelsLock.Unlock()
 
 	select {
-	case c <- v:
-		return true
+	case c.channel <- v:
+		return
 
-	case <-time.After(timeout):
-		return false
+	case <-c.ctx.Done():
+		return
 	}
 }
 
-func (b *Broadcaster[T]) Receive(channel string, timeout time.Duration) (*T, bool) {
+func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error) {
 	b.channelsLock.Lock()
 	c, ok := b.channels[channel]
 	if !ok {
-		c = make(chan T)
+		ctx, cancel := context.WithCancel(ctx)
+		c = channelWithContext[T]{
+			channel: make(chan T),
+
+			ctx:    ctx,
+			cancel: cancel,
+		}
 		b.channels[channel] = c
 	}
 	b.channelsLock.Unlock()
 
 	select {
-	case v, ok := <-c:
+	case v, ok := <-c.channel:
 		if !ok {
-			return nil, false
+			return nil, net.ErrClosed
 		}
-		return &v, true
+		return &v, nil
 
-	case <-time.After(timeout):
-		return nil, false
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 
@@ -60,7 +75,8 @@ func (b *Broadcaster[T]) Close(channel string) {
 	b.channelsLock.Lock()
 	c, ok := b.channels[channel]
 	if ok {
-		close(c)
+		c.cancel()
+		close(c.channel)
 	}
 	delete(b.channels, channel)
 	b.channelsLock.Unlock()

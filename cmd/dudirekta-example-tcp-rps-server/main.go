@@ -7,7 +7,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pojntfx/dudirekta/pkg/rpc"
@@ -129,8 +128,8 @@ func main() {
 		registry := rpc.NewRegistry[remote, json.RawMessage](
 			&local{},
 
-			time.Second*10,
 			ctx,
+
 			&rpc.Options{
 				OnClientConnect: func(remoteID string) {
 					clients++
@@ -175,8 +174,8 @@ func main() {
 		registry := rpc.NewRegistry[remote, cbor.RawMessage](
 			&local{},
 
-			time.Second*10,
 			ctx,
+
 			&rpc.Options{
 				OnClientConnect: func(remoteID string) {
 					clients++

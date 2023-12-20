@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"sync/atomic"
-	"time"
 
 	"github.com/pojntfx/dudirekta/pkg/rpc"
 )
@@ -58,8 +57,8 @@ func main() {
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		service,
 
-		time.Second*10,
 		ctx,
+
 		&rpc.Options{
 			OnClientConnect: func(remoteID string) {
 				clients++
