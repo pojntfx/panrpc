@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
 	"github.com/rs/zerolog"
 )
@@ -178,7 +178,7 @@ func main() {
 		u.String(),
 		*key,
 		strings.Split(*ice, ","),
-		[]string{"dudirekta/example/webrtc"},
+		[]string{"ltsrpc/example/webrtc"},
 		&wrtcconn.AdapterConfig{
 			Timeout:    *timeout,
 			ForceRelay: *forceRelay,

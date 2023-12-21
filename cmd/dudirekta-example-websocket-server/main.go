@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 	"nhooyr.io/websocket"
 )
 

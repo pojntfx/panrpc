@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 	"github.com/redis/go-redis/v9"
 )
 

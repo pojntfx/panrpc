@@ -9,7 +9,7 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 )
 
 type local struct {

@@ -9,7 +9,7 @@ import (
 	"net"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 )
 
 var (

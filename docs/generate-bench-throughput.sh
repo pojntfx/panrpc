@@ -6,7 +6,7 @@ mkdir -p ./out
 
 echo "throughput" >./out/throughput-${SERIALIZER}.csv
 
-export RESULTS=$(go run ./cmd/dudirekta-example-tcp-throughput-client/ --serializer ${SERIALIZER})
+export RESULTS=$(go run ./cmd/ltsrpc-example-tcp-throughput-client/ --serializer ${SERIALIZER})
 
 IFS=$'\n'
 for result in ${RESULTS}; do

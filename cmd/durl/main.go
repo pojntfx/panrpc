@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/dudirekta/pkg/rpc"
+	"github.com/pojntfx/ltsrpc/pkg/rpc"
 	"nhooyr.io/websocket"
 )
 
@@ -38,7 +38,7 @@ func main() {
 	flag.Usage = func() {
 		bin := filepath.Base(os.Args[0])
 
-		fmt.Fprintf(os.Stderr, `Like cURL, but for dudirekta: Command-line tool for interacting with dudirekta servers
+		fmt.Fprintf(os.Stderr, `Like cURL, but for ltsrpc: Command-line tool for interacting with ltsrpc servers
 
 Usage of %v:
 	%v [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>

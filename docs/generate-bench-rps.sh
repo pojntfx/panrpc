@@ -8,7 +8,7 @@ mkdir -p ./out
 
 echo "data_type,runs" >./out/rps-${SERIALIZER}.csv
 for data_type in "${DATA_TYPES[@]}"; do
-    export RESULTS=$(go run ./cmd/dudirekta-example-tcp-rps-client/ --data-type ${data_type} --serializer ${SERIALIZER})
+    export RESULTS=$(go run ./cmd/ltsrpc-example-tcp-rps-client/ --data-type ${data_type} --serializer ${SERIALIZER})
 
     IFS=$'\n'
     for result in ${RESULTS}; do

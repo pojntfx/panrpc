@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/dudirekta/pkg/utils"
+	"github.com/pojntfx/ltsrpc/pkg/utils"
 )
 
 var (

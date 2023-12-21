@@ -1,4 +1,4 @@
-module github.com/pojntfx/dudirekta
+module github.com/pojntfx/ltsrpc
 
 go 1.18
 
