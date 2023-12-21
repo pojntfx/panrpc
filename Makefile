@@ -5,7 +5,7 @@ OUTPUT_DIR ?= out
 DST ?=
 
 # Private variables
-obj = durl
+obj = lurl
 all: $(addprefix build/,$(obj))
 
 # Build

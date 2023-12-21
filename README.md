@@ -42,30 +42,30 @@ $ npm i -s @pojntfx/ltsrpc
 
 This README's documentation only covers the Go version. For the TypeScript version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses ltsrpc in its examples; you can also find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/ltsrpc) as well as example in [ts/ltsrpc-example-websocket-client.ts](./ts/ltsrpc-example-websocket-client.ts).
 
-### `durl` Tool
+### `lurl` Tool
 
-In addition to the library, the CLI tool `durl` is also available; `durl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for ltsrpc: A command-line tool for interacting with ltsrpc servers.
+In addition to the library, the CLI tool `lurl` is also available; `lurl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for ltsrpc: A command-line tool for interacting with ltsrpc servers.
 
 Static binaries are available on [GitHub releases](https://github.com/pojntfx/ltsrpc/releases).
 
 On Linux, you can install them like so:
 
 ```shell
-$ curl -L -o /tmp/durl "https://github.com/pojntfx/ltsrpc/releases/latest/download/durl.linux-$(uname -m)"
-$ sudo install /tmp/durl /usr/local/bin
+$ curl -L -o /tmp/lurl "https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.linux-$(uname -m)"
+$ sudo install /tmp/lurl /usr/local/bin
 ```
 
 On macOS, you can use the following:
 
 ```shell
-$ curl -L -o /tmp/durl "https://github.com/pojntfx/ltsrpc/releases/latest/download/durl.darwin-$(uname -m)"
-$ sudo install /tmp/durl /usr/local/bin
+$ curl -L -o /tmp/lurl "https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.darwin-$(uname -m)"
+$ sudo install /tmp/lurl /usr/local/bin
 ```
 
 On Windows, the following should work (using PowerShell as administrator):
 
 ```shell
-PS> Invoke-WebRequest https://github.com/pojntfx/ltsrpc/releases/latest/download/durl.windows-x86_64.exe -OutFile \Windows\System32\durl.exe
+PS> Invoke-WebRequest https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.windows-x86_64.exe -OutFile \Windows\System32\lurl.exe
 ```
 
 You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/ltsrpc/releases).
@@ -527,14 +527,14 @@ Keep in mind that ltsrpc is bidirectional, meaning that both the client and serv
 ## Reference
 
 ```shell
-$ durl --help
+$ lurl --help
 Like cURL, but for ltsrpc: Command-line tool for interacting with ltsrpc servers
 
-Usage of durl:
-	durl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
+Usage of lurl:
+	lurl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
 
 Example:
-	durl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+	lurl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
 
 Flags:
   -cert string
