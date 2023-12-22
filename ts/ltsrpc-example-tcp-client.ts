@@ -1,27 +1,37 @@
 /* eslint-disable no-alert */
 /* eslint-disable no-console */
+import { Socket } from "net";
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { linkWebSocket } from "./index";
+import { parse } from "url";
+import { linkTCPSocket } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
-const raddr = env.RADDR || "ws://127.0.0.1:1337";
+const raddr = env.RADDR || "tcp://127.0.0.1:1337";
 
-const socket = new WebSocket(raddr);
+const socket = new Socket();
 
-socket.addEventListener("close", (e) => {
-  console.error("Disconnected with error:", e.reason);
+socket.on("error", (e) => {
+  console.error("Disconnected with error:", e.cause);
 
   exit(1);
 });
 
 await new Promise<void>((res, rej) => {
-  socket.addEventListener("open", () => res());
-  socket.addEventListener("error", rej);
+  const u = parse(raddr);
+
+  socket.connect(
+    {
+      host: u.hostname as string,
+      port: parseInt(u.port as string, 10),
+    },
+    res
+  );
+  socket.on("error", rej);
 });
 
-const remote = linkWebSocket(
+const remote = linkTCPSocket(
   socket,
 
   {
