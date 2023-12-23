@@ -10,26 +10,40 @@ import {
   unmarshalResponse,
 } from "./messages";
 
+export const ErrorCallCancelled = "call timed out";
+
+export interface ILocalContext {
+  remoteID: string;
+}
+
+export interface ILocal {
+  [k: string]: (ctx: ILocalContext, ...rest: any) => Promise<any>;
+}
+
+export type IRemoteContext =
+  | undefined
+  | {
+      signal?: AbortSignal;
+    };
+
+export interface IRemote {
+  [k: string]: (ctx: IRemoteContext, ...rest: any) => Promise<any>;
+}
+
 interface ICallResponse {
   value?: any;
   err: string;
 }
 
-export const ErrorCallCancelled = "call timed out";
-
 /**
  * Expose local functions and link remote ones to a WebSocket
- * @param socket WebSocket to use
- * @param local Local functions to expose
  * @returns Remote functions
  */
-export const linkWebSocket = <R, T>(
+export const linkWebSocket = <L extends ILocal, R extends IRemote, T>(
   socket: WebSocket,
 
-  local: any,
+  local: L,
   remote: R,
-
-  signal: AbortSignal,
 
   stringify: (value: any) => string,
   parse: (text: string) => any,
@@ -42,9 +56,9 @@ export const linkWebSocket = <R, T>(
   const r = { ...remote };
   // eslint-disable-next-line no-restricted-syntax, guard-for-in
   for (const functionName in r) {
-    (r as any)[functionName] = async (...args: any[]) =>
+    (r as any)[functionName] = async (ctx: IRemoteContext, ...rest: any[]) =>
       new Promise((res, rej) => {
-        if (signal.aborted) {
+        if (ctx?.signal?.aborted) {
           rej(new Error(ErrorCallCancelled));
 
           return;
@@ -53,7 +67,7 @@ export const linkWebSocket = <R, T>(
         const id = v4();
 
         const abortListener = () => {
-          signal.removeEventListener("abort", abortListener);
+          ctx?.signal?.removeEventListener("abort", abortListener);
 
           const callResponse: ICallResponse = {
             err: ErrorCallCancelled,
@@ -61,7 +75,7 @@ export const linkWebSocket = <R, T>(
 
           broker.emit(`rpc:${id}`, callResponse);
         };
-        signal.addEventListener("abort", abortListener);
+        ctx?.signal?.addEventListener("abort", abortListener);
 
         const returnListener = ({ value, err }: ICallResponse) => {
           broker.removeListener(`rpc:${id}`, returnListener);
@@ -76,7 +90,7 @@ export const linkWebSocket = <R, T>(
 
         socket.send(
           marshalMessage<T>(
-            marshalRequest<T>(id, functionName, args, stringifyNested),
+            marshalRequest<T>(id, functionName, rest, stringifyNested),
             undefined,
             stringify
           )
@@ -95,7 +109,9 @@ export const linkWebSocket = <R, T>(
 
       let res: T;
       try {
-        const rv = await (local as any)[functionName](...args);
+        const ctx: ILocalContext = { remoteID: "1" }; // TODO: Use remote-unique ID here
+
+        const rv = await (local as any)[functionName](ctx, ...args);
 
         res = marshalResponse<T>(call, rv, "", stringifyNested);
       } catch (e) {

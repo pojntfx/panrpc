@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { linkWebSocket } from "./index";
+import { ILocalContext, IRemoteContext, linkWebSocket } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -20,22 +20,18 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
-const controller = new AbortController();
-
 const remote = linkWebSocket(
   socket,
 
   {
-    Println: async (msg: string) => {
+    Println: async (ctx: ILocalContext, msg: string) => {
       console.log(msg);
     },
   },
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Increment: async (delta: number): Promise<number> => 0,
+    Increment: async (ctx: IRemoteContext, delta: number): Promise<number> => 0,
   },
-
-  controller.signal,
 
   JSON.stringify,
   JSON.parse,
@@ -60,7 +56,7 @@ while (true) {
     case "a":
       try {
         // eslint-disable-next-line no-await-in-loop
-        const res = await remote.Increment(1);
+        const res = await remote.Increment(undefined, 1);
 
         console.log(res);
       } catch (e) {
@@ -71,7 +67,7 @@ while (true) {
     case "b":
       try {
         // eslint-disable-next-line no-await-in-loop
-        const res = await remote.Increment(-1);
+        const res = await remote.Increment(undefined, -1);
 
         console.log(res);
       } catch (e) {
