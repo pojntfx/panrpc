@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
-import { v4 } from "uuid";
 import { Socket } from "net";
+import { v4 } from "uuid";
 import {
   marshalMessage,
   marshalRequest,
@@ -15,7 +15,7 @@ interface ICallResponse {
   err: string;
 }
 
-export const ErrorCallTimedOut = "call timed out";
+export const ErrorCallCancelled = "call timed out";
 
 /**
  * Expose local functions and link remote ones to a WebSocket
@@ -29,7 +29,7 @@ export const linkWebSocket = <R, T>(
   local: any,
   remote: R,
 
-  timeout: number,
+  signal: AbortSignal,
 
   stringify: (value: any) => string,
   parse: (text: string) => any,
@@ -44,31 +44,35 @@ export const linkWebSocket = <R, T>(
   for (const functionName in r) {
     (r as any)[functionName] = async (...args: any[]) =>
       new Promise((res, rej) => {
+        if (signal.aborted) {
+          rej(new Error(ErrorCallCancelled));
+
+          return;
+        }
+
         const id = v4();
 
-        const handleReturn = ({ value, err }: ICallResponse) => {
+        const abortListener = () => {
+          signal.removeEventListener("abort", abortListener);
+
+          const callResponse: ICallResponse = {
+            err: ErrorCallCancelled,
+          };
+
+          broker.emit(`rpc:${id}`, callResponse);
+        };
+        signal.addEventListener("abort", abortListener);
+
+        const returnListener = ({ value, err }: ICallResponse) => {
+          broker.removeListener(`rpc:${id}`, returnListener);
+
           if (err) {
             rej(new Error(err));
           } else {
             res(value);
           }
-
-          broker.removeListener(`rpc:${id}`, handleReturn);
         };
-
-        const t = setTimeout(() => {
-          const callResponse: ICallResponse = {
-            err: ErrorCallTimedOut,
-          };
-
-          broker.emit(`rpc:${id}`, callResponse);
-        }, timeout);
-
-        broker.addListener(`rpc:${id}`, (e) => {
-          clearTimeout(t);
-
-          handleReturn(e);
-        });
+        broker.addListener(`rpc:${id}`, returnListener);
 
         socket.send(
           marshalMessage<T>(
@@ -163,7 +167,7 @@ export const linkTCPSocket = <R, T>(
 
         const t = setTimeout(() => {
           const callResponse: ICallResponse = {
-            err: ErrorCallTimedOut,
+            err: ErrorCallCancelled,
           };
 
           broker.emit(`rpc:${id}`, callResponse);

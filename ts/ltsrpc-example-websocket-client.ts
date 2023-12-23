@@ -1,4 +1,3 @@
-/* eslint-disable no-alert */
 /* eslint-disable no-console */
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
@@ -21,6 +20,8 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
+const controller = new AbortController();
+
 const remote = linkWebSocket(
   socket,
 
@@ -34,7 +35,7 @@ const remote = linkWebSocket(
     Increment: async (delta: number): Promise<number> => 0,
   },
 
-  1000 * 10,
+  controller.signal,
 
   JSON.stringify,
   JSON.parse,
