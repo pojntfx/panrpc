@@ -20,7 +20,7 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
-const remote = linkWebSocket(
+const { remote, close } = linkWebSocket(
   socket,
 
   {
@@ -39,6 +39,7 @@ const remote = linkWebSocket(
   (v) => v,
   (v) => v
 );
+socket.addEventListener("close", close);
 
 console.log("Connected to", raddr);
 
