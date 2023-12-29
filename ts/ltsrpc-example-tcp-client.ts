@@ -1,10 +1,9 @@
-/* eslint-disable no-alert */
 /* eslint-disable no-console */
 import { Socket } from "net";
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
-import { linkTCPSocket } from "./index";
+import { ILocalContext, IRemoteContext, linkTCPSocket } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -31,20 +30,18 @@ await new Promise<void>((res, rej) => {
   socket.on("error", rej);
 });
 
-const remote = linkTCPSocket(
+const { remote, close } = linkTCPSocket(
   socket,
 
   {
-    Println: async (msg: string) => {
+    Println: async (ctx: ILocalContext, msg: string) => {
       console.log(msg);
     },
   },
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Increment: async (delta: number): Promise<number> => 0,
+    Increment: async (ctx: IRemoteContext, delta: number): Promise<number> => 0,
   },
-
-  1000 * 10,
 
   JSON.stringify,
   JSON.parse,
@@ -52,6 +49,7 @@ const remote = linkTCPSocket(
   (v) => v,
   (v) => v
 );
+socket.on("close", close);
 
 console.log("Connected to", raddr);
 
@@ -69,7 +67,7 @@ while (true) {
     case "a":
       try {
         // eslint-disable-next-line no-await-in-loop
-        const res = await remote.Increment(1);
+        const res = await remote.Increment(undefined, 1);
 
         console.log(res);
       } catch (e) {
@@ -80,7 +78,7 @@ while (true) {
     case "b":
       try {
         // eslint-disable-next-line no-await-in-loop
-        const res = await remote.Increment(-1);
+        const res = await remote.Increment(undefined, -1);
 
         console.log(res);
       } catch (e) {
