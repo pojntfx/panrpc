@@ -49,7 +49,11 @@ const { remote, close } = linkTCPSocket(
   (v) => v,
   (v) => v
 );
-socket.on("close", close);
+socket.on("close", () => {
+  close();
+
+  exit(0);
+});
 
 console.log("Connected to", raddr);
 

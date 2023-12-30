@@ -63,15 +63,14 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
     };
   }
 
-  open() {
-    this.socket.addEventListener("message", this.handler);
-  }
+  open = () => this.socket.addEventListener("message", this.handler);
 
-  close() {
-    this.socket.removeEventListener("message", this.handler);
-  }
+  close = () => this.socket.removeEventListener("message", this.handler);
 
-  on(event: "request" | "response", listener: (message: T) => void): this {
+  on = (
+    event: "request" | "response",
+    listener: (message: T) => void
+  ): this => {
     if (event === "request") {
       this.requestListener = listener;
     } else if (event === "response") {
@@ -79,7 +78,7 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
     }
 
     return this;
-  }
+  };
 }
 
 class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
@@ -105,15 +104,14 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
     };
   }
 
-  open() {
-    this.socket.addListener("data", this.handler);
-  }
+  open = () => this.socket.addListener("data", this.handler);
 
-  close() {
-    this.socket.removeListener("data", this.handler);
-  }
+  close = () => this.socket.removeListener("data", this.handler);
 
-  on(event: "request" | "response", listener: (message: T) => void): this {
+  on = (
+    event: "request" | "response",
+    listener: (message: T) => void
+  ): this => {
     if (event === "request") {
       this.requestListener = listener;
     } else if (event === "response") {
@@ -121,7 +119,7 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
     }
 
     return this;
-  }
+  };
 }
 
 /**
