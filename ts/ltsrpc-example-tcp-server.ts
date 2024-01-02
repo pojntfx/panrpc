@@ -16,7 +16,7 @@ const server = createServer(async (socket) => {
     console.error("Client disconnected with error:", e.cause);
   });
 
-  const { remote, close } = linkTCPSocket(
+  const remote = linkTCPSocket(
     socket,
 
     {
@@ -45,8 +45,6 @@ const server = createServer(async (socket) => {
     (v) => v
   );
   socket.on("close", () => {
-    close();
-
     clients--;
 
     console.log(clients, "clients connected");

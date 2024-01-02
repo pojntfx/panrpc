@@ -22,7 +22,7 @@ server.on("connection", async (socket) => {
     console.error("Client disconnected with error:", e);
   });
 
-  const { remote, close } = linkWebSocket(
+  const remote = linkWebSocket(
     socket,
 
     {
@@ -51,8 +51,6 @@ server.on("connection", async (socket) => {
     (v) => v
   );
   socket.addEventListener("close", () => {
-    close();
-
     clients--;
 
     console.log(clients, "clients connected");

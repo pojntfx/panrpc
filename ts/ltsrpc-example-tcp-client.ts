@@ -30,7 +30,7 @@ await new Promise<void>((res, rej) => {
   socket.on("error", rej);
 });
 
-const { remote, close } = linkTCPSocket(
+const remote = linkTCPSocket(
   socket,
 
   {
@@ -49,11 +49,7 @@ const { remote, close } = linkTCPSocket(
   (v) => v,
   (v) => v
 );
-socket.on("close", () => {
-  close();
-
-  exit(0);
-});
+socket.on("close", () => exit(0));
 
 console.log("Connected to", raddr);
 

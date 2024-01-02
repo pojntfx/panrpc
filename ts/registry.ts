@@ -41,18 +41,14 @@ export interface IRequestResponseReader<T> {
 }
 
 class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
-  private socket: WebSocket;
-
-  private handler: (event: MessageEvent<string | Buffer>) => any;
-
   private requestListener?: (message: T) => void;
 
   private responseListener?: (message: T) => void;
 
   constructor(socket: WebSocket, parse: (text: string) => any) {
-    this.socket = socket;
-
-    this.handler = (event: MessageEvent<string | Buffer>) => {
+    socket.addEventListener(
+      "message",
+      (event: MessageEvent<string | Buffer>) => {
       const msg = unmarshalMessage<T>(event.data as string, parse);
 
       if (msg.request) {
@@ -60,12 +56,9 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
       } else if (msg.response) {
         this.responseListener?.(msg.response);
       }
-    };
+      }
+    );
   }
-
-  open = () => this.socket.addEventListener("message", this.handler);
-
-  close = () => this.socket.removeEventListener("message", this.handler);
 
   on = (
     event: "request" | "response",
@@ -82,18 +75,12 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
 }
 
 class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
-  private socket: Socket;
-
-  private handler: (event: MessageEvent<string | Buffer>) => any;
-
   private requestListener?: (message: T) => void;
 
   private responseListener?: (message: T) => void;
 
   constructor(socket: Socket, parse: (text: string) => any) {
-    this.socket = socket;
-
-    this.handler = (data: any) => {
+    socket.addListener("data", (data: any) => {
       const msg = unmarshalMessage<T>(data.toString() as string, parse);
 
       if (msg.request) {
@@ -101,12 +88,8 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
       } else if (msg.response) {
         this.responseListener?.(msg.response);
       }
-    };
+    });
   }
-
-  open = () => this.socket.addListener("data", this.handler);
-
-  close = () => this.socket.removeListener("data", this.handler);
 
   on = (
     event: "request" | "response",
@@ -251,10 +234,8 @@ export const linkWebSocket = <L extends ILocal, R extends IRemote, T>(
     socket,
     parse
   );
-  requestResponseReceiver.open();
 
-  return {
-    remote: linkMessage(
+  return linkMessage(
       local,
       remote,
 
@@ -267,9 +248,7 @@ export const linkWebSocket = <L extends ILocal, R extends IRemote, T>(
 
       stringifyNested,
       parseNested
-    ),
-    close: requestResponseReceiver.close,
-  };
+  );
 };
 
 /**
@@ -299,10 +278,8 @@ export const linkTCPSocket = <L extends ILocal, R extends IRemote, T>(
     socket,
     parse
   );
-  requestResponseReceiver.open();
 
-  return {
-    remote: linkMessage(
+  return linkMessage(
       local,
       remote,
 
@@ -315,7 +292,5 @@ export const linkTCPSocket = <L extends ILocal, R extends IRemote, T>(
 
       stringifyNested,
       parseNested
-    ),
-    close: requestResponseReceiver.close,
-  };
+  );
 };
