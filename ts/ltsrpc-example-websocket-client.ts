@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { ILocalContext, IRemoteContext, linkWebSocket } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -20,9 +20,7 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
-const remote = linkWebSocket(
-  socket,
-
+const registry = new Registry(
   {
     Println: async (ctx: ILocalContext, msg: string) => {
       console.log(msg);
@@ -31,7 +29,11 @@ const remote = linkWebSocket(
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Increment: async (ctx: IRemoteContext, delta: number): Promise<number> => 0,
-  },
+  }
+);
+
+const remote = registry.linkWebSocket(
+  socket,
 
   JSON.stringify,
   JSON.parse,

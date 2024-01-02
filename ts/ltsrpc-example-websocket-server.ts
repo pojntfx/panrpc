@@ -4,7 +4,7 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocketServer } from "ws";
-import { ILocalContext, IRemoteContext, linkWebSocket } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -13,6 +13,28 @@ const u = parse(laddr);
 
 let clients = 0;
 let counter = 0;
+
+const registry = new Registry(
+  {
+    Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
+      console.log(
+        "Incrementing counter by",
+        delta,
+        "for remote with ID",
+        ctx.remoteID
+      );
+
+      counter += delta;
+
+      return counter;
+    },
+  },
+  {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Println: async (ctx: IRemoteContext, msg: string) => {},
+  }
+);
+
 const server = new WebSocketServer({
   host: u.hostname as string,
   port: parseInt(u.port as string, 10),
@@ -22,27 +44,8 @@ server.on("connection", async (socket) => {
     console.error("Client disconnected with error:", e);
   });
 
-  const remote = linkWebSocket(
+  const remote = registry.linkWebSocket(
     socket,
-
-    {
-      Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
-        console.log(
-          "Incrementing counter by",
-          delta,
-          "for remote with ID",
-          ctx.remoteID
-        );
-
-        counter += delta;
-
-        return counter;
-      },
-    },
-    {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      Println: async (ctx: IRemoteContext, msg: string) => {},
-    },
 
     JSON.stringify,
     JSON.parse,

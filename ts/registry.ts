@@ -49,13 +49,13 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
     socket.addEventListener(
       "message",
       (event: MessageEvent<string | Buffer>) => {
-      const msg = unmarshalMessage<T>(event.data as string, parse);
+        const msg = unmarshalMessage<T>(event.data as string, parse);
 
-      if (msg.request) {
-        this.requestListener?.(msg.request);
-      } else if (msg.response) {
-        this.responseListener?.(msg.response);
-      }
+        if (msg.request) {
+          this.requestListener?.(msg.request);
+        } else if (msg.response) {
+          this.responseListener?.(msg.response);
+        }
       }
     );
   }
@@ -105,140 +105,139 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
   };
 }
 
-/**
- * Expose local functions and link remote ones to a message-based transport
- * @param local Local functions to explose
- * @param remote Remote functions to implement
- * @param writeRequest Function to write a request
- * @param writeResponse Function to write a response
- * @param requestResponseReader Emitter to read requests and responses
- * @param stringify Function to marshal a message
- * @param parse Function to unmarshal a message
- * @returns Remote functions
- */
-export const linkMessage = <L extends ILocal, R extends IRemote, T>(
-  local: L,
-  remote: R,
+export interface IOptions {
+  onClientConnect: (remoteID: string) => Promise<void>;
+  onClientDisconnect: (remoteID: string) => Promise<void>;
+}
 
-  writeRequest: (text: T) => Promise<any>,
-  writeResponse: (text: T) => Promise<any>,
+export class Registry<L extends ILocal, R extends IRemote> {
+  constructor(
+    private local: L,
+    private remote: R,
+    private options?: IOptions
+  ) {}
 
-  requestResponseReader: IRequestResponseReader<T>,
+  /**
+   * Expose local functions and link remote ones to a message-based transport
+   * @param writeRequest Function to write a request
+   * @param writeResponse Function to write a response
+   * @param requestResponseReader Emitter to read requests and responses
+   * @param stringify Function to marshal a message
+   * @param parse Function to unmarshal a message
+   * @returns Remote functions
+   */
+  linkMessage = <T>(
+    writeRequest: (text: T) => Promise<any>,
+    writeResponse: (text: T) => Promise<any>,
 
-  stringify: (value: any) => T,
-  parse: (text: T) => any
-) => {
-  const broker = new EventEmitter();
+    requestResponseReader: IRequestResponseReader<T>,
 
-  const r = { ...remote };
-  // eslint-disable-next-line no-restricted-syntax, guard-for-in
-  for (const functionName in r) {
-    (r as any)[functionName] = async (ctx: IRemoteContext, ...rest: any[]) =>
-      new Promise((res, rej) => {
-        if (ctx?.signal?.aborted) {
-          rej(new Error(ErrorCallCancelled));
+    stringify: (value: any) => T,
+    parse: (text: T) => any
+  ) => {
+    const broker = new EventEmitter();
 
-          return;
-        }
+    const r = { ...this.remote };
+    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    for (const functionName in r) {
+      (r as any)[functionName] = async (ctx: IRemoteContext, ...rest: any[]) =>
+        new Promise((res, rej) => {
+          if (ctx?.signal?.aborted) {
+            rej(new Error(ErrorCallCancelled));
 
-        const id = v4();
-
-        const abortListener = () => {
-          ctx?.signal?.removeEventListener("abort", abortListener);
-
-          const callResponse: ICallResponse = {
-            err: ErrorCallCancelled,
-          };
-
-          broker.emit(`rpc:${id}`, callResponse);
-        };
-        ctx?.signal?.addEventListener("abort", abortListener);
-
-        const returnListener = ({ value, err }: ICallResponse) => {
-          broker.removeListener(`rpc:${id}`, returnListener);
-
-          if (err) {
-            rej(new Error(err));
-          } else {
-            res(value);
+            return;
           }
-        };
-        broker.addListener(`rpc:${id}`, returnListener);
 
-        writeRequest(
-          marshalRequest<T>(id, functionName, rest, stringify)
-        ).catch(rej);
-      });
-  }
+          const id = v4();
 
-  requestResponseReader.on("request", async (message) => {
-    const { call, functionName, args } = unmarshalRequest<T>(message, parse);
+          const abortListener = () => {
+            ctx?.signal?.removeEventListener("abort", abortListener);
 
-    let res: T;
-    try {
-      const ctx: ILocalContext = { remoteID: "1" }; // TODO: Use remote-unique ID here
+            const callResponse: ICallResponse = {
+              err: ErrorCallCancelled,
+            };
 
-      const rv = await (local as any)[functionName](ctx, ...args);
+            broker.emit(`rpc:${id}`, callResponse);
+          };
+          ctx?.signal?.addEventListener("abort", abortListener);
 
-      res = marshalResponse<T>(call, rv, "", stringify);
-    } catch (e) {
-      res = marshalResponse<T>(
-        call,
-        undefined,
-        (e as Error).message,
-        stringify
-      );
+          const returnListener = ({ value, err }: ICallResponse) => {
+            broker.removeListener(`rpc:${id}`, returnListener);
+
+            if (err) {
+              rej(new Error(err));
+            } else {
+              res(value);
+            }
+          };
+          broker.addListener(`rpc:${id}`, returnListener);
+
+          writeRequest(
+            marshalRequest<T>(id, functionName, rest, stringify)
+          ).catch(rej);
+        });
     }
 
-    await writeResponse(res);
-  });
+    requestResponseReader.on("request", async (message) => {
+      const { call, functionName, args } = unmarshalRequest<T>(message, parse);
 
-  requestResponseReader.on("response", async (message) => {
-    const { call, value, err } = unmarshalResponse<T>(message, parse);
+      let res: T;
+      try {
+        const ctx: ILocalContext = { remoteID: "1" }; // TODO: Use remote-unique ID here
 
-    const callResponse: ICallResponse = {
-      value,
-      err,
-    };
+        const rv = await (this.local as any)[functionName](ctx, ...args);
 
-    broker.emit(`rpc:${call}`, callResponse);
-  });
+        res = marshalResponse<T>(call, rv, "", stringify);
+      } catch (e) {
+        res = marshalResponse<T>(
+          call,
+          undefined,
+          (e as Error).message,
+          stringify
+        );
+      }
 
-  return r;
-};
+      await writeResponse(res);
+    });
 
-/**
- * Expose local functions and link remote ones to a WebSocket
- * @param socket Socket to link functions to
- * @param local Local functions to expose
- * @param remote Remote functions to implement
- * @param stringify Function to marshal a message
- * @param parse Function to unmarshal a message
- * @param stringifyNested Function to marshal a nested message
- * @param parseNested Function to unmarshal a nested message
- * @returns Remote functions
- */
-export const linkWebSocket = <L extends ILocal, R extends IRemote, T>(
-  socket: WebSocket,
+    requestResponseReader.on("response", async (message) => {
+      const { call, value, err } = unmarshalResponse<T>(message, parse);
 
-  local: L,
-  remote: R,
+      const callResponse: ICallResponse = {
+        value,
+        err,
+      };
 
-  stringify: (value: any) => string,
-  parse: (text: string) => any,
+      broker.emit(`rpc:${call}`, callResponse);
+    });
 
-  stringifyNested: (value: any) => T,
-  parseNested: (text: T) => any
-) => {
-  const requestResponseReceiver = new WebSocketRequestResponseReader<T>(
-    socket,
-    parse
-  );
+    return r;
+  };
 
-  return linkMessage(
-      local,
-      remote,
+  /**
+   * Expose local functions and link remote ones to a WebSocket
+   * @param socket Socket to link functions to
+   * @param stringify Function to marshal a message
+   * @param parse Function to unmarshal a message
+   * @param stringifyNested Function to marshal a nested message
+   * @param parseNested Function to unmarshal a nested message
+   * @returns Remote functions
+   */
+  linkWebSocket = <T>(
+    socket: WebSocket,
 
+    stringify: (value: any) => string,
+    parse: (text: string) => any,
+
+    stringifyNested: (value: any) => T,
+    parseNested: (text: T) => any
+  ) => {
+    const requestResponseReceiver = new WebSocketRequestResponseReader<T>(
+      socket,
+      parse
+    );
+
+    return this.linkMessage(
       async (text: T) =>
         socket.send(marshalMessage<T>(text, undefined, stringify)),
       async (text: T) =>
@@ -248,41 +247,33 @@ export const linkWebSocket = <L extends ILocal, R extends IRemote, T>(
 
       stringifyNested,
       parseNested
-  );
-};
+    );
+  };
 
-/**
- * Expose local functions and link remote ones to a TCPSocket
- * @param socket Socket to link functions to
- * @param local Local functions to expose
- * @param remote Remote functions to implement
- * @param stringify Function to marshal a message
- * @param parse Function to unmarshal a message
- * @param stringifyNested Function to marshal a nested message
- * @param parseNested Function to unmarshal a nested message
- * @returns Remote functions
- */
-export const linkTCPSocket = <L extends ILocal, R extends IRemote, T>(
-  socket: Socket,
+  /**
+   * Expose local functions and link remote ones to a TCPSocket
+   * @param socket Socket to link functions to
+   * @param stringify Function to marshal a message
+   * @param parse Function to unmarshal a message
+   * @param stringifyNested Function to marshal a nested message
+   * @param parseNested Function to unmarshal a nested message
+   * @returns Remote functions
+   */
+  linkTCPSocket = <T>(
+    socket: Socket,
 
-  local: L,
-  remote: R,
+    stringify: (value: any) => string,
+    parse: (text: string) => any,
 
-  stringify: (value: any) => string,
-  parse: (text: string) => any,
+    stringifyNested: (value: any) => T,
+    parseNested: (text: T) => any
+  ) => {
+    const requestResponseReceiver = new TCPSocketRequestResponseReader<T>(
+      socket,
+      parse
+    );
 
-  stringifyNested: (value: any) => T,
-  parseNested: (text: T) => any
-) => {
-  const requestResponseReceiver = new TCPSocketRequestResponseReader<T>(
-    socket,
-    parse
-  );
-
-  return linkMessage(
-      local,
-      remote,
-
+    return this.linkMessage(
       async (text: T) =>
         socket.write(marshalMessage<T>(text, undefined, stringify)),
       async (text: T) =>
@@ -292,5 +283,6 @@ export const linkTCPSocket = <L extends ILocal, R extends IRemote, T>(
 
       stringifyNested,
       parseNested
-  );
-};
+    );
+  };
+}

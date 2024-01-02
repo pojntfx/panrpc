@@ -3,7 +3,7 @@ import { createServer } from "net";
 import { env, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
-import { ILocalContext, IRemoteContext, linkTCPSocket } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -11,32 +11,35 @@ const laddr = env.LADDR || "tcp://127.0.0.1:1337";
 
 let clients = 0;
 let counter = 0;
+
+const registry = new Registry(
+  {
+    Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
+      console.log(
+        "Incrementing counter by",
+        delta,
+        "for remote with ID",
+        ctx.remoteID
+      );
+
+      counter += delta;
+
+      return counter;
+    },
+  },
+  {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Println: async (ctx: IRemoteContext, msg: string) => {},
+  }
+);
+
 const server = createServer(async (socket) => {
   socket.on("error", (e) => {
     console.error("Client disconnected with error:", e.cause);
   });
 
-  const remote = linkTCPSocket(
+  const remote = registry.linkTCPSocket(
     socket,
-
-    {
-      Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
-        console.log(
-          "Incrementing counter by",
-          delta,
-          "for remote with ID",
-          ctx.remoteID
-        );
-
-        counter += delta;
-
-        return counter;
-      },
-    },
-    {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      Println: async (ctx: IRemoteContext, msg: string) => {},
-    },
 
     JSON.stringify,
     JSON.parse,

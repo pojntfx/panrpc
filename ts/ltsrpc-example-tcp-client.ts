@@ -3,7 +3,7 @@ import { Socket } from "net";
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
-import { ILocalContext, IRemoteContext, linkTCPSocket } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 const rl = createInterface({ input: stdin, output: stdout });
 
@@ -30,9 +30,7 @@ await new Promise<void>((res, rej) => {
   socket.on("error", rej);
 });
 
-const remote = linkTCPSocket(
-  socket,
-
+const registry = new Registry(
   {
     Println: async (ctx: ILocalContext, msg: string) => {
       console.log(msg);
@@ -41,7 +39,11 @@ const remote = linkTCPSocket(
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Increment: async (ctx: IRemoteContext, delta: number): Promise<number> => 0,
-  },
+  }
+);
+
+const remote = registry.linkTCPSocket(
+  socket,
 
   JSON.stringify,
   JSON.parse,
