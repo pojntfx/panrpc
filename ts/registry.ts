@@ -38,12 +38,15 @@ interface ICallResponse {
 export interface IRequestResponseReader<T> {
   on(event: "request", listener: (message: T) => void): this;
   on(event: "response", listener: (message: T) => void): this;
+  on(event: "close", listener: () => void): this;
 }
 
 class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
   private requestListener?: (message: T) => void;
 
   private responseListener?: (message: T) => void;
+
+  private closeListener?: () => void;
 
   constructor(socket: WebSocket, parse: (text: string) => any) {
     socket.addEventListener(
@@ -58,16 +61,20 @@ class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
         }
       }
     );
+
+    socket.addEventListener("close", () => this.closeListener?.());
   }
 
   on = (
-    event: "request" | "response",
-    listener: (message: T) => void
+    event: "request" | "response" | "close",
+    listener: ((message: T) => void) | (() => void)
   ): this => {
     if (event === "request") {
       this.requestListener = listener;
     } else if (event === "response") {
       this.responseListener = listener;
+    } else if (event === "close") {
+      this.closeListener = listener as () => void;
     }
 
     return this;
@@ -79,6 +86,8 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
 
   private responseListener?: (message: T) => void;
 
+  private closeListener?: () => void;
+
   constructor(socket: Socket, parse: (text: string) => any) {
     socket.addListener("data", (data: any) => {
       const msg = unmarshalMessage<T>(data.toString() as string, parse);
@@ -89,16 +98,20 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
         this.responseListener?.(msg.response);
       }
     });
+
+    socket.addListener("close", () => this.closeListener?.());
   }
 
   on = (
-    event: "request" | "response",
+    event: "request" | "response" | "close",
     listener: (message: T) => void
   ): this => {
     if (event === "request") {
       this.requestListener = listener;
     } else if (event === "response") {
       this.responseListener = listener;
+    } else if (event === "close") {
+      this.closeListener = listener as () => void;
     }
 
     return this;
@@ -106,11 +119,15 @@ class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
 }
 
 export interface IOptions {
-  onClientConnect: (remoteID: string) => Promise<void>;
-  onClientDisconnect: (remoteID: string) => Promise<void>;
+  onClientConnect?: (remoteID: string) => void;
+  onClientDisconnect?: (remoteID: string) => void;
 }
 
 export class Registry<L extends ILocal, R extends IRemote> {
+  private remotes: {
+    [remoteID: string]: R;
+  } = {};
+
   constructor(
     private local: L,
     private remote: R,
@@ -178,12 +195,14 @@ export class Registry<L extends ILocal, R extends IRemote> {
         });
     }
 
+    const remoteID = v4();
+
     requestResponseReader.on("request", async (message) => {
       const { call, functionName, args } = unmarshalRequest<T>(message, parse);
 
       let res: T;
       try {
-        const ctx: ILocalContext = { remoteID: "1" }; // TODO: Use remote-unique ID here
+        const ctx: ILocalContext = { remoteID };
 
         const rv = await (this.local as any)[functionName](ctx, ...args);
 
@@ -211,7 +230,13 @@ export class Registry<L extends ILocal, R extends IRemote> {
       broker.emit(`rpc:${call}`, callResponse);
     });
 
-    return r;
+    this.remotes[remoteID] = r;
+    this.options?.onClientConnect?.(remoteID);
+
+    requestResponseReader.on("close", () => {
+      delete this.remotes[remoteID];
+      this.options?.onClientDisconnect?.(remoteID);
+    });
   };
 
   /**
@@ -237,7 +262,7 @@ export class Registry<L extends ILocal, R extends IRemote> {
       parse
     );
 
-    return this.linkMessage(
+    this.linkMessage(
       async (text: T) =>
         socket.send(marshalMessage<T>(text, undefined, stringify)),
       async (text: T) =>
@@ -273,7 +298,7 @@ export class Registry<L extends ILocal, R extends IRemote> {
       parse
     );
 
-    return this.linkMessage(
+    this.linkMessage(
       async (text: T) =>
         socket.write(marshalMessage<T>(text, undefined, stringify)),
       async (text: T) =>
@@ -284,5 +309,13 @@ export class Registry<L extends ILocal, R extends IRemote> {
       stringifyNested,
       parseNested
     );
+  };
+
+  forRemotes = async (cb: (remoteID: string, remote: R) => Promise<void>) => {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const remoteID of Object.keys(this.remotes)) {
+      // eslint-disable-next-line no-await-in-loop
+      await cb(remoteID, this.remotes[remoteID]);
+    }
   };
 }
