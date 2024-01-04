@@ -1,6 +1,9 @@
 /* eslint-disable no-console */
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
+import { parse } from "url";
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 let clients = 0;
@@ -80,29 +83,57 @@ const registry = new Registry(
   }
 })();
 
-const raddr = env.RADDR || "ws://127.0.0.1:1337";
+const addr = env.ADDR || "127.0.0.1:1337";
+const listen = env.LISTEN === "true";
 
-const socket = new WebSocket(raddr);
+if (listen) {
+  const u = parse(`ws://${addr}`);
 
-socket.addEventListener("close", (e) => {
-  console.error("Disconnected with error:", e.reason);
+  const server = new WebSocketServer({
+    host: u.hostname as string,
+    port: parseInt(u.port as string, 10),
+  });
 
-  exit(1);
-});
+  server.on("connection", (socket) => {
+    socket.addEventListener("error", (e) => {
+      console.error("Client disconnected with error:", e);
+    });
 
-await new Promise<void>((res, rej) => {
-  socket.addEventListener("open", () => res());
-  socket.addEventListener("error", rej);
-});
+    registry.linkWebSocket(
+      socket,
 
-registry.linkWebSocket(
-  socket,
+      JSON.stringify,
+      JSON.parse,
 
-  JSON.stringify,
-  JSON.parse,
+      (v) => v,
+      (v) => v
+    );
+  });
 
-  (v) => v,
-  (v) => v
-);
+  console.log("Listening on", addr);
+} else {
+  const socket = new WebSocket(`ws://${addr}`);
 
-console.log("Connected to", raddr);
+  socket.addEventListener("close", (e) => {
+    console.error("Disconnected with error:", e.reason);
+
+    exit(1);
+  });
+
+  await new Promise<void>((res, rej) => {
+    socket.addEventListener("open", () => res());
+    socket.addEventListener("error", rej);
+  });
+
+  registry.linkWebSocket(
+    socket,
+
+    JSON.stringify,
+    JSON.parse,
+
+    (v) => v,
+    (v) => v
+  );
+
+  console.log("Connected to", addr);
+}

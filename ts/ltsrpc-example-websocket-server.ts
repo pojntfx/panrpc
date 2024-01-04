@@ -1,15 +1,10 @@
 /* eslint-disable no-console */
-import { env, stdin, stdout } from "process";
+import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "./index";
-
-const rl = createInterface({ input: stdin, output: stdout });
-
-const laddr = env.LADDR || "tcp://127.0.0.1:1337";
-const u = parse(laddr);
 
 let clients = 0;
 let counter = 0;
@@ -32,19 +27,99 @@ const registry = new Registry(
   {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Println: async (ctx: IRemoteContext, msg: string) => {},
+  },
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "clients connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "clients connected");
+    },
   }
 );
 
-const server = new WebSocketServer({
-  host: u.hostname as string,
-  port: parseInt(u.port as string, 10),
-});
-server.on("connection", async (socket) => {
-  socket.addEventListener("error", (e) => {
-    console.error("Client disconnected with error:", e);
+(async () => {
+  console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
+
+- a: Print "Hello, world!
+`);
+
+  const rl = createInterface({ input: stdin, output: stdout });
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const line =
+      // eslint-disable-next-line no-await-in-loop
+      await rl.question("");
+
+    // eslint-disable-next-line no-await-in-loop
+    await registry.forRemotes(async (remoteID, remote) => {
+      console.log("Calling functions for remote with ID", remoteID);
+
+      switch (line) {
+        case "a":
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await remote.Println(undefined, "Hello, world!");
+          } catch (e) {
+            console.error(`Got error for Increment func: ${e}`);
+          }
+          break;
+
+        default:
+          console.log(`Unknown letter ${line}, ignoring input`);
+      }
+    });
+  }
+})();
+
+const addr = env.ADDR || "127.0.0.1:1337";
+const listen = env.LISTEN !== "false";
+
+if (listen) {
+  const u = parse(`ws://${addr}`);
+
+  const server = new WebSocketServer({
+    host: u.hostname as string,
+    port: parseInt(u.port as string, 10),
   });
 
-  const remote = registry.linkWebSocket(
+  server.on("connection", (socket) => {
+    socket.addEventListener("error", (e) => {
+      console.error("Client disconnected with error:", e);
+    });
+
+    registry.linkWebSocket(
+      socket,
+
+      JSON.stringify,
+      JSON.parse,
+
+      (v) => v,
+      (v) => v
+    );
+  });
+
+  console.log("Listening on", addr);
+} else {
+  const socket = new WebSocket(`ws://${addr}`);
+
+  socket.addEventListener("close", (e) => {
+    console.error("Disconnected with error:", e.reason);
+
+    exit(1);
+  });
+
+  await new Promise<void>((res, rej) => {
+    socket.addEventListener("open", () => res());
+    socket.addEventListener("error", rej);
+  });
+
+  registry.linkWebSocket(
     socket,
 
     JSON.stringify,
@@ -53,39 +128,6 @@ server.on("connection", async (socket) => {
     (v) => v,
     (v) => v
   );
-  socket.addEventListener("close", () => {
-    clients--;
 
-    console.log(clients, "clients connected");
-  });
-
-  clients++;
-
-  console.log(clients, "clients connected");
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const line =
-      // eslint-disable-next-line no-await-in-loop
-      await rl.question(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Print "Hello, world!
-`);
-
-    switch (line) {
-      case "a":
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await remote.Println(undefined, "Hello, world!");
-        } catch (e) {
-          console.error(`Got error for Println func: ${e}`);
-        }
-        break;
-
-      default:
-        console.log(`Unknown letter ${line}, ignoring input`);
-    }
-  }
-});
-
-console.log("Listening on", laddr);
+  console.log("Connected to", addr);
+}
