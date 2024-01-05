@@ -1,33 +1,30 @@
 /* eslint-disable no-console */
-import { env, exit, stdin, stdout } from "process";
-import { createInterface } from "readline/promises";
+import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, IRemoteContext, Registry } from "./index";
+import { ILocalContext, Registry } from "./index";
 
 let clients = 0;
-let counter = 0;
 
 const registry = new Registry(
   {
-    Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
-      console.log(
-        "Incrementing counter by",
-        delta,
-        "for remote with ID",
-        ctx.remoteID
-      );
+    Iterate: async (
+      ctx: ILocalContext,
+      length: number,
+      onIteration: (i: number, b: string) => Promise<string>
+    ): Promise<number> => {
+      for (let i = 0; i < length; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const rv = await onIteration(i, "This is from the callee");
 
-      counter += delta;
+        console.log("Closure returned:", rv);
+      }
 
-      return counter;
+      return length;
     },
   },
-  {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Println: async (ctx: IRemoteContext, msg: string) => {},
-  },
+  {},
   {
     onClientConnect: () => {
       clients++;
@@ -41,42 +38,6 @@ const registry = new Registry(
     },
   }
 );
-
-(async () => {
-  console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Print "Hello, world!
-`);
-
-  const rl = createInterface({ input: stdin, output: stdout });
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const line =
-      // eslint-disable-next-line no-await-in-loop
-      await rl.question("");
-
-    // eslint-disable-next-line no-await-in-loop
-    await registry.forRemotes(async (remoteID, remote) => {
-      console.log("Calling functions for remote with ID", remoteID);
-
-      switch (line) {
-        case "a":
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            await remote.Println(undefined, "Hello, world!");
-          } catch (e) {
-            console.error(`Got error for Increment func: ${e}`);
-          }
-
-          break;
-
-        default:
-          console.log(`Unknown letter ${line}, ignoring input`);
-      }
-    });
-  }
-})();
 
 const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";

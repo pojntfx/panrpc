@@ -68,6 +68,7 @@ const registry = new Registry(
           } catch (e) {
             console.error(`Got error for Increment func: ${e}`);
           }
+
           break;
 
         default:

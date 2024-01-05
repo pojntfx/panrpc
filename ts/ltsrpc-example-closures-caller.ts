@@ -4,21 +4,21 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, IRemoteContext, Registry } from "./index";
+import { IRemoteContext, Registry } from "./index";
 
 let clients = 0;
 
 const registry = new Registry(
+  {},
   {
-    Println: async (ctx: ILocalContext, msg: string) => {
-      console.log("Printing message", msg, "for remote with ID", ctx.remoteID);
-
-      console.log(msg);
-    },
-  },
-  {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Increment: async (ctx: IRemoteContext, delta: number): Promise<number> => 0,
+    Iterate: async (
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      ctx: IRemoteContext,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      length: number,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onIteration: (i: number, b: string) => Promise<string>
+    ): Promise<number> => 0,
   },
   {
     onClientConnect: () => {
@@ -37,8 +37,8 @@ const registry = new Registry(
 (async () => {
   console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
 
-- a: Increment remote counter by one
-- b: Decrement remote counter by one`);
+- a: Iterate over 5
+- b: Iterate over 10`);
 
   const rl = createInterface({ input: stdin, output: stdout });
 
@@ -56,11 +56,15 @@ const registry = new Registry(
         case "a":
           try {
             // eslint-disable-next-line no-await-in-loop
-            const res = await remote.Increment(undefined, 1);
+            const length = await remote.Iterate(undefined, 5, async (i, b) => {
+              console.log("In iteration", i, b);
 
-            console.log(res);
+              return "This is from the caller";
+            });
+
+            console.log(length);
           } catch (e) {
-            console.error(`Got error for Increment func: ${e}`);
+            console.error(`Got error for Iterate func: ${e}`);
           }
 
           break;
@@ -68,11 +72,15 @@ const registry = new Registry(
         case "b":
           try {
             // eslint-disable-next-line no-await-in-loop
-            const res = await remote.Increment(undefined, -1);
+            const length = await remote.Iterate(undefined, 10, async (i, b) => {
+              console.log("In iteration", i, b);
 
-            console.log(res);
+              return "This is from the caller";
+            });
+
+            console.log(length);
           } catch (e) {
-            console.error(`Got error for Increment func: ${e}`);
+            console.error(`Got error for Iterate func: ${e}`);
           }
 
           break;
