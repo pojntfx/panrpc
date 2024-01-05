@@ -134,33 +134,8 @@ export class Registry<L extends ILocal, R extends IRemote> {
     const l: L = {} as L;
     // eslint-disable-next-line no-restricted-syntax, guard-for-in
     for (const functionName in local) {
-      // eslint-disable-next-line @typescript-eslint/no-loop-func
-      (l as any)[functionName] = async (...args: any[]) => {
-        if (args[0] instanceof Params) {
-        }
-        try {
-          console.log(args);
-
-          console.log("Hey!", typia.is<Params>(args));
-        } catch (e) {
-          console.error(e);
-
-          throw e;
-        }
-
-        // console.log(typeof fn);
-        // type Fn = ReturnType<typeof fn>;
-        // if (args instanceof Function) {
-        // }
-        // type TestParams = Parameters<(a: string, b: number) => void>; // [string, number]
-        // type SecondParam = TestParams[1]; // number
-        // console.log(typeof SecondParam);
-        // type a = args[0];
-        // console.log(args[0]);
-        // args.map((arg, i) =>
-        //   console.log(i, arg, local[functionName].arguments)
-        // );
-      };
+      (l as any)[functionName] = (...args: any[]) =>
+        (local as any)[functionName](...args);
     }
 
     this.local = l;
