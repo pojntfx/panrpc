@@ -9,6 +9,7 @@ import {
   unmarshalRequest,
   unmarshalResponse,
 } from "./messages";
+import "reflect-metadata";
 
 export const ErrorCallCancelled = "call timed out";
 
@@ -117,7 +118,25 @@ export interface IOptions {
   onClientDisconnect?: (remoteID: string) => void;
 }
 
-export class Registry<L, R> {
+const remoteClosureKey = Symbol("required");
+export const remoteClosure = (
+  target: Object,
+  propertyKey: string | symbol,
+  parameterIndex: number
+) => {
+  const remoteClosureParameterIndexes: number[] =
+    Reflect.getOwnMetadata(remoteClosureKey, target, propertyKey) || [];
+  remoteClosureParameterIndexes.push(parameterIndex);
+
+  Reflect.defineMetadata(
+    remoteClosureKey,
+    remoteClosureParameterIndexes,
+    target,
+    propertyKey
+  );
+};
+
+export class Registry<L extends Object, R extends Object> {
   private local: L;
 
   private remotes: {
@@ -135,8 +154,30 @@ export class Registry<L, R> {
         continue;
       }
 
-      (l as any)[functionName] = (...args: any[]) =>
-        (local as any)[functionName](...args);
+      const remoteClosureParameterIndexes: number[] | undefined =
+        Reflect.getMetadata(remoteClosureKey, local, functionName);
+
+      (l as any)[functionName] = (ctx: ILocalContext, ...args: any[]) =>
+        (local as any)[functionName](
+          ctx,
+          ...args.map((arg, index) =>
+            remoteClosureParameterIndexes?.includes(index + 1)
+              ? async (...closureArgs: any[]) => {
+                  // TODO: Call remote closure (by calling the virtual `CallClosure` RPC exposed by the remote) here and return value
+                  console.log(
+                    "Calling closure with ID",
+                    arg,
+                    "registered on remote with ID",
+                    ctx.remoteID,
+                    "with arguments",
+                    closureArgs
+                  );
+
+                  return 1337;
+                }
+              : arg
+          )
+        );
     }
 
     this.local = l;

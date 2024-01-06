@@ -3,42 +3,42 @@ import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, Registry } from "./index";
+import { ILocalContext, Registry, remoteClosure } from "./index";
+
+class Local {
+  // eslint-disable-next-line class-methods-use-this
+  async Iterate(
+    ctx: ILocalContext,
+    length: number,
+    @remoteClosure onIteration: (i: number, b: string) => Promise<string>
+  ): Promise<number> {
+    for (let i = 0; i < length; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const rv = await onIteration(i, "This is from the callee");
+
+      console.log("Closure returned:", rv);
+    }
+
+    return length;
+  }
+}
+
+class Remote {}
 
 let clients = 0;
 
-const registry = new Registry(
-  new (class {
-    // eslint-disable-next-line class-methods-use-this
-    async Iterate(
-      ctx: ILocalContext,
-      length: number,
-      onIteration: (i: number, b: string) => Promise<string>
-    ): Promise<number> {
-      for (let i = 0; i < length; i++) {
-        // eslint-disable-next-line no-await-in-loop
-        const rv = await onIteration(i, "This is from the callee");
+const registry = new Registry(new Local(), new Remote(), {
+  onClientConnect: () => {
+    clients++;
 
-        console.log("Closure returned:", rv);
-      }
+    console.log(clients, "clients connected");
+  },
+  onClientDisconnect: () => {
+    clients--;
 
-      return length;
-    }
-  })(),
-  new (class {})(),
-  {
-    onClientConnect: () => {
-      clients++;
-
-      console.log(clients, "clients connected");
-    },
-    onClientDisconnect: () => {
-      clients--;
-
-      console.log(clients, "clients connected");
-    },
-  }
-);
+    console.log(clients, "clients connected");
+  },
+});
 
 const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";

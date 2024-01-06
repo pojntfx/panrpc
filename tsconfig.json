@@ -1,12 +1,14 @@
 {
   "include": ["ts/**/*.ts"],
   "compilerOptions": {
-    "types": ["bun-types"],
+    "types": ["bun-types", "reflect-metadata"],
     "target": "es2017",
     "module": "es2022",
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

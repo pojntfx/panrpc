@@ -6,42 +6,42 @@ import { parse } from "url";
 import { WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "./index";
 
+class Local {
+  private counter = 0;
+
+  async Increment(ctx: ILocalContext, delta: number): Promise<number> {
+    console.log(
+      "Incrementing counter by",
+      delta,
+      "for remote with ID",
+      ctx.remoteID
+    );
+
+    this.counter += delta;
+
+    return this.counter;
+  }
+}
+
+class Remote {
+  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+  async Println(ctx: IRemoteContext, msg: string) {}
+}
+
 let clients = 0;
 
-const registry = new Registry(
-  new (class {
-    private counter = 0;
+const registry = new Registry(new Local(), new Remote(), {
+  onClientConnect: () => {
+    clients++;
 
-    async Increment(ctx: ILocalContext, delta: number): Promise<number> {
-      console.log(
-        "Incrementing counter by",
-        delta,
-        "for remote with ID",
-        ctx.remoteID
-      );
+    console.log(clients, "clients connected");
+  },
+  onClientDisconnect: () => {
+    clients--;
 
-      this.counter += delta;
-
-      return this.counter;
-    }
-  })(),
-  new (class {
-    // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-    async Println(ctx: IRemoteContext, msg: string) {}
-  })(),
-  {
-    onClientConnect: () => {
-      clients++;
-
-      console.log(clients, "clients connected");
-    },
-    onClientDisconnect: () => {
-      clients--;
-
-      console.log(clients, "clients connected");
-    },
-  }
-);
+    console.log(clients, "clients connected");
+  },
+});
 
 (async () => {
   console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):

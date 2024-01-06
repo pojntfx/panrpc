@@ -6,36 +6,36 @@ import { parse } from "url";
 import { Socket, createServer } from "net";
 import { IRemoteContext, Registry } from "./index";
 
+class Local {}
+
+class Remote {
+  // eslint-disable-next-line class-methods-use-this
+  async Iterate(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ctx: IRemoteContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    length: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onIteration: (i: number, b: string) => Promise<string>
+  ): Promise<number> {
+    return 0;
+  }
+}
+
 let clients = 0;
 
-const registry = new Registry(
-  new (class {})(),
-  new (class {
-    // eslint-disable-next-line class-methods-use-this
-    async Iterate(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ctx: IRemoteContext,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      length: number,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      onIteration: (i: number, b: string) => Promise<string>
-    ): Promise<number> {
-      return 0;
-    }
-  })(),
-  {
-    onClientConnect: () => {
-      clients++;
+const registry = new Registry(new Local(), new Remote(), {
+  onClientConnect: () => {
+    clients++;
 
-      console.log(clients, "clients connected");
-    },
-    onClientDisconnect: () => {
-      clients--;
+    console.log(clients, "clients connected");
+  },
+  onClientDisconnect: () => {
+    clients--;
 
-      console.log(clients, "clients connected");
-    },
-  }
-);
+    console.log(clients, "clients connected");
+  },
+});
 
 (async () => {
   console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
