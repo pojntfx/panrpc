@@ -7,11 +7,12 @@ import { Socket, createServer } from "net";
 import { ILocalContext, IRemoteContext, Registry } from "./index";
 
 let clients = 0;
-let counter = 0;
 
 const registry = new Registry(
-  {
-    Increment: async (ctx: ILocalContext, delta: number): Promise<number> => {
+  new (class {
+    private counter = 0;
+
+    async Increment(ctx: ILocalContext, delta: number): Promise<number> {
       console.log(
         "Incrementing counter by",
         delta,
@@ -19,15 +20,15 @@ const registry = new Registry(
         ctx.remoteID
       );
 
-      counter += delta;
+      this.counter += delta;
 
-      return counter;
-    },
-  },
-  {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Println: async (ctx: IRemoteContext, msg: string) => {},
-  },
+      return this.counter;
+    }
+  })(),
+  new (class {
+    // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+    async Println(ctx: IRemoteContext, msg: string) {}
+  })(),
   {
     onClientConnect: () => {
       clients++;

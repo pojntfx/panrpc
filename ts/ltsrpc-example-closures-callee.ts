@@ -8,12 +8,13 @@ import { ILocalContext, Registry } from "./index";
 let clients = 0;
 
 const registry = new Registry(
-  {
-    Iterate: async (
+  new (class {
+    // eslint-disable-next-line class-methods-use-this
+    async Iterate(
       ctx: ILocalContext,
       length: number,
       onIteration: (i: number, b: string) => Promise<string>
-    ): Promise<number> => {
+    ): Promise<number> {
       for (let i = 0; i < length; i++) {
         // eslint-disable-next-line no-await-in-loop
         const rv = await onIteration(i, "This is from the callee");
@@ -22,9 +23,9 @@ const registry = new Registry(
       }
 
       return length;
-    },
-  },
-  {},
+    }
+  })(),
+  new (class {})(),
   {
     onClientConnect: () => {
       clients++;

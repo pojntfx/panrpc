@@ -12,12 +12,10 @@ import {
 
 export const ErrorCallCancelled = "call timed out";
 
+const constructorFunctionName = "constructor";
+
 export interface ILocalContext {
   remoteID: string;
-}
-
-export interface ILocal {
-  [k: string]: (ctx: ILocalContext, ...rest: any) => Promise<any>;
 }
 
 export type IRemoteContext =
@@ -25,10 +23,6 @@ export type IRemoteContext =
   | {
       signal?: AbortSignal;
     };
-
-export interface IRemote {
-  [k: string]: (ctx: IRemoteContext, ...rest: any) => Promise<any>;
-}
 
 interface ICallResponse {
   value?: any;
@@ -123,7 +117,7 @@ export interface IOptions {
   onClientDisconnect?: (remoteID: string) => void;
 }
 
-export class Registry<L extends ILocal, R extends IRemote> {
+export class Registry<L, R> {
   private local: L;
 
   private remotes: {
@@ -132,8 +126,15 @@ export class Registry<L extends ILocal, R extends IRemote> {
 
   constructor(local: L, private remote: R, private options?: IOptions) {
     const l: L = {} as L;
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
-    for (const functionName in local) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const functionName of Object.getOwnPropertyNames(
+      Object.getPrototypeOf(local)
+    )) {
+      if (functionName === constructorFunctionName) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
       (l as any)[functionName] = (...args: any[]) =>
         (local as any)[functionName](...args);
     }
@@ -161,9 +162,16 @@ export class Registry<L extends ILocal, R extends IRemote> {
   ) => {
     const broker = new EventEmitter();
 
-    const r = { ...this.remote };
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
-    for (const functionName in r) {
+    const r: R = {} as R;
+    // eslint-disable-next-line no-restricted-syntax
+    for (const functionName of Object.getOwnPropertyNames(
+      Object.getPrototypeOf(this.remote)
+    )) {
+      if (functionName === constructorFunctionName) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
       (r as any)[functionName] = async (ctx: IRemoteContext, ...rest: any[]) =>
         new Promise((res, rej) => {
           if (ctx?.signal?.aborted) {

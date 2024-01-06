@@ -9,17 +9,20 @@ import { IRemoteContext, Registry } from "./index";
 let clients = 0;
 
 const registry = new Registry(
-  {},
-  {
-    Iterate: async (
+  new (class {})(),
+  new (class {
+    // eslint-disable-next-line class-methods-use-this
+    async Iterate(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ctx: IRemoteContext,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       length: number,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       onIteration: (i: number, b: string) => Promise<string>
-    ): Promise<number> => 0,
-  },
+    ): Promise<number> {
+      return 0;
+    }
+  })(),
   {
     onClientConnect: () => {
       clients++;
