@@ -12,6 +12,7 @@ import {
 import "reflect-metadata";
 
 export const ErrorCallCancelled = "call timed out";
+export const ErrorCannotCallNonFunction = "can not call non function";
 
 const constructorFunctionName = "constructor";
 
@@ -137,51 +138,15 @@ export const remoteClosure = (
 };
 
 export class Registry<L extends Object, R extends Object> {
-  private local: L;
-
   private remotes: {
     [remoteID: string]: R;
   } = {};
 
-  constructor(local: L, private remote: R, private options?: IOptions) {
-    const l: L = {} as L;
-    // eslint-disable-next-line no-restricted-syntax
-    for (const functionName of Object.getOwnPropertyNames(
-      Object.getPrototypeOf(local)
-    )) {
-      if (functionName === constructorFunctionName) {
-        // eslint-disable-next-line no-continue
-        continue;
-      }
-
-      const remoteClosureParameterIndexes: number[] | undefined =
-        Reflect.getMetadata(remoteClosureKey, local, functionName);
-
-      (l as any)[functionName] = (ctx: ILocalContext, ...args: any[]) =>
-        (local as any)[functionName](
-          ctx,
-          ...args.map((arg, index) =>
-            remoteClosureParameterIndexes?.includes(index + 1)
-              ? async (...closureArgs: any[]) => {
-                  // TODO: Call remote closure (by calling the virtual `CallClosure` RPC exposed by the remote) here and return value
-                  console.log(
-                    "Calling closure with ID",
-                    arg,
-                    "registered on remote with ID",
-                    ctx.remoteID,
-                    "with arguments",
-                    closureArgs
-                  );
-
-                  return 1337;
-                }
-              : arg
-          )
-        );
-    }
-
-    this.local = l;
-  }
+  constructor(
+    private local: L,
+    private remote: R,
+    private options?: IOptions
+  ) {}
 
   /**
    * Expose local functions and link remote ones to a message-based transport
@@ -258,9 +223,40 @@ export class Registry<L extends Object, R extends Object> {
 
       let res: T;
       try {
+        if (functionName === constructorFunctionName) {
+          throw new Error(ErrorCannotCallNonFunction);
+        }
+
+        const fn = (this.local as any)[functionName];
+        if (typeof fn !== "function") {
+          throw new Error(ErrorCannotCallNonFunction);
+        }
+
+        const remoteClosureParameterIndexes: number[] | undefined =
+          Reflect.getMetadata(remoteClosureKey, this.local, functionName);
+
         const ctx: ILocalContext = { remoteID };
 
-        const rv = await (this.local as any)[functionName](ctx, ...args);
+        const rv = await fn(
+          ctx,
+          ...args.map((arg, index) =>
+            remoteClosureParameterIndexes?.includes(index + 1)
+              ? async (...closureArgs: any[]) => {
+                  // TODO: Call remote closure (by calling the virtual `CallClosure` RPC exposed by the remote) here and return value
+                  console.log(
+                    "Calling closure with ID",
+                    arg,
+                    "registered on remote with ID",
+                    ctx.remoteID,
+                    "with arguments",
+                    closureArgs
+                  );
+
+                  return 1337;
+                }
+              : arg
+          )
+        );
 
         res = marshalResponse<T>(call, rv, "", stringify);
       } catch (e) {
