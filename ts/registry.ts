@@ -137,6 +137,50 @@ export const remoteClosure = (
   );
 };
 
+const makeRPC =
+  <T>(
+    name: string,
+    responseResolver: EventEmitter,
+
+    writeRequest: (text: T) => Promise<any>,
+
+    stringify: (value: any) => T
+  ) =>
+  async (ctx: IRemoteContext, ...rest: any[]) =>
+    new Promise((res, rej) => {
+      if (ctx?.signal?.aborted) {
+        rej(new Error(ErrorCallCancelled));
+
+        return;
+      }
+
+      const id = v4();
+
+      const abortListener = () => {
+        ctx?.signal?.removeEventListener("abort", abortListener);
+
+        const callResponse: ICallResponse = {
+          err: ErrorCallCancelled,
+        };
+
+        responseResolver.emit(`rpc:${id}`, callResponse);
+      };
+      ctx?.signal?.addEventListener("abort", abortListener);
+
+      const returnListener = ({ value, err }: ICallResponse) => {
+        responseResolver.removeListener(`rpc:${id}`, returnListener);
+
+        if (err) {
+          rej(new Error(err));
+        } else {
+          res(value);
+        }
+      };
+      responseResolver.addListener(`rpc:${id}`, returnListener);
+
+      writeRequest(marshalRequest<T>(id, name, rest, stringify)).catch(rej);
+    });
+
 export class Registry<L extends Object, R extends Object> {
   private remotes: {
     [remoteID: string]: R;
@@ -166,7 +210,7 @@ export class Registry<L extends Object, R extends Object> {
     stringify: (value: any) => T,
     parse: (text: T) => any
   ) => {
-    const broker = new EventEmitter();
+    const responseResolver = new EventEmitter();
 
     const r: R = {} as R;
     // eslint-disable-next-line no-restricted-syntax
@@ -178,42 +222,14 @@ export class Registry<L extends Object, R extends Object> {
         continue;
       }
 
-      (r as any)[functionName] = async (ctx: IRemoteContext, ...rest: any[]) =>
-        new Promise((res, rej) => {
-          if (ctx?.signal?.aborted) {
-            rej(new Error(ErrorCallCancelled));
+      (r as any)[functionName] = makeRPC(
+        functionName,
+        responseResolver,
 
-            return;
-          }
+        writeRequest,
 
-          const id = v4();
-
-          const abortListener = () => {
-            ctx?.signal?.removeEventListener("abort", abortListener);
-
-            const callResponse: ICallResponse = {
-              err: ErrorCallCancelled,
-            };
-
-            broker.emit(`rpc:${id}`, callResponse);
-          };
-          ctx?.signal?.addEventListener("abort", abortListener);
-
-          const returnListener = ({ value, err }: ICallResponse) => {
-            broker.removeListener(`rpc:${id}`, returnListener);
-
-            if (err) {
-              rej(new Error(err));
-            } else {
-              res(value);
-            }
-          };
-          broker.addListener(`rpc:${id}`, returnListener);
-
-          writeRequest(
-            marshalRequest<T>(id, functionName, rest, stringify)
-          ).catch(rej);
-        });
+        stringify
+      );
     }
 
     const remoteID = v4();
@@ -239,22 +255,22 @@ export class Registry<L extends Object, R extends Object> {
 
         const rv = await fn(
           ctx,
-          ...args.map((arg, index) =>
+          ...args.map((closureID, index) =>
             remoteClosureParameterIndexes?.includes(index + 1)
-              ? async (...closureArgs: any[]) => {
-                  // TODO: Call remote closure (by calling the virtual `CallClosure` RPC exposed by the remote) here and return value
-                  console.log(
-                    "Calling closure with ID",
-                    arg,
-                    "registered on remote with ID",
-                    ctx.remoteID,
-                    "with arguments",
-                    closureArgs
+              ? (...closureArgs: any[]) => {
+                  const rpc = makeRPC<T>(
+                    "CallClosure",
+                    responseResolver,
+
+                    writeRequest,
+
+                    stringify
                   );
 
-                  return 1337;
+                  // TODO: Handle remote context passing here by forwarding the function's remote context
+                  return rpc(undefined, ...closureArgs);
                 }
-              : arg
+              : closureID
           )
         );
 
@@ -279,7 +295,7 @@ export class Registry<L extends Object, R extends Object> {
         err,
       };
 
-      broker.emit(`rpc:${call}`, callResponse);
+      responseResolver.emit(`rpc:${call}`, callResponse);
     });
 
     this.remotes[remoteID] = r;
