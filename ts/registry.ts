@@ -1,6 +1,8 @@
 import { EventEmitter } from "events";
 import { Socket } from "net";
+import "reflect-metadata";
 import { v4 } from "uuid";
+import { ClosureManager } from "./manager";
 import {
   marshalMessage,
   marshalRequest,
@@ -9,7 +11,6 @@ import {
   unmarshalRequest,
   unmarshalResponse,
 } from "./messages";
-import "reflect-metadata";
 
 export const ErrorCallCancelled = "call timed out";
 export const ErrorCannotCallNonFunction = "can not call non function";
@@ -182,6 +183,8 @@ const makeRPC =
     });
 
 export class Registry<L extends Object, R extends Object> {
+  private closureManager: ClosureManager;
+
   private remotes: {
     [remoteID: string]: R;
   } = {};
@@ -193,7 +196,9 @@ export class Registry<L extends Object, R extends Object> {
     private signal?: AbortSignal,
 
     private options?: IOptions
-  ) {}
+  ) {
+    this.closureManager = new ClosureManager();
+  }
 
   /**
    * Expose local functions and link remote ones to a message-based transport
@@ -246,9 +251,13 @@ export class Registry<L extends Object, R extends Object> {
           throw new Error(ErrorCannotCallNonFunction);
         }
 
-        const fn = (this.local as any)[functionName];
+        let fn = (this.local as any)[functionName];
         if (typeof fn !== "function") {
-          throw new Error(ErrorCannotCallNonFunction);
+          fn = (this.closureManager as any)[functionName];
+
+          if (typeof fn !== "function") {
+            throw new Error(ErrorCannotCallNonFunction);
+          }
         }
 
         const remoteClosureParameterIndexes: number[] | undefined =
