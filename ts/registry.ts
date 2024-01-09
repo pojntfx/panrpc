@@ -189,6 +189,9 @@ export class Registry<L extends Object, R extends Object> {
   constructor(
     private local: L,
     private remote: R,
+
+    private signal?: AbortSignal,
+
     private options?: IOptions
   ) {}
 
@@ -267,8 +270,13 @@ export class Registry<L extends Object, R extends Object> {
                     stringify
                   );
 
-                  // TODO: Handle remote context passing here by forwarding the function's remote context
-                  return rpc(undefined, ...closureArgs);
+                  return rpc(
+                    {
+                      signal: this.signal,
+                    },
+                    closureID,
+                    closureArgs
+                  );
                 }
               : closureID
           )

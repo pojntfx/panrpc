@@ -27,18 +27,25 @@ class Remote {}
 
 let clients = 0;
 
-const registry = new Registry(new Local(), new Remote(), {
-  onClientConnect: () => {
-    clients++;
+const registry = new Registry(
+  new Local(),
+  new Remote(),
 
-    console.log(clients, "clients connected");
-  },
-  onClientDisconnect: () => {
-    clients--;
+  undefined,
 
-    console.log(clients, "clients connected");
-  },
-});
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "clients connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "clients connected");
+    },
+  }
+);
 
 const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";

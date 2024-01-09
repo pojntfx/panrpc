@@ -9,6 +9,10 @@ import { ILocalContext, IRemoteContext, Registry } from "./index";
 class Local {
   private counter = 0;
 
+  constructor() {
+    this.Increment = this.Increment.bind(this);
+  }
+
   async Increment(ctx: ILocalContext, delta: number): Promise<number> {
     console.log(
       "Incrementing counter by",
@@ -30,18 +34,25 @@ class Remote {
 
 let clients = 0;
 
-const registry = new Registry(new Local(), new Remote(), {
-  onClientConnect: () => {
-    clients++;
+const registry = new Registry(
+  new Local(),
+  new Remote(),
 
-    console.log(clients, "clients connected");
-  },
-  onClientDisconnect: () => {
-    clients--;
+  undefined,
 
-    console.log(clients, "clients connected");
-  },
-});
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "clients connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "clients connected");
+    },
+  }
+);
 
 (async () => {
   console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
