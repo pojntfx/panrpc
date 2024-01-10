@@ -4,32 +4,22 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, IRemoteContext, Registry } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
-  private counter = 0;
+  // eslint-disable-next-line class-methods-use-this
+  async Println(ctx: ILocalContext, msg: string) {
+    console.log("Printing message", msg, "for remote with ID", ctx.remoteID);
 
-  constructor() {
-    this.Increment = this.Increment.bind(this);
-  }
-
-  async Increment(ctx: ILocalContext, delta: number): Promise<number> {
-    console.log(
-      "Incrementing counter by",
-      delta,
-      "for remote with ID",
-      ctx.remoteID
-    );
-
-    this.counter += delta;
-
-    return this.counter;
+    console.log(msg);
   }
 }
 
 class Remote {
-  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-  async Println(ctx: IRemoteContext, msg: string) {}
+  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars
+  async Increment(ctx: IRemoteContext, delta: number): Promise<number> {
+    return 0;
+  }
 }
 
 let clients = 0;
@@ -57,8 +47,8 @@ const registry = new Registry(
 (async () => {
   console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
 
-- a: Print "Hello, world!
-`);
+- a: Increment remote counter by one
+- b: Decrement remote counter by one`);
 
   const rl = createInterface({ input: stdin, output: stdout });
 
@@ -76,7 +66,21 @@ const registry = new Registry(
         case "a":
           try {
             // eslint-disable-next-line no-await-in-loop
-            await remote.Println(undefined, "Hello, world!");
+            const res = await remote.Increment(undefined, 1);
+
+            console.log(res);
+          } catch (e) {
+            console.error(`Got error for Increment func: ${e}`);
+          }
+
+          break;
+
+        case "b":
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await remote.Increment(undefined, -1);
+
+            console.log(res);
           } catch (e) {
             console.error(`Got error for Increment func: ${e}`);
           }
@@ -91,7 +95,7 @@ const registry = new Registry(
 })();
 
 const addr = env.ADDR || "127.0.0.1:1337";
-const listen = env.LISTEN !== "false";
+const listen = env.LISTEN === "true";
 
 if (listen) {
   const u = parse(`tcp://${addr}`);

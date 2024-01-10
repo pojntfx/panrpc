@@ -3,8 +3,8 @@ import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { WebSocketServer } from "ws";
-import { ILocalContext, IRemoteContext, Registry } from "./index";
+import { Socket, createServer } from "net";
+import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
   private counter = 0;
@@ -94,19 +94,14 @@ const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";
 
 if (listen) {
-  const u = parse(`ws://${addr}`);
+  const u = parse(`tcp://${addr}`);
 
-  const server = new WebSocketServer({
-    host: u.hostname as string,
-    port: parseInt(u.port as string, 10),
-  });
-
-  server.on("connection", (socket) => {
-    socket.addEventListener("error", (e) => {
+  const server = createServer(async (socket) => {
+    socket.on("error", (e) => {
       console.error("Client disconnected with error:", e);
     });
 
-    registry.linkWebSocket(
+    registry.linkTCPSocket(
       socket,
 
       JSON.stringify,
@@ -117,22 +112,37 @@ if (listen) {
     );
   });
 
-  console.log("Listening on", addr);
+  server.listen(
+    {
+      host: u.hostname as string,
+      port: parseInt(u.port as string, 10),
+    },
+    () => console.log("Listening on", addr)
+  );
 } else {
-  const socket = new WebSocket(`ws://${addr}`);
+  const u = parse(`tcp://${addr}`);
 
-  socket.addEventListener("close", (e) => {
-    console.error("Disconnected with error:", e.reason);
+  const socket = new Socket();
+
+  socket.on("error", (e) => {
+    console.error("Disconnected with error:", e.cause);
 
     exit(1);
   });
+  socket.on("close", () => exit(0));
 
   await new Promise<void>((res, rej) => {
-    socket.addEventListener("open", () => res());
-    socket.addEventListener("error", rej);
+    socket.connect(
+      {
+        host: u.hostname as string,
+        port: parseInt(u.port as string, 10),
+      },
+      res
+    );
+    socket.on("error", rej);
   });
 
-  registry.linkWebSocket(
+  registry.linkTCPSocket(
     socket,
 
     JSON.stringify,

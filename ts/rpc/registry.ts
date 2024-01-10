@@ -9,7 +9,7 @@ import {
   unmarshalMessage,
   unmarshalRequest,
   unmarshalResponse,
-} from "./messages";
+} from "../utils/messages";
 import { ILocalContext, IRemoteContext } from "./context";
 import { ClosureManager, registerClosure } from "./manager";
 

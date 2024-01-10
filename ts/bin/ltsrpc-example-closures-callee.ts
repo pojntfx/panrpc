@@ -3,7 +3,7 @@ import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, Registry, remoteClosure } from "./index";
+import { ILocalContext, Registry, remoteClosure } from "../index";
 
 class Local {
   // eslint-disable-next-line class-methods-use-this

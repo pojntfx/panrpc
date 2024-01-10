@@ -4,7 +4,7 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocketServer } from "ws";
-import { ILocalContext, IRemoteContext, Registry } from "./index";
+import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
   // eslint-disable-next-line class-methods-use-this
