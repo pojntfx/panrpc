@@ -2,7 +2,6 @@ import { EventEmitter } from "events";
 import { Socket } from "net";
 import "reflect-metadata";
 import { v4 } from "uuid";
-import { ClosureManager } from "./manager";
 import {
   marshalMessage,
   marshalRequest,
@@ -11,21 +10,13 @@ import {
   unmarshalRequest,
   unmarshalResponse,
 } from "./messages";
+import { ILocalContext, IRemoteContext } from "./context";
+import { ClosureManager, registerClosure } from "./manager";
 
 export const ErrorCallCancelled = "call timed out";
 export const ErrorCannotCallNonFunction = "can not call non function";
 
 const constructorFunctionName = "constructor";
-
-export interface ILocalContext {
-  remoteID: string;
-}
-
-export type IRemoteContext =
-  | undefined
-  | {
-      signal?: AbortSignal;
-    };
 
 interface ICallResponse {
   value?: any;
@@ -145,7 +136,9 @@ const makeRPC =
 
     writeRequest: (text: T) => Promise<any>,
 
-    stringify: (value: any) => T
+    stringify: (value: any) => T,
+
+    closureManager: ClosureManager
   ) =>
   async (ctx: IRemoteContext, ...rest: any[]) =>
     new Promise((res, rej) => {
@@ -155,21 +148,41 @@ const makeRPC =
         return;
       }
 
-      const id = v4();
+      const closureFreers: (() => void)[] = [];
+      const args = rest.map((arg) => {
+        if (typeof arg === "function") {
+          const { closureID, freeClosure } = registerClosure(
+            closureManager,
+            arg as Function
+          );
+
+          closureFreers.push(freeClosure);
+
+          return closureID;
+        }
+
+        return arg;
+      });
+
+      const callID = v4();
 
       const abortListener = () => {
         ctx?.signal?.removeEventListener("abort", abortListener);
+
+        closureFreers.map((free) => free());
 
         const callResponse: ICallResponse = {
           err: ErrorCallCancelled,
         };
 
-        responseResolver.emit(`rpc:${id}`, callResponse);
+        responseResolver.emit(`rpc:${callID}`, callResponse);
       };
       ctx?.signal?.addEventListener("abort", abortListener);
 
       const returnListener = ({ value, err }: ICallResponse) => {
-        responseResolver.removeListener(`rpc:${id}`, returnListener);
+        responseResolver.removeListener(`rpc:${callID}`, returnListener);
+
+        closureFreers.map((free) => free());
 
         if (err) {
           rej(new Error(err));
@@ -177,9 +190,9 @@ const makeRPC =
           res(value);
         }
       };
-      responseResolver.addListener(`rpc:${id}`, returnListener);
+      responseResolver.addListener(`rpc:${callID}`, returnListener);
 
-      writeRequest(marshalRequest<T>(id, name, rest, stringify)).catch(rej);
+      writeRequest(marshalRequest<T>(callID, name, args, stringify)).catch(rej);
     });
 
 export class Registry<L extends Object, R extends Object> {
@@ -236,7 +249,9 @@ export class Registry<L extends Object, R extends Object> {
 
         writeRequest,
 
-        stringify
+        stringify,
+
+        this.closureManager
       );
     }
 
@@ -276,7 +291,9 @@ export class Registry<L extends Object, R extends Object> {
 
                     writeRequest,
 
-                    stringify
+                    stringify,
+
+                    this.closureManager
                   );
 
                   return rpc(
