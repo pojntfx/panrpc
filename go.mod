@@ -1,4 +1,4 @@
-module github.com/pojntfx/ltsrpc
+module github.com/pojntfx/panrpc
 
 go 1.18
 

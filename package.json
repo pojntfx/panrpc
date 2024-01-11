@@ -1,5 +1,5 @@
 {
-  "name": "@pojntfx/ltsrpc",
+  "name": "@pojntfx/panrpc",
   "version": "0.6.1",
   "description": "Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.",
   "source": "ts/index.ts",
@@ -11,18 +11,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pojntfx/ltsrpc.git"
+    "url": "git+https://github.com/pojntfx/panrpc.git"
   },
   "keywords": [
-    "ltsrpc",
+    "panrpc",
     "rpc"
   ],
   "author": "Felicitas Pojtinger <felicitas@pojtinger.com>",
   "license": "AGPL-3.0",
   "bugs": {
-    "url": "https://github.com/pojntfx/ltsrpc/issues"
+    "url": "https://github.com/pojntfx/panrpc/issues"
   },
-  "homepage": "https://github.com/pojntfx/ltsrpc#readme",
+  "homepage": "https://github.com/pojntfx/panrpc#readme",
   "devDependencies": {
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.30.6",

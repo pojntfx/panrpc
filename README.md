@@ -1,74 +1,74 @@
-# ltsrpc
+# panrpc
 
 ![Logo](./docs/logo-readme.png)
 
 Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.
 
-[![hydrun CI](https://github.com/pojntfx/ltsrpc/actions/workflows/hydrun.yaml/badge.svg)](https://github.com/pojntfx/ltsrpc/actions/workflows/hydrun.yaml)
+[![hydrun CI](https://github.com/pojntfx/panrpc/actions/workflows/hydrun.yaml/badge.svg)](https://github.com/pojntfx/panrpc/actions/workflows/hydrun.yaml)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg)
-[![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/ltsrpc.svg)](https://pkg.go.dev/github.com/pojntfx/ltsrpc)
-[![npm CI](https://github.com/pojntfx/ltsrpc/actions/workflows/npm.yaml/badge.svg)](https://github.com/pojntfx/ltsrpc/actions/workflows/npm.yaml)
-[![npm: @pojntfx/ltsrpc](https://img.shields.io/npm/v/@pojntfx/ltsrpc)](https://www.npmjs.com/package/@pojntfx/ltsrpc)
-[![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/ltsrpc)
-[![Matrix](https://img.shields.io/matrix/ltsrpc:matrix.org)](https://matrix.to/#/#ltsrpc:matrix.org?via=matrix.org)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc)
+[![npm CI](https://github.com/pojntfx/panrpc/actions/workflows/npm.yaml/badge.svg)](https://github.com/pojntfx/panrpc/actions/workflows/npm.yaml)
+[![npm: @pojntfx/panrpc](https://img.shields.io/npm/v/@pojntfx/panrpc)](https://www.npmjs.com/package/@pojntfx/panrpc)
+[![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc)
+[![Matrix](https://img.shields.io/matrix/panrpc:matrix.org)](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)
 
 ## Overview
 
-ltsrpc is a novel RPC framework with a unique feature: It allows exposing functions on **both the client and server**!
+panrpc is a novel RPC framework with a unique feature: It allows exposing functions on **both the client and server**!
 
 It enables you to ...
 
-- **Call remote functions transparently**: ltsrpc makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
-- **Call functions on the client from the server**: Unlike most RPC frameworks, ltsrpc allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
-- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser` such as TCP, WebSocket or WebRTC with the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/ltsrpc/pkg/rpc#LinkStream), or any message-based transport such as Redis or NATS with the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/ltsrpc/pkg/rpc#LinkMessage), you can use ltsrpc to build services that run in almost any environment, including the browser!
-- **Use an encoding/decoding layer of your choice**: Instead of depending on Protobuf or another fixed format for serialization, ltsrpc can work with every serialization framework that implements the basic `Marshal`/`Unmarshal` interface, such as JSON or CBOR.
-- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, ltsrpc can handle closures and callbacks transparently, just like with local function calls!
+- **Call remote functions transparently**: panrpc makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
+- **Call functions on the client from the server**: Unlike most RPC frameworks, panrpc allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
+- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser` such as TCP, WebSocket or WebRTC with the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream), or any message-based transport such as Redis or NATS with the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage), you can use panrpc to build services that run in almost any environment, including the browser!
+- **Use an encoding/decoding layer of your choice**: Instead of depending on Protobuf or another fixed format for serialization, panrpc can work with every serialization framework that implements the basic `Marshal`/`Unmarshal` interface, such as JSON or CBOR.
+- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, panrpc can handle closures and callbacks transparently, just like with local function calls!
 
 ## Installation
 
 ### Library
 
-You can add ltsrpc to your Go project by running the following:
+You can add panrpc to your Go project by running the following:
 
 ```shell
-$ go get github.com/pojntfx/ltsrpc/...@latest
+$ go get github.com/pojntfx/panrpc/...@latest
 ```
 
 There is also a TypeScript version for browser and Node.js support (without transparent support for closures); you can install it like so:
 
 ```shell
-$ npm i -s @pojntfx/ltsrpc
+$ npm i -s @pojntfx/panrpc
 ```
 
-This README's documentation only covers the Go version. For the TypeScript version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses ltsrpc in its examples; you can also find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/ltsrpc) as well as example in [ts/ltsrpc-example-websocket-client.ts](./ts/ltsrpc-example-websocket-client.ts).
+This README's documentation only covers the Go version. For the TypeScript version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses panrpc in its examples; you can also find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc) as well as example in [ts/panrpc-example-websocket-client.ts](./ts/panrpc-example-websocket-client.ts).
 
-### `lurl` Tool
+### `purl` Tool
 
-In addition to the library, the CLI tool `lurl` is also available; `lurl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for ltsrpc: A command-line tool for interacting with ltsrpc servers.
+In addition to the library, the CLI tool `purl` is also available; `purl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for panrpc: A command-line tool for interacting with panrpc servers.
 
-Static binaries are available on [GitHub releases](https://github.com/pojntfx/ltsrpc/releases).
+Static binaries are available on [GitHub releases](https://github.com/pojntfx/panrpc/releases).
 
 On Linux, you can install them like so:
 
 ```shell
-$ curl -L -o /tmp/lurl "https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.linux-$(uname -m)"
-$ sudo install /tmp/lurl /usr/local/bin
+$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.linux-$(uname -m)"
+$ sudo install /tmp/purl /usr/local/bin
 ```
 
 On macOS, you can use the following:
 
 ```shell
-$ curl -L -o /tmp/lurl "https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.darwin-$(uname -m)"
-$ sudo install /tmp/lurl /usr/local/bin
+$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.darwin-$(uname -m)"
+$ sudo install /tmp/purl /usr/local/bin
 ```
 
 On Windows, the following should work (using PowerShell as administrator):
 
 ```shell
-PS> Invoke-WebRequest https://github.com/pojntfx/ltsrpc/releases/latest/download/lurl.windows-x86_64.exe -OutFile \Windows\System32\lurl.exe
+PS> Invoke-WebRequest https://github.com/pojntfx/panrpc/releases/latest/download/purl.windows-x86_64.exe -OutFile \Windows\System32\purl.exe
 ```
 
-You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/ltsrpc/releases).
+You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/panrpc/releases).
 
 ## Usage
 
@@ -76,7 +76,7 @@ You can find binaries for more operating systems and architectures on [GitHub re
 
 ### 1. Define Local Functions
 
-ltsrpc uses reflection to create the glue code required to expose and call functions. Start by defining your server's exposed functions like so:
+panrpc uses reflection to create the glue code required to expose and call functions. Start by defining your server's exposed functions like so:
 
 ```go
 // server.go
@@ -170,7 +170,7 @@ Note the second generic parameter; it is the type that should be used for encodi
 
 ### 4. Link the Registry to a Transport and Serializer
 
-Next, expose the functions by linking them to a transport. There are two available transport APIs; the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/ltsrpc/pkg/rpc#LinkStream) (which is useful for stream-like transports such as TCP, WebSockets, WebRTC or anything else that provides an `io.ReadWriteCloser`), and the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/ltsrpc/pkg/rpc#LinkMessage) (which is useful for transports that use messages, such as message brokers like Redis, UDP or other packet-based protocols). In this example, we'll use the stream-oriented API; for more information on using the m, meaning it can run in the browser!essage-oriented API, see [Examples](#examples).
+Next, expose the functions by linking them to a transport. There are two available transport APIs; the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream) (which is useful for stream-like transports such as TCP, WebSockets, WebRTC or anything else that provides an `io.ReadWriteCloser`), and the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage) (which is useful for transports that use messages, such as message brokers like Redis, UDP or other packet-based protocols). In this example, we'll use the stream-oriented API; for more information on using the m, meaning it can run in the browser!essage-oriented API, see [Examples](#examples).
 
 Similarly so, as mentioned in [Add Functions to a Registry](#3-add-functions-to-a-registry), it is possible to use almost any serialization framework you want, as long as it can provide the necessary import interface. In this example, we'll be using the `encoding/json` package from the Go standard library, but in most cases, a more performant and compact framework such as CBOR is the better choice. See [Benchmarks](#benchmarks) for usage examples with other serialization frameworks and a performance comparison.
 
@@ -339,7 +339,7 @@ service.ForRemotes = registry.ForRemotes
 
 ### 6. Using Closures and Callbacks
 
-Because ltsrpc is bidirectional, it is possible to pass closures and callbacks as function arguments, just like you would locally. For example, on the server:
+Because panrpc is bidirectional, it is possible to pass closures and callbacks as function arguments, just like you would locally. For example, on the server:
 
 ```go
 // server.go
@@ -403,37 +403,37 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 }
 ```
 
-🚀 That's it! We can't wait to see what you're going to build with ltsrpc.
+🚀 That's it! We can't wait to see what you're going to build with panrpc.
 
 ## Reference
 
 ### Examples
 
-To make getting started with ltsrpc easier, take a look at the following examples:
+To make getting started with panrpc easier, take a look at the following examples:
 
 - **Transports**
   - **TCP (Stream-Oriented API)**
-    - [TCP Server](./cmd/ltsrpc-example-tcp-server/main.go)
-    - [TCP Client](./cmd/ltsrpc-example-tcp-client/main.go)
+    - [TCP Server](./cmd/panrpc-example-tcp-server/main.go)
+    - [TCP Client](./cmd/panrpc-example-tcp-client/main.go)
   - **WebSocket (Stream-Oriented API)**
-    - [WebSocket Server](./cmd/ltsrpc-example-websocket-server/main.go)
-    - [WebSocket Client](./cmd/ltsrpc-example-websocket-client/main.go)
+    - [WebSocket Server](./cmd/panrpc-example-websocket-server/main.go)
+    - [WebSocket Client](./cmd/panrpc-example-websocket-client/main.go)
   - **WebRTC (Stream-Oriented API)**
-    - [WebRTC Peer](./cmd/ltsrpc-example-webrtc-peer/main.go)
+    - [WebRTC Peer](./cmd/panrpc-example-webrtc-peer/main.go)
   - **Redis (Message-Oriented API)**
-    - [Redis Server](./cmd/ltsrpc-example-redis-server/main.go)
-    - [Redis Client](./cmd/ltsrpc-example-redis-client/main.go)
+    - [Redis Server](./cmd/panrpc-example-redis-server/main.go)
+    - [Redis Client](./cmd/panrpc-example-redis-client/main.go)
 - **Callbacks**
-  - [Callbacks Demo Server](./cmd/ltsrpc-example-callbacks-callee/main.go)
-  - [Callbacks Demo Client](./cmd/ltsrpc-example-callbacks-caller/main.go)
+  - [Callbacks Demo Server](./cmd/panrpc-example-callbacks-callee/main.go)
+  - [Callbacks Demo Client](./cmd/panrpc-example-callbacks-caller/main.go)
 - **Closures**
-  - [Closures Demo Server](./cmd/ltsrpc-example-closures-callee/main.go)
-  - [Closures Demo Client](./cmd/ltsrpc-example-closures-caller/main.go)
+  - [Closures Demo Server](./cmd/panrpc-example-closures-callee/main.go)
+  - [Closures Demo Client](./cmd/panrpc-example-closures-caller/main.go)
 - **Benchmarks**
-  - [Requests/Second Benchmark Server](./cmd/ltsrpc-example-tcp-rps-server/main.go)
-  - [Requests/Second Benchmark Client](./cmd/ltsrpc-example-tcp-rps-client/main.go)
-  - [Throughput Benchmark Server](./cmd/ltsrpc-example-tcp-throughput-server/main.go)
-  - [Throughput Benchmark Client](./cmd/ltsrpc-example-tcp-throughput-client/main.go)
+  - [Requests/Second Benchmark Server](./cmd/panrpc-example-tcp-rps-server/main.go)
+  - [Requests/Second Benchmark Client](./cmd/panrpc-example-tcp-rps-client/main.go)
+  - [Throughput Benchmark Server](./cmd/panrpc-example-tcp-throughput-server/main.go)
+  - [Throughput Benchmark Client](./cmd/panrpc-example-tcp-throughput-client/main.go)
 
 ### Benchmarks
 
@@ -490,7 +490,7 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 
 ### Protocol
 
-The protocol used by ltsrpc is simple and independent of transport and serialization layer; in the following examples, we'll use JSON.
+The protocol used by panrpc is simple and independent of transport and serialization layer; in the following examples, we'll use JSON.
 
 A function call to e.g. the `Println` function from above looks like this:
 
@@ -522,19 +522,19 @@ A function return looks like this:
 
 Here, `response` specifies that the message is a function return. `call` is the ID of the function call from above, `value` is the function's return value, and the last element is the error message; `nil` errors are represented by the empty string.
 
-Keep in mind that ltsrpc is bidirectional, meaning that both the client and server can send and receive both types of messages to each other.
+Keep in mind that panrpc is bidirectional, meaning that both the client and server can send and receive both types of messages to each other.
 
 ## Reference
 
 ```shell
-$ lurl --help
-Like cURL, but for ltsrpc: Command-line tool for interacting with ltsrpc servers
+$ purl --help
+Like cURL, but for panrpc: Command-line tool for interacting with panrpc servers
 
-Usage of lurl:
-	lurl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
+Usage of purl:
+	purl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
 
 Example:
-	lurl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+	purl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
 
 Flags:
   -cert string
@@ -559,20 +559,20 @@ Flags:
 
 To contribute, please use the [GitHub flow](https://guides.github.com/introduction/flow/) and follow our [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-To build and start a development version of ltsrpc locally, run the following:
+To build and start a development version of panrpc locally, run the following:
 
 ```shell
-$ git clone https://github.com/pojntfx/ltsrpc.git
-$ cd ltsrpc
-$ go run ./cmd/ltsrpc-example-tcp-server/ # Starts the TCP example server
+$ git clone https://github.com/pojntfx/panrpc.git
+$ cd panrpc
+$ go run ./cmd/panrpc-example-tcp-server/ # Starts the TCP example server
 # In another terminal
-$ go run ./cmd/ltsrpc-example-tcp-client/ # Starts the TCP example client
+$ go run ./cmd/panrpc-example-tcp-client/ # Starts the TCP example client
 ```
 
-Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#ltsrpc:matrix.org?via=matrix.org)!
+Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)!
 
 ## License
 
-ltsrpc (c) 2023 Felicitas Pojtinger and contributors
+panrpc (c) 2023 Felicitas Pojtinger and contributors
 
 SPDX-License-Identifier: Apache-2.0

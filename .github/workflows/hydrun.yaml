@@ -21,11 +21,11 @@ jobs:
             flags: ""
             cmd: GOFLAGS="-short" ./Hydrunfile test
             dst: out/nonexistent
-          - id: go-lurl
+          - id: go-purl
             src: .
             os: golang:bookworm
             flags: ""
-            cmd: ./Hydrunfile go lurl
+            cmd: ./Hydrunfile go purl
             dst: out/*
 
     steps:

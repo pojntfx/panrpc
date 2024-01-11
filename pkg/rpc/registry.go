@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/pojntfx/ltsrpc/pkg/utils"
+	"github.com/pojntfx/panrpc/pkg/utils"
 )
 
 var (
