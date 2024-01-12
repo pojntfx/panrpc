@@ -178,7 +178,7 @@ func main() {
 		u.String(),
 		*key,
 		strings.Split(*ice, ","),
-		[]string{"panrpc/example/webrtc"},
+		[]string{"panrpc.example.webrtc"},
 		&wrtcconn.AdapterConfig{
 			Timeout:    *timeout,
 			ForceRelay: *forceRelay,
@@ -195,7 +195,6 @@ func main() {
 	}
 	defer adapter.Close()
 
-	errs := make(chan error)
 	for {
 		select {
 		case <-ctx.Done():
@@ -204,8 +203,6 @@ func main() {
 			}
 
 			return
-		case err := <-errs:
-			panic(err)
 		case rid := <-ids:
 			log.Println("Listening with ID", rid)
 		case remote := <-adapter.Accept():
