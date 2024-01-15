@@ -18,11 +18,11 @@ type remote struct {
 	Iterate func(
 		ctx context.Context,
 		length int,
-		onIteration func(i int, b string) (string, error),
+		onIteration func(ctx context.Context, i int, b string) (string, error),
 	) (int, error)
 }
 
-func Iterate(callee remote, ctx context.Context, length int, onIteration func(i int, b string) (string, error)) (int, error) {
+func Iterate(callee remote, ctx context.Context, length int, onIteration func(ctx context.Context, i int, b string) (string, error)) (int, error) {
 	return callee.Iterate(ctx, length, onIteration)
 }
 
@@ -74,7 +74,7 @@ func main() {
 
 				switch line {
 				case "a\n":
-					length, err := Iterate(remote, ctx, 5, func(i int, b string) (string, error) {
+					length, err := Iterate(remote, ctx, 5, func(ctx context.Context, i int, b string) (string, error) {
 						log.Println("In iteration", i, b)
 
 						return "This is from the caller", nil
@@ -87,7 +87,7 @@ func main() {
 
 					log.Println(length)
 				case "b\n":
-					length, err := Iterate(remote, ctx, 10, func(i int, b string) (string, error) {
+					length, err := Iterate(remote, ctx, 10, func(ctx context.Context, i int, b string) (string, error) {
 						log.Println("In iteration", i, b)
 
 						return "This is from the caller", nil

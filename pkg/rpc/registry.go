@@ -444,7 +444,7 @@ func (r Registry[R, T]) LinkMessage(
 					}
 
 					if function.Type().NumIn() != len(req.Args)+1 {
-						setErr(ErrInvalidArgs)
+						setErr(ErrInvalidArgsCount)
 
 						return
 					}
@@ -504,12 +504,26 @@ func (r Registry[R, T]) LinkMessage(
 									unmarshal,
 								)
 
-								rpcArgs := []interface{}{}
-								for i := 0; i < len(args); i++ {
-									rpcArgs = append(rpcArgs, args[i].Interface())
+								var (
+									ctx     context.Context
+									rpcArgs = []interface{}{}
+								)
+								for i, arg := range args {
+									if i == 0 {
+										v, ok := arg.Interface().(context.Context)
+										if !ok {
+											panic(ErrInvalidArgs)
+										}
+										ctx = v
+
+										// Don't sent the context over the wire
+										continue
+									}
+
+									rpcArgs = append(rpcArgs, arg.Interface())
 								}
 
-								rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(r.ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+								rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
 								if err != nil {
 									panic(err)
 								}

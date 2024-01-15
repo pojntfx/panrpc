@@ -92,7 +92,9 @@ func (m *closureManager) CallClosure(ctx context.Context, closureID string, args
 	}
 	m.closuresLock.Unlock()
 
-	return closure(args...)
+	var c context.Context = ctx
+
+	return closure(append([]interface{}{c}, args...)...)
 }
 
 func registerClosure(m *closureManager, fn interface{}) (string, func(), error) {

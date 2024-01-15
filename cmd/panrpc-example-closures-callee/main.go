@@ -15,10 +15,10 @@ type local struct{}
 func (s *local) Iterate(
 	ctx context.Context,
 	length int,
-	onIteration func(i int, b string) (string, error),
+	onIteration func(ctx context.Context, i int, b string) (string, error),
 ) (int, error) {
 	for i := 0; i < length; i++ {
-		rv, err := onIteration(i, "This is from the callee")
+		rv, err := onIteration(ctx, i, "This is from the callee")
 		if err != nil {
 			return -1, err
 		}
