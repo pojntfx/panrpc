@@ -284,7 +284,7 @@ export class Registry<L extends Object, R extends Object> {
           ctx,
           ...args.map((closureID, index) =>
             remoteClosureParameterIndexes?.includes(index + 1)
-              ? (...closureArgs: any[]) => {
+              ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
                   const rpc = makeRPC<T>(
                     "CallClosure",
                     responseResolver,
@@ -296,13 +296,7 @@ export class Registry<L extends Object, R extends Object> {
                     this.closureManager
                   );
 
-                  return rpc(
-                    {
-                      signal: this.signal,
-                    },
-                    closureID,
-                    closureArgs
-                  );
+                  return rpc(closureCtx, closureID, closureArgs);
                 }
               : closureID
           )

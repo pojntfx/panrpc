@@ -3,18 +3,24 @@ import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { ILocalContext, Registry, remoteClosure } from "../index";
+import {
+  ILocalContext,
+  IRemoteContext,
+  Registry,
+  remoteClosure,
+} from "../index";
 
 class Local {
   // eslint-disable-next-line class-methods-use-this
   async Iterate(
     ctx: ILocalContext,
     length: number,
-    @remoteClosure onIteration: (i: number, b: string) => Promise<string>
+    @remoteClosure
+    onIteration: (ctx: IRemoteContext, i: number, b: string) => Promise<string>
   ): Promise<number> {
     for (let i = 0; i < length; i++) {
       // eslint-disable-next-line no-await-in-loop
-      const rv = await onIteration(i, "This is from the callee");
+      const rv = await onIteration(undefined, i, "This is from the callee");
 
       console.log("Closure returned:", rv);
     }

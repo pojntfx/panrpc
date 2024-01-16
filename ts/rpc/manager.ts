@@ -18,7 +18,7 @@ export class ClosureManager {
       throw new Error(ErrorClosureDoesNotExist);
     }
 
-    return fn(...args);
+    return fn(ctx, ...args);
   };
 }
 

@@ -4,7 +4,7 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
-import { IRemoteContext, Registry } from "../index";
+import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {}
 
@@ -16,7 +16,7 @@ class Remote {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     length: number,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    onIteration: (i: number, b: string) => Promise<string>
+    onIteration: (ctx: ILocalContext, i: number, b: string) => Promise<string>
   ): Promise<number> {
     return 0;
   }
@@ -66,11 +66,15 @@ const registry = new Registry(
         case "a":
           try {
             // eslint-disable-next-line no-await-in-loop
-            const length = await remote.Iterate(undefined, 5, async (i, b) => {
-              console.log("In iteration", i, b);
+            const length = await remote.Iterate(
+              undefined,
+              5,
+              async (_, i, b) => {
+                console.log("In iteration", i, b);
 
-              return "This is from the caller";
-            });
+                return "This is from the caller";
+              }
+            );
 
             console.log(length);
           } catch (e) {
@@ -82,11 +86,15 @@ const registry = new Registry(
         case "b":
           try {
             // eslint-disable-next-line no-await-in-loop
-            const length = await remote.Iterate(undefined, 10, async (i, b) => {
-              console.log("In iteration", i, b);
+            const length = await remote.Iterate(
+              undefined,
+              10,
+              async (_, i, b) => {
+                console.log("In iteration", i, b);
 
-              return "This is from the caller";
-            });
+                return "This is from the caller";
+              }
+            );
 
             console.log(length);
           } catch (e) {
