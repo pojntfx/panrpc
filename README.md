@@ -531,24 +531,34 @@ $ purl --help
 Like cURL, but for panrpc: Command-line tool for interacting with panrpc servers
 
 Usage of purl:
-	purl [flags] <(ws|wss|tcp|tls)://host:port/function> <[args...]>
+	purl [flags] <(ws|wss|tcp|tls|weron)://(host:port/function|password:key@community/channel[/remote]/function)> <[args...]>
 
-Example:
-	purl wss://jarvis.fel.p8.lu/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+Examples:
+	purl tcp://localhost:1337/Increment '[1]'
+	purl tls://localhost:443/Increment '[1]'
+	purl ws://localhost:1337/Increment '[1]'
+	purl wss://localhost:443/Increment '[1]'
+	purl weron://examplepass:examplekey@examplecommunity/panrpc.example.webrtc/Increment '[1]'
 
 Flags:
-  -cert string
-    	TLS certificate
-  -key string
-    	TLS key
   -listen
-    	Whether to connect to remotes by listening or dialing
+    	Whether to connect to remotes by listening or dialing (ignored for weron://)
   -timeout duration
     	Time to wait for a response to a call (default 10s)
+  -tls-cert string
+    	TLS certificate (only valid for wss:// and tls://)
+  -tls-key string
+    	TLS key (only valid for wss:// and tls://)
+  -tls-verify
+    	Whether to verify TLS peer certificates (only valid for wss:// and tls://) (default true)
   -verbose
     	Whether to enable verbose logging
-  -verify
-    	Whether to verify TLS peer certificates (default true)
+  -weron-force-relay
+    	Force usage of TURN servers (only valid for weron://)
+  -weron-ice string
+    	Comma-separated list of STUN servers (in format stun:host:port) and TURN servers to use (in format username:credential@turn:host:port) (i.e. username:credential@turn:global.turn.twilio.com:3478?transport=tcp) (only valid for weron://) (default "stun:stun.l.google.com:19302")
+  -weron-signaler string
+    	Signaler address (only valid for weron://) (default "wss://weron.up.railway.app/")
 ```
 
 ## Acknowledgements

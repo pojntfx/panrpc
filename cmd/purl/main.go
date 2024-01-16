@@ -51,11 +51,14 @@ Usage of %v:
 	%v [flags] <(ws|wss|tcp|tls|weron)://(host:port/function|password:key@community/channel[/remote]/function)> <[args...]>
 
 Examples:
-	%v wss://manager.house.example.com/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
-	%v weron://mypass:mykey@example.com/house/manager/ToggleLights '["token", { "kitchen": true, "bathroom": false }]'
+	%v tcp://localhost:1337/Increment '[1]'
+	%v tls://localhost:443/Increment '[1]'
+	%v ws://localhost:1337/Increment '[1]'
+	%v wss://localhost:443/Increment '[1]'
+	%v weron://examplepass:examplekey@examplecommunity/panrpc.example.webrtc/Increment '[1]'
 
 Flags:
-`, bin, bin, bin, bin)
+`, bin, bin, bin, bin, bin, bin, bin)
 
 		flag.PrintDefaults()
 	}
