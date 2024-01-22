@@ -543,6 +543,8 @@ Examples:
 Flags:
   -listen
     	Whether to connect to remotes by listening or dialing (ignored for weron://)
+  -serializer string
+    	Serializer to use (json or cbor) (default "json")
   -timeout duration
     	Time to wait for a response to a call (default 10s)
   -tls-cert string

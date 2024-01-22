@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
@@ -26,14 +27,15 @@ import (
 )
 
 var (
-	errMissingURL       = errors.New("missing URL")
-	errMissingArgs      = errors.New("missing args")
-	errMissingFunction  = errors.New("missing function")
-	errMissingPassword  = errors.New("missing password")
-	errMissingKey       = errors.New("missing key")
-	errMissingCommunity = errors.New("missing community")
-	errMissingChannel   = errors.New("missing channel")
-	errCallTimedOut     = errors.New("call timed out")
+	errMissingURL        = errors.New("missing URL")
+	errMissingArgs       = errors.New("missing args")
+	errMissingFunction   = errors.New("missing function")
+	errMissingPassword   = errors.New("missing password")
+	errMissingKey        = errors.New("missing key")
+	errMissingCommunity  = errors.New("missing community")
+	errMissingChannel    = errors.New("missing channel")
+	errCallTimedOut      = errors.New("call timed out")
+	errUnknownSerializer = errors.New("unknown serializer")
 )
 
 type reducedResponse struct {
@@ -64,6 +66,7 @@ Flags:
 	}
 
 	listen := flag.Bool("listen", false, "Whether to connect to remotes by listening or dialing (ignored for weron://)")
+	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
 	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response to a call")
 
 	tlsCert := flag.String("tls-cert", "", "TLS certificate (only valid for wss:// and tls://)")
@@ -200,16 +203,6 @@ Flags:
 	callArgs := []any{}
 	if err := json.Unmarshal([]byte(callArgsRaw), &callArgs); err != nil {
 		panic(err)
-	}
-
-	callArgsEncoded := []json.RawMessage{}
-	for _, callArg := range callArgs {
-		callArgEncoded, err := json.Marshal(callArg)
-		if err != nil {
-			panic(err)
-		}
-
-		callArgsEncoded = append(callArgsEncoded, callArgEncoded)
 	}
 
 	var tlsConfig *tls.Config
@@ -405,71 +398,166 @@ Flags:
 	}
 	defer conn.Close()
 
-	var (
-		req json.RawMessage
-		err error
-	)
-	req, err = json.Marshal(rpc.Request[json.RawMessage]{
-		Call:     callID,
-		Function: callFunctionName,
-		Args:     callArgsEncoded,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	if err := json.NewEncoder(conn).Encode(rpc.Message[json.RawMessage]{
-		Request: &req,
-	}); err != nil {
-		panic(err)
-	}
-
-	var (
-		timeoutChan  = time.After(*timeout)
-		responseChan = make(chan rpc.Response[json.RawMessage])
-	)
-	go func() {
-		decoder := json.NewDecoder(conn)
-		for {
-			var msg rpc.Message[json.RawMessage]
-			if err := decoder.Decode(&msg); err != nil {
+	switch *serializer {
+	case "json":
+		callArgsEncoded := []json.RawMessage{}
+		for _, callArg := range callArgs {
+			callArgEncoded, err := json.Marshal(callArg)
+			if err != nil {
 				panic(err)
 			}
 
-			if msg.Response == nil {
-				if *verbose {
-					log.Println("Received request, skipping:", msg)
-				}
-
-				continue
-			}
-
-			var response rpc.Response[json.RawMessage]
-			if err := json.Unmarshal(*msg.Response, &response); err != nil {
-				panic(err)
-			}
-
-			responseChan <- response
-
-			break
+			callArgsEncoded = append(callArgsEncoded, callArgEncoded)
 		}
-	}()
 
-	select {
-	case <-timeoutChan:
-		log.Fatal(errCallTimedOut)
-
-	case response := <-responseChan:
-		var value any
-		if err := json.Unmarshal(response.Value, &value); err != nil {
+		var (
+			req json.RawMessage
+			err error
+		)
+		req, err = json.Marshal(rpc.Request[json.RawMessage]{
+			Call:     callID,
+			Function: callFunctionName,
+			Args:     callArgsEncoded,
+		})
+		if err != nil {
 			panic(err)
 		}
 
-		if err := json.NewEncoder(os.Stdout).Encode(reducedResponse{
-			Value: value,
-			Err:   response.Err,
+		if err := json.NewEncoder(conn).Encode(rpc.Message[json.RawMessage]{
+			Request: &req,
 		}); err != nil {
 			panic(err)
 		}
+
+		var (
+			timeoutChan  = time.After(*timeout)
+			responseChan = make(chan rpc.Response[json.RawMessage])
+		)
+		go func() {
+			decoder := json.NewDecoder(conn)
+			for {
+				var msg rpc.Message[json.RawMessage]
+				if err := decoder.Decode(&msg); err != nil {
+					panic(err)
+				}
+
+				if msg.Response == nil {
+					if *verbose {
+						log.Println("Received request, skipping:", msg)
+					}
+
+					continue
+				}
+
+				var response rpc.Response[json.RawMessage]
+				if err := json.Unmarshal(*msg.Response, &response); err != nil {
+					panic(err)
+				}
+
+				responseChan <- response
+
+				break
+			}
+		}()
+
+		select {
+		case <-timeoutChan:
+			log.Fatal(errCallTimedOut)
+
+		case response := <-responseChan:
+			var value any
+			if err := json.Unmarshal(response.Value, &value); err != nil {
+				panic(err)
+			}
+
+			if err := json.NewEncoder(os.Stdout).Encode(reducedResponse{
+				Value: value,
+				Err:   response.Err,
+			}); err != nil {
+				panic(err)
+			}
+		}
+
+	case "cbor":
+		callArgsEncoded := []cbor.RawMessage{}
+		for _, callArg := range callArgs {
+			callArgEncoded, err := cbor.Marshal(callArg)
+			if err != nil {
+				panic(err)
+			}
+
+			callArgsEncoded = append(callArgsEncoded, callArgEncoded)
+		}
+
+		var (
+			req cbor.RawMessage
+			err error
+		)
+		req, err = cbor.Marshal(rpc.Request[cbor.RawMessage]{
+			Call:     callID,
+			Function: callFunctionName,
+			Args:     callArgsEncoded,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		if err := cbor.NewEncoder(conn).Encode(rpc.Message[cbor.RawMessage]{
+			Request: &req,
+		}); err != nil {
+			panic(err)
+		}
+
+		var (
+			timeoutChan  = time.After(*timeout)
+			responseChan = make(chan rpc.Response[cbor.RawMessage])
+		)
+		go func() {
+			decoder := cbor.NewDecoder(conn)
+			for {
+				var msg rpc.Message[cbor.RawMessage]
+				if err := decoder.Decode(&msg); err != nil {
+					panic(err)
+				}
+
+				if msg.Response == nil {
+					if *verbose {
+						log.Println("Received request, skipping:", msg)
+					}
+
+					continue
+				}
+
+				var response rpc.Response[cbor.RawMessage]
+				if err := cbor.Unmarshal(*msg.Response, &response); err != nil {
+					panic(err)
+				}
+
+				responseChan <- response
+
+				break
+			}
+		}()
+
+		select {
+		case <-timeoutChan:
+			log.Fatal(errCallTimedOut)
+
+		case response := <-responseChan:
+			var value any
+			if err := cbor.Unmarshal(response.Value, &value); err != nil {
+				panic(err)
+			}
+
+			if err := json.NewEncoder(os.Stdout).Encode(reducedResponse{
+				Value: value,
+				Err:   response.Err,
+			}); err != nil {
+				panic(err)
+			}
+		}
+
+	default:
+		panic(errUnknownSerializer)
 	}
 }
