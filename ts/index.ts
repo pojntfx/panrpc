@@ -1,3 +1,3 @@
-export * from "./rpc/registry";
-export * from "./rpc/context";
-export { ErrorClosureDoesNotExist } from "./rpc/manager";
+export * from "./src/rpc/registry";
+export * from "./src/rpc/context";
+export { ErrorClosureDoesNotExist } from "./src/rpc/manager";

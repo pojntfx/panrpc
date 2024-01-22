@@ -1,0 +1,46 @@
+{
+  "name": "@pojntfx/panrpc",
+  "version": "0.6.1",
+  "description": "Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.",
+  "source": "index.ts",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "eslint . && tsc --emitDeclarationOnly && typedoc --out typedoc index.ts && bun build --minify --splitting --target browser --outdir=dist ./index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pojntfx/panrpc.git"
+  },
+  "keywords": [
+    "panrpc",
+    "rpc"
+  ],
+  "author": "Felicitas Pojtinger <felicitas@pojtinger.com>",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/pojntfx/panrpc/issues"
+  },
+  "homepage": "https://github.com/pojntfx/panrpc#readme",
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.6",
+    "@typescript-eslint/parser": "^5.30.6",
+    "bun-types": "^1.0.7",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^17.0.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.7.1",
+    "typedoc": "^0.23.8",
+    "typescript": "^4.7.4",
+    "ws": "^8.16.0"
+  },
+  "dependencies": {
+    "reflect-metadata": "^0.2.1",
+    "uuid": "^9.0.0"
+  }
+}
