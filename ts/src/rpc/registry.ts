@@ -1,12 +1,12 @@
 import { EventEmitter } from "events";
-import { Socket } from "net";
 import "reflect-metadata";
+import { Readable, Writable } from "stream";
+import Chain, { PassThrough } from "stream-chain";
 import { v4 } from "uuid";
 import {
-  marshalMessage,
+  IMessage,
   marshalRequest,
   marshalResponse,
-  unmarshalMessage,
   unmarshalRequest,
   unmarshalResponse,
 } from "../utils/messages";
@@ -21,89 +21,6 @@ const constructorFunctionName = "constructor";
 interface ICallResponse {
   value?: any;
   err: string;
-}
-
-export interface IRequestResponseReader<T> {
-  on(event: "request", listener: (message: T) => void): this;
-  on(event: "response", listener: (message: T) => void): this;
-  on(event: "close", listener: () => void): this;
-}
-
-class WebSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
-  private requestListener?: (message: T) => void;
-
-  private responseListener?: (message: T) => void;
-
-  private closeListener?: () => void;
-
-  constructor(socket: WebSocket, parse: (text: string) => any) {
-    socket.addEventListener(
-      "message",
-      (event: MessageEvent<string | Buffer>) => {
-        const msg = unmarshalMessage<T>(event.data as string, parse);
-
-        if (msg.request) {
-          this.requestListener?.(msg.request);
-        } else if (msg.response) {
-          this.responseListener?.(msg.response);
-        }
-      }
-    );
-
-    socket.addEventListener("close", () => this.closeListener?.());
-  }
-
-  on = (
-    event: "request" | "response" | "close",
-    listener: ((message: T) => void) | (() => void)
-  ): this => {
-    if (event === "request") {
-      this.requestListener = listener;
-    } else if (event === "response") {
-      this.responseListener = listener;
-    } else if (event === "close") {
-      this.closeListener = listener as () => void;
-    }
-
-    return this;
-  };
-}
-
-class TCPSocketRequestResponseReader<T> implements IRequestResponseReader<T> {
-  private requestListener?: (message: T) => void;
-
-  private responseListener?: (message: T) => void;
-
-  private closeListener?: () => void;
-
-  constructor(socket: Socket, parse: (text: string) => any) {
-    socket.addListener("data", (data: any) => {
-      const msg = unmarshalMessage<T>(data.toString() as string, parse);
-
-      if (msg.request) {
-        this.requestListener?.(msg.request);
-      } else if (msg.response) {
-        this.responseListener?.(msg.response);
-      }
-    });
-
-    socket.addListener("close", () => this.closeListener?.());
-  }
-
-  on = (
-    event: "request" | "response" | "close",
-    listener: (message: T) => void
-  ): this => {
-    if (event === "request") {
-      this.requestListener = listener;
-    } else if (event === "response") {
-      this.responseListener = listener;
-    } else if (event === "close") {
-      this.closeListener = listener as () => void;
-    }
-
-    return this;
-  };
 }
 
 export interface IOptions {
@@ -134,9 +51,9 @@ const makeRPC =
     name: string,
     responseResolver: EventEmitter,
 
-    writeRequest: (text: T) => Promise<any>,
+    requestWriter: Writable,
 
-    stringify: (value: any) => T,
+    marshal: (value: any) => T,
 
     closureManager: ClosureManager
   ) =>
@@ -192,7 +109,14 @@ const makeRPC =
       };
       responseResolver.addListener(`rpc:${callID}`, returnListener);
 
-      writeRequest(marshalRequest<T>(callID, name, args, stringify)).catch(rej);
+      new Promise<void>((ress, rejj) => {
+        requestWriter.write(
+          marshalRequest<T>(callID, name, args, marshal),
+          (e) => (e ? rejj(e) : ress())
+        );
+      })
+        .catch(rej)
+        .then(res);
     });
 
 export class Registry<L extends Object, R extends Object> {
@@ -213,23 +137,15 @@ export class Registry<L extends Object, R extends Object> {
     this.closureManager = new ClosureManager();
   }
 
-  /**
-   * Expose local functions and link remote ones to a message-based transport
-   * @param writeRequest Function to write a request
-   * @param writeResponse Function to write a response
-   * @param requestResponseReader Emitter to read requests and responses
-   * @param stringify Function to marshal a message
-   * @param parse Function to unmarshal a message
-   * @returns Remote functions
-   */
   linkMessage = <T>(
-    writeRequest: (text: T) => Promise<any>,
-    writeResponse: (text: T) => Promise<any>,
+    requestWriter: Writable,
+    responseWriter: Writable,
 
-    requestResponseReader: IRequestResponseReader<T>,
+    requestReader: Readable,
+    responseReader: Readable,
 
-    stringify: (value: any) => T,
-    parse: (text: T) => any
+    marshal: (value: any) => T,
+    unmarshal: (text: T) => any
   ) => {
     const responseResolver = new EventEmitter();
 
@@ -247,9 +163,9 @@ export class Registry<L extends Object, R extends Object> {
         functionName,
         responseResolver,
 
-        writeRequest,
+        requestWriter,
 
-        stringify,
+        marshal,
 
         this.closureManager
       );
@@ -257,153 +173,151 @@ export class Registry<L extends Object, R extends Object> {
 
     const remoteID = v4();
 
-    requestResponseReader.on("request", async (message) => {
-      const { call, functionName, args } = unmarshalRequest<T>(message, parse);
+    requestReader.pipe(
+      new Chain([
+        async (message) => {
+          const { call, functionName, args } = unmarshalRequest<T>(
+            message,
+            unmarshal
+          );
 
-      let res: T;
-      try {
-        if (functionName === constructorFunctionName) {
-          throw new Error(ErrorCannotCallNonFunction);
-        }
+          let resp: T;
+          try {
+            if (functionName === constructorFunctionName) {
+              throw new Error(ErrorCannotCallNonFunction);
+            }
 
-        let fn = (this.local as any)[functionName];
-        if (typeof fn !== "function") {
-          fn = (this.closureManager as any)[functionName];
+            let fn = (this.local as any)[functionName];
+            if (typeof fn !== "function") {
+              fn = (this.closureManager as any)[functionName];
 
-          if (typeof fn !== "function") {
-            throw new Error(ErrorCannotCallNonFunction);
+              if (typeof fn !== "function") {
+                throw new Error(ErrorCannotCallNonFunction);
+              }
+            }
+
+            const remoteClosureParameterIndexes: number[] | undefined =
+              Reflect.getMetadata(remoteClosureKey, this.local, functionName);
+
+            const ctx: ILocalContext = { remoteID };
+
+            const rv = await fn(
+              ctx,
+              ...args.map((closureID, index) =>
+                remoteClosureParameterIndexes?.includes(index + 1)
+                  ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
+                      const rpc = makeRPC<T>(
+                        "CallClosure",
+                        responseResolver,
+
+                        requestWriter,
+
+                        marshal,
+
+                        this.closureManager
+                      );
+
+                      return rpc(closureCtx, closureID, closureArgs);
+                    }
+                  : closureID
+              )
+            );
+
+            resp = marshalResponse<T>(call, rv, "", marshal);
+          } catch (e) {
+            resp = marshalResponse<T>(
+              call,
+              undefined,
+              (e as Error).message,
+              marshal
+            );
           }
-        }
 
-        const remoteClosureParameterIndexes: number[] | undefined =
-          Reflect.getMetadata(remoteClosureKey, this.local, functionName);
+          await new Promise<void>((res, rej) => {
+            responseWriter.write(resp, (e) => (e ? rej(e) : res()));
+          });
+        },
+      ])
+    );
 
-        const ctx: ILocalContext = { remoteID };
+    responseReader.pipe(
+      new Chain([
+        async (message) => {
+          const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
 
-        const rv = await fn(
-          ctx,
-          ...args.map((closureID, index) =>
-            remoteClosureParameterIndexes?.includes(index + 1)
-              ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
-                  const rpc = makeRPC<T>(
-                    "CallClosure",
-                    responseResolver,
+          const callResponse: ICallResponse = {
+            value,
+            err,
+          };
 
-                    writeRequest,
-
-                    stringify,
-
-                    this.closureManager
-                  );
-
-                  return rpc(closureCtx, closureID, closureArgs);
-                }
-              : closureID
-          )
-        );
-
-        res = marshalResponse<T>(call, rv, "", stringify);
-      } catch (e) {
-        res = marshalResponse<T>(
-          call,
-          undefined,
-          (e as Error).message,
-          stringify
-        );
-      }
-
-      await writeResponse(res);
-    });
-
-    requestResponseReader.on("response", async (message) => {
-      const { call, value, err } = unmarshalResponse<T>(message, parse);
-
-      const callResponse: ICallResponse = {
-        value,
-        err,
-      };
-
-      responseResolver.emit(`rpc:${call}`, callResponse);
-    });
+          responseResolver.emit(`rpc:${call}`, callResponse);
+        },
+      ])
+    );
 
     this.remotes[remoteID] = r;
     this.options?.onClientConnect?.(remoteID);
 
-    requestResponseReader.on("close", () => {
+    responseReader.on("close", () => {
       delete this.remotes[remoteID];
       this.options?.onClientDisconnect?.(remoteID);
     });
   };
 
-  /**
-   * Expose local functions and link remote ones to a WebSocket
-   * @param socket Socket to link functions to
-   * @param stringify Function to marshal a message
-   * @param parse Function to unmarshal a message
-   * @param stringifyNested Function to marshal a nested message
-   * @param parseNested Function to unmarshal a nested message
-   * @returns Remote functions
-   */
-  linkWebSocket = <T>(
-    socket: WebSocket,
+  linkStream = <T>(
+    encoder: Writable,
+    decoder: Readable,
 
-    stringify: (value: any) => string,
-    parse: (text: string) => any,
-
-    stringifyNested: (value: any) => T,
-    parseNested: (text: T) => any
+    marshal: (value: any) => T,
+    unmarshal: (text: T) => any
   ) => {
-    const requestResponseReceiver = new WebSocketRequestResponseReader<T>(
-      socket,
-      parse
+    const requestWriter = new Chain([
+      (v) => {
+        const msg: IMessage<T> = { request: v };
+
+        return msg;
+      },
+    ]);
+    requestWriter.pipe(encoder);
+
+    const responseWriter = new Chain([
+      (v) => {
+        const msg: IMessage<T> = { response: v };
+
+        return msg;
+      },
+    ]);
+    responseWriter.pipe(encoder);
+
+    const requestReader = new PassThrough();
+    const responseReader = new PassThrough();
+
+    decoder.on("close", () => {
+      requestReader.destroy();
+      responseReader.destroy();
+    });
+
+    decoder.pipe(
+      new Chain([
+        (msg) => {
+          if (msg.request) {
+            requestReader.push(msg.request);
+          } else {
+            responseReader.push(msg.request);
+          }
+        },
+      ])
     );
 
     this.linkMessage(
-      async (text: T) =>
-        socket.send(marshalMessage<T>(text, undefined, stringify)),
-      async (text: T) =>
-        socket.send(marshalMessage<T>(undefined, text, stringify)),
+      requestWriter,
+      responseWriter,
 
-      requestResponseReceiver,
+      requestReader,
+      responseReader,
 
-      stringifyNested,
-      parseNested
-    );
-  };
-
-  /**
-   * Expose local functions and link remote ones to a TCPSocket
-   * @param socket Socket to link functions to
-   * @param stringify Function to marshal a message
-   * @param parse Function to unmarshal a message
-   * @param stringifyNested Function to marshal a nested message
-   * @param parseNested Function to unmarshal a nested message
-   * @returns Remote functions
-   */
-  linkTCPSocket = <T>(
-    socket: Socket,
-
-    stringify: (value: any) => string,
-    parse: (text: string) => any,
-
-    stringifyNested: (value: any) => T,
-    parseNested: (text: T) => any
-  ) => {
-    const requestResponseReceiver = new TCPSocketRequestResponseReader<T>(
-      socket,
-      parse
-    );
-
-    this.linkMessage(
-      async (text: T) =>
-        socket.write(marshalMessage<T>(text, undefined, stringify)),
-      async (text: T) =>
-        socket.write(marshalMessage<T>(undefined, text, stringify)),
-
-      requestResponseReceiver,
-
-      stringifyNested,
-      parseNested
+      marshal,
+      unmarshal
     );
   };
 

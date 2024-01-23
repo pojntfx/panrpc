@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/pojntfx/panrpc#readme",
   "devDependencies": {
+    "@types/stream-json": "^1.7.7",
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.30.6",
     "@typescript-eslint/parser": "^5.30.6",
@@ -41,6 +42,8 @@
   },
   "dependencies": {
     "reflect-metadata": "^0.2.1",
+    "stream-chain": "^2.2.5",
+    "stream-json": "^1.8.0",
     "uuid": "^9.0.0"
   }
 }

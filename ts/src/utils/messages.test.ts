@@ -1,68 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import {
-  marshalMessage,
   marshalRequest,
   marshalResponse,
-  unmarshalMessage,
   unmarshalRequest,
   unmarshalResponse,
 } from "./messages";
 
 describe("Nested encoding", () => {
-  const stringify = JSON.stringify;
-  const parse = JSON.parse;
-
-  const stringifyNested = (value: any) => btoa(JSON.stringify(value));
-  const parseNested = (text: string) => JSON.parse(atob(text));
-
-  describe("Message", () => {
-    test("can marshal a message with a request set", () => {
-      expect(
-        marshalMessage(
-          marshalRequest("1", "Println", ["Hello, world!"], (v) =>
-            stringifyNested(v)
-          ),
-          "",
-          stringify
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can unmarshal a message with a request set", () => {
-      expect(
-        unmarshalMessage(
-          `{"request":"eyJjYWxsIjoiMSIsImZ1bmN0aW9uIjoiUHJpbnRsbiIsImFyZ3MiOlsiSWtobGJHeHZMQ0IzYjNKc1pDRWkiXX0=","response":""}`,
-          parse
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can marshal a message with a response set", () => {
-      expect(
-        marshalMessage(
-          "",
-          marshalResponse("1", true, "", (v) => stringifyNested(v)),
-          stringify
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can unmarshal a message with a response set", () => {
-      expect(
-        unmarshalMessage(
-          `{"request":"","response":"eyJjYWxsIjoiMSIsInZhbHVlIjoiZEhKMVpRPT0iLCJlcnIiOiIifQ=="}`,
-          parse
-        )
-      ).toMatchSnapshot();
-    });
-  });
+  const marshal = (value: any) => btoa(JSON.stringify(value));
+  const unmarshal = (text: string) => JSON.parse(atob(text));
 
   describe("Request", () => {
     test("can marshal a simple request", () => {
       expect(
-        marshalRequest("1", "Println", ["Hello, world!"], (v) =>
-          stringifyNested(v)
-        )
+        marshalRequest("1", "Println", ["Hello, world!"], (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -70,16 +21,14 @@ describe("Nested encoding", () => {
       expect(
         unmarshalRequest(
           "eyJjYWxsIjoiMSIsImZ1bmN0aW9uIjoiUHJpbnRsbiIsImFyZ3MiOlsiSWtobGJHeHZMQ0IzYjNKc1pDRWkiXX0=",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
 
     test("can marshal a complex request", () => {
       expect(
-        marshalRequest("1-2-3", "Add", [1, 2, { asdf: 1 }], (v) =>
-          stringifyNested(v)
-        )
+        marshalRequest("1-2-3", "Add", [1, 2, { asdf: 1 }], (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -87,7 +36,7 @@ describe("Nested encoding", () => {
       expect(
         unmarshalRequest(
           "eyJjYWxsIjoiMS0yLTMiLCJmdW5jdGlvbiI6IkFkZCIsImFyZ3MiOlsiTVE9PSIsIk1nPT0iLCJleUpoYzJSbUlqb3hmUT09Il19",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -96,7 +45,7 @@ describe("Nested encoding", () => {
   describe("Response", () => {
     test("can marshal a simple response with no error", () => {
       expect(
-        marshalResponse("1", true, "", (v) => stringifyNested(v))
+        marshalResponse("1", true, "", (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -104,14 +53,14 @@ describe("Nested encoding", () => {
       expect(
         unmarshalResponse(
           "eyJjYWxsIjoiMSIsInZhbHVlIjoiZEhKMVpRPT0iLCJlcnIiOiIifQ==",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
 
     test("can marshal a simple response with error", () => {
       expect(
-        marshalResponse("1", true, "test error", (v) => stringifyNested(v))
+        marshalResponse("1", true, "test error", (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -119,7 +68,7 @@ describe("Nested encoding", () => {
       expect(
         unmarshalResponse(
           "eyJjYWxsIjoiMSIsInZhbHVlIjoiZEhKMVpRPT0iLCJlcnIiOiJ0ZXN0IGVycm9yIn0=",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -135,7 +84,7 @@ describe("Nested encoding", () => {
             },
           },
           "",
-          (v) => stringifyNested(v)
+          (v) => marshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -144,7 +93,7 @@ describe("Nested encoding", () => {
       expect(
         unmarshalResponse(
           "eyJjYWxsIjoiMSIsInZhbHVlIjoiZXlKaElqb3hMQ0ppSWpwN0ltTWlPaUowWlhOMEluMTkiLCJlcnIiOiIifQ==",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -160,7 +109,7 @@ describe("Nested encoding", () => {
             },
           },
           "test error",
-          (v) => stringifyNested(v)
+          (v) => marshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -169,7 +118,7 @@ describe("Nested encoding", () => {
       expect(
         unmarshalResponse(
           "eyJjYWxsIjoiMSIsInZhbHVlIjoiZXlKaElqb3hMQ0ppSWpwN0ltTWlPaUowWlhOMEluMTkiLCJlcnIiOiJ0ZXN0IGVycm9yIn0=",
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -177,60 +126,13 @@ describe("Nested encoding", () => {
 });
 
 describe("Flat encoding", () => {
-  const stringify = JSON.stringify;
-  const parse = JSON.parse;
-
-  const stringifyNested = (value: any) => value;
-  const parseNested = (text: any) => text;
-
-  describe("Message", () => {
-    test("can marshal a message with a request set", () => {
-      expect(
-        marshalMessage(
-          marshalRequest("1", "Println", ["Hello, world!"], (v) =>
-            stringifyNested(v)
-          ),
-          "",
-          stringify
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can unmarshal a message with a request set", () => {
-      expect(
-        unmarshalMessage(
-          `{"request":{"call":"1","function":"Println","args":["Hello, world!"]},"response":""}`,
-          parse
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can marshal a message with a response set", () => {
-      expect(
-        marshalMessage(
-          "",
-          marshalResponse("1", true, "", (v) => stringifyNested(v)),
-          stringify
-        )
-      ).toMatchSnapshot();
-    });
-
-    test("can unmarshal a message with a response set", () => {
-      expect(
-        unmarshalMessage(
-          `{"request":"","response":{"call":"1","value":true,"err":""}}`,
-          parse
-        )
-      ).toMatchSnapshot();
-    });
-  });
+  const marshal = (value: any) => value;
+  const unmarshal = (text: any) => text;
 
   describe("Request", () => {
     test("can marshal a simple request", () => {
       expect(
-        marshalRequest("1", "Println", ["Hello, world!"], (v) =>
-          stringifyNested(v)
-        )
+        marshalRequest("1", "Println", ["Hello, world!"], (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -241,16 +143,14 @@ describe("Flat encoding", () => {
             args: ["Hello, world!"],
             function: "Println",
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
 
     test("can marshal a complex request", () => {
       expect(
-        marshalRequest("1-2-3", "Add", [1, 2, { asdf: 1 }], (v) =>
-          stringifyNested(v)
-        )
+        marshalRequest("1-2-3", "Add", [1, 2, { asdf: 1 }], (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -267,7 +167,7 @@ describe("Flat encoding", () => {
             ],
             function: "Add",
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -276,7 +176,7 @@ describe("Flat encoding", () => {
   describe("Response", () => {
     test("can marshal a simple response with no error", () => {
       expect(
-        marshalResponse("1", true, "", (v) => stringifyNested(v))
+        marshalResponse("1", true, "", (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -287,14 +187,14 @@ describe("Flat encoding", () => {
             err: "",
             value: true,
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
 
     test("can marshal a simple response with error", () => {
       expect(
-        marshalResponse("1", true, "test error", (v) => stringifyNested(v))
+        marshalResponse("1", true, "test error", (v) => marshal(v))
       ).toMatchSnapshot();
     });
 
@@ -305,7 +205,7 @@ describe("Flat encoding", () => {
             err: "test error",
             value: true,
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -321,7 +221,7 @@ describe("Flat encoding", () => {
             },
           },
           "",
-          (v) => stringifyNested(v)
+          (v) => marshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -338,7 +238,7 @@ describe("Flat encoding", () => {
               },
             },
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -354,7 +254,7 @@ describe("Flat encoding", () => {
             },
           },
           "test error",
-          (v) => stringifyNested(v)
+          (v) => marshal(v)
         )
       ).toMatchSnapshot();
     });
@@ -371,7 +271,7 @@ describe("Flat encoding", () => {
               },
             },
           },
-          (v) => parseNested(v)
+          (v) => unmarshal(v)
         )
       ).toMatchSnapshot();
     });
