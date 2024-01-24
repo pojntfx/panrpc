@@ -4,6 +4,9 @@ import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
+import Chain from "stream-chain";
+import p from "stream-json/jsonl/Parser";
+import Stringer from "stream-json/jsonl/Stringer";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
@@ -27,8 +30,6 @@ let clients = 0;
 const registry = new Registry(
   new Local(),
   new Remote(),
-
-  undefined,
 
   {
     onClientConnect: () => {
@@ -105,11 +106,15 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    registry.linkTCPSocket(
-      socket,
+    const decoder = new Chain([p.parser(), (v) => v.value]);
+    socket.pipe(decoder);
 
-      JSON.stringify,
-      JSON.parse,
+    const encoder = new Stringer();
+    encoder.pipe(socket);
+
+    registry.linkStream(
+      encoder,
+      decoder,
 
       (v) => v,
       (v) => v
@@ -146,11 +151,15 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  registry.linkTCPSocket(
-    socket,
+  const decoder = new Chain([p.parser(), (v) => v.value]);
+  socket.pipe(decoder);
 
-    JSON.stringify,
-    JSON.parse,
+  const encoder = new Stringer();
+  encoder.pipe(socket);
+
+  registry.linkStream(
+    encoder,
+    decoder,
 
     (v) => v,
     (v) => v

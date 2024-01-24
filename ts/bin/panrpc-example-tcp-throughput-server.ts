@@ -1,44 +1,32 @@
 /* eslint-disable no-console */
-import { env, exit, stdin, stdout } from "process";
-import { createInterface } from "readline/promises";
+import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { createServer, Socket } from "net";
+import { Socket, createServer } from "net";
 import Chain from "stream-chain";
 import p from "stream-json/jsonl/Parser";
 import Stringer from "stream-json/jsonl/Stringer";
-import { ILocalContext, IRemoteContext, Registry } from "../index";
+import { ILocalContext, Registry } from "../index";
 
 class Local {
-  private counter = 0;
-
-  constructor() {
-    this.Increment = this.Increment.bind(this);
+  constructor(private buf: number[]) {
+    this.GetBytes = this.GetBytes.bind(this);
   }
 
-  async Increment(ctx: ILocalContext, delta: number): Promise<number> {
-    console.log(
-      "Incrementing counter by",
-      delta,
-      "for remote with ID",
-      ctx.remoteID
-    );
-
-    this.counter += delta;
-
-    return this.counter;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async GetBytes(ctx: ILocalContext): Promise<number[]> {
+    return this.buf;
   }
 }
 
-class Remote {
-  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-  async Println(ctx: IRemoteContext, msg: string) {}
-}
+class Remote {}
+
+const buffer = parseInt(env.BUFFER || `${1 * 1024 * 1024}`, 10);
 
 let clients = 0;
 
 const registry = new Registry(
-  new Local(),
+  new Local(new Array(buffer)),
   new Remote(),
 
   {
@@ -54,42 +42,6 @@ const registry = new Registry(
     },
   }
 );
-
-(async () => {
-  console.log(`Enter one of the following letters followed by <ENTER> to run a function on the remote(s):
-
-- a: Print "Hello, world!
-`);
-
-  const rl = createInterface({ input: stdin, output: stdout });
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const line =
-      // eslint-disable-next-line no-await-in-loop
-      await rl.question("");
-
-    // eslint-disable-next-line no-await-in-loop
-    await registry.forRemotes(async (remoteID, remote) => {
-      console.log("Calling functions for remote with ID", remoteID);
-
-      switch (line) {
-        case "a":
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            await remote.Println(undefined, "Hello, world!");
-          } catch (e) {
-            console.error(`Got error for Increment func: ${e}`);
-          }
-
-          break;
-
-        default:
-          console.log(`Unknown letter ${line}, ignoring input`);
-      }
-    });
-  }
-})();
 
 const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";

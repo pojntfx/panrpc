@@ -238,75 +238,6 @@ func (r Registry[R, T]) makeRPC(
 	})
 }
 
-func (r Registry[R, T]) LinkStream(
-	encode func(v Message[T]) error,
-	decode func(v *Message[T]) error,
-
-	marshal func(v any) (T, error),
-	unmarshal func(data T, v any) error,
-) error {
-	var (
-		decodeDone = make(chan struct{})
-		decodeErr  error
-
-		requests  = make(chan T)
-		responses = make(chan T)
-	)
-	go func() {
-		for {
-			var msg Message[T]
-			if err := decode(&msg); err != nil {
-				decodeErr = err
-
-				close(decodeDone)
-
-				break
-			}
-
-			if msg.Request != nil {
-				requests <- *msg.Request
-			}
-
-			if msg.Response != nil {
-				responses <- *msg.Response
-			}
-		}
-	}()
-
-	return r.LinkMessage(
-		func(b T) error {
-			return encode(Message[T]{
-				Request: &b,
-			})
-		},
-		func(b T) error {
-			return encode(Message[T]{
-				Response: &b,
-			})
-		},
-
-		func() (T, error) {
-			select {
-			case <-decodeDone:
-				return *new(T), decodeErr
-			case request := <-requests:
-				return request, nil
-			}
-		},
-		func() (T, error) {
-			select {
-			case <-decodeDone:
-				return *new(T), decodeErr
-			case response := <-responses:
-				return response, nil
-			}
-		},
-
-		marshal,
-		unmarshal,
-	)
-}
-
 func (r Registry[R, T]) LinkMessage(
 	writeRequest,
 	writeResponse func(b T) error,
@@ -733,6 +664,75 @@ func (r Registry[R, T]) LinkMessage(
 	fatalErrLock.L.Unlock()
 
 	return fatalErr
+}
+
+func (r Registry[R, T]) LinkStream(
+	encode func(v Message[T]) error,
+	decode func(v *Message[T]) error,
+
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
+) error {
+	var (
+		decodeDone = make(chan struct{})
+		decodeErr  error
+
+		requests  = make(chan T)
+		responses = make(chan T)
+	)
+	go func() {
+		for {
+			var msg Message[T]
+			if err := decode(&msg); err != nil {
+				decodeErr = err
+
+				close(decodeDone)
+
+				break
+			}
+
+			if msg.Request != nil {
+				requests <- *msg.Request
+			}
+
+			if msg.Response != nil {
+				responses <- *msg.Response
+			}
+		}
+	}()
+
+	return r.LinkMessage(
+		func(b T) error {
+			return encode(Message[T]{
+				Request: &b,
+			})
+		},
+		func(b T) error {
+			return encode(Message[T]{
+				Response: &b,
+			})
+		},
+
+		func() (T, error) {
+			select {
+			case <-decodeDone:
+				return *new(T), decodeErr
+			case request := <-requests:
+				return request, nil
+			}
+		},
+		func() (T, error) {
+			select {
+			case <-decodeDone:
+				return *new(T), decodeErr
+			case response := <-responses:
+				return response, nil
+			}
+		},
+
+		marshal,
+		unmarshal,
+	)
 }
 
 func (r Registry[R, T]) ForRemotes(

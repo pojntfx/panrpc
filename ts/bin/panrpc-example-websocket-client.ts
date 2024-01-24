@@ -28,8 +28,6 @@ const registry = new Registry(
   new Local(),
   new Remote(),
 
-  undefined,
-
   {
     onClientConnect: () => {
       clients++;

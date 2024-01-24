@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import "reflect-metadata";
 import { Readable, Writable } from "stream";
-import Chain, { PassThrough } from "stream-chain";
+import Chain from "stream-chain";
 import { v4 } from "uuid";
 import {
   IMessage,
@@ -109,14 +109,10 @@ const makeRPC =
       };
       responseResolver.addListener(`rpc:${callID}`, returnListener);
 
-      new Promise<void>((ress, rejj) => {
-        requestWriter.write(
-          marshalRequest<T>(callID, name, args, marshal),
-          (e) => (e ? rejj(e) : ress())
-        );
-      })
-        .catch(rej)
-        .then(res);
+      requestWriter.write(
+        marshalRequest<T>(callID, name, args, marshal),
+        (e) => e && rej(e)
+      );
     });
 
 export class Registry<L extends Object, R extends Object> {
@@ -129,8 +125,6 @@ export class Registry<L extends Object, R extends Object> {
   constructor(
     private local: L,
     private remote: R,
-
-    private signal?: AbortSignal,
 
     private options?: IOptions
   ) {
@@ -175,7 +169,7 @@ export class Registry<L extends Object, R extends Object> {
 
     requestReader.pipe(
       new Chain([
-        async (message) => {
+        async (message: T) => {
           const { call, functionName, args } = unmarshalRequest<T>(
             message,
             unmarshal
@@ -242,7 +236,7 @@ export class Registry<L extends Object, R extends Object> {
 
     responseReader.pipe(
       new Chain([
-        async (message) => {
+        async (message: T) => {
           const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
 
           const callResponse: ICallResponse = {
@@ -258,9 +252,24 @@ export class Registry<L extends Object, R extends Object> {
     this.remotes[remoteID] = r;
     this.options?.onClientConnect?.(remoteID);
 
+    let closed = false;
+
+    requestReader.on("close", () => {
+      if (!closed) {
+        closed = true;
+
+        delete this.remotes[remoteID];
+        this.options?.onClientDisconnect?.(remoteID);
+      }
+    });
+
     responseReader.on("close", () => {
-      delete this.remotes[remoteID];
-      this.options?.onClientDisconnect?.(remoteID);
+      if (!closed) {
+        closed = true;
+
+        delete this.remotes[remoteID];
+        this.options?.onClientDisconnect?.(remoteID);
+      }
     });
   };
 
@@ -272,7 +281,7 @@ export class Registry<L extends Object, R extends Object> {
     unmarshal: (text: T) => any
   ) => {
     const requestWriter = new Chain([
-      (v) => {
+      (v: T) => {
         const msg: IMessage<T> = { request: v };
 
         return msg;
@@ -281,7 +290,7 @@ export class Registry<L extends Object, R extends Object> {
     requestWriter.pipe(encoder);
 
     const responseWriter = new Chain([
-      (v) => {
+      (v: T) => {
         const msg: IMessage<T> = { response: v };
 
         return msg;
@@ -289,8 +298,8 @@ export class Registry<L extends Object, R extends Object> {
     ]);
     responseWriter.pipe(encoder);
 
-    const requestReader = new PassThrough();
-    const responseReader = new PassThrough();
+    const requestReader = new Chain([(v: T) => v]);
+    const responseReader = new Chain([(v: T) => v]);
 
     decoder.on("close", () => {
       requestReader.destroy();
@@ -299,11 +308,11 @@ export class Registry<L extends Object, R extends Object> {
 
     decoder.pipe(
       new Chain([
-        (msg) => {
+        (msg: IMessage<T>) => {
           if (msg.request) {
-            requestReader.push(msg.request);
+            requestReader.write(msg.request);
           } else {
-            responseReader.push(msg.request);
+            responseReader.write(msg.response);
           }
         },
       ])
