@@ -102,10 +102,10 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new Chain([p.parser(), (v) => v.value]);
+    const decoder = new Chain([(v) => JSON.parse(v)]);
     socket.pipe(decoder);
 
-    const encoder = new Stringer();
+    const encoder = new Chain([(v) => JSON.stringify(v)]);
     encoder.pipe(socket);
 
     registry.linkStream(

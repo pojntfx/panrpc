@@ -5,8 +5,6 @@ import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
 import Chain from "stream-chain";
-import p from "stream-json/jsonl/Parser";
-import Stringer from "stream-json/jsonl/Stringer";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {}
@@ -122,10 +120,10 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new Chain([p.parser(), (v) => v.value]);
+    const decoder = new Chain([(v) => JSON.parse(v)]);
     socket.pipe(decoder);
 
-    const encoder = new Stringer();
+    const encoder = new Chain([(v) => JSON.stringify(v)]);
     encoder.pipe(socket);
 
     registry.linkStream(
@@ -167,10 +165,10 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  const decoder = new Chain([p.parser(), (v) => v.value]);
+  const decoder = new Chain([(v) => JSON.parse(v)]);
   socket.pipe(decoder);
 
-  const encoder = new Stringer();
+  const encoder = new Chain([(v) => JSON.stringify(v)]);
   encoder.pipe(socket);
 
   registry.linkStream(

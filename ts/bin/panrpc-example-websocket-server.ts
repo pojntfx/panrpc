@@ -1,10 +1,8 @@
 /* eslint-disable no-console */
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { parse } from "url";
 import Chain from "stream-chain";
-import p from "stream-json/jsonl/Parser";
-import Stringer from "stream-json/jsonl/Stringer";
+import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocket, WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
@@ -107,11 +105,11 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new Chain([p.parser(), (v) => v.value]);
+    const decoder = new Chain([(v) => JSON.parse(v)]);
     socket.addEventListener("message", (m) => decoder.write(m.data));
     socket.addEventListener("close", () => decoder.destroy());
 
-    const encoder = new Stringer();
+    const encoder = new Chain([(v) => JSON.stringify(v)]);
     encoder.pipe(new Chain([(m) => socket.send(m)]));
     socket.addEventListener("close", () => encoder.destroy());
 
@@ -140,11 +138,11 @@ if (listen) {
     socket.addEventListener("error", rej);
   });
 
-  const decoder = new Chain([p.parser(), (v) => v.value]);
+  const decoder = new Chain([(v) => JSON.parse(v)]);
   socket.addEventListener("message", (m) => decoder.write(m.data));
   socket.addEventListener("close", () => decoder.destroy());
 
-  const encoder = new Stringer();
+  const encoder = new Chain([(v) => JSON.stringify(v)]);
   encoder.pipe(new Chain([(m) => socket.send(m)]));
   socket.addEventListener("close", () => encoder.destroy());
 

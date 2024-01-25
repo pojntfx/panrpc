@@ -150,7 +150,7 @@ func main() {
 					}
 				}()
 
-				conn := websocket.NetConn(ctx, c, websocket.MessageBinary)
+				conn := websocket.NetConn(ctx, c, websocket.MessageText)
 				defer conn.Close()
 
 				encoder := json.NewEncoder(conn)
@@ -200,7 +200,7 @@ func main() {
 			panic(err)
 		}
 
-		conn := websocket.NetConn(ctx, c, websocket.MessageBinary)
+		conn := websocket.NetConn(ctx, c, websocket.MessageText)
 		defer conn.Close()
 
 		log.Println("Connected to", *addr)
