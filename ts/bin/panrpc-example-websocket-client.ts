@@ -2,8 +2,11 @@
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
+import Chain from "stream-chain";
+import p from "stream-json/jsonl/Parser";
+import Stringer from "stream-json/jsonl/Stringer";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
@@ -108,11 +111,17 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    registry.linkWebSocket(
-      socket,
+    const decoder = new Chain([p.parser(), (v) => v.value]);
+    socket.addEventListener("message", (m) => decoder.write(m.data));
+    socket.addEventListener("close", () => decoder.destroy());
 
-      JSON.stringify,
-      JSON.parse,
+    const encoder = new Stringer();
+    encoder.pipe(new Chain([(m) => socket.send(m)]));
+    socket.addEventListener("close", () => encoder.destroy());
+
+    registry.linkStream(
+      encoder,
+      decoder,
 
       (v) => v,
       (v) => v
@@ -123,22 +132,29 @@ if (listen) {
 } else {
   const socket = new WebSocket(`ws://${addr}`);
 
-  socket.addEventListener("close", (e) => {
-    console.error("Disconnected with error:", e.reason);
+  socket.addEventListener("error", (e) => {
+    console.error("Disconnected with error:", e);
 
     exit(1);
   });
+  socket.addEventListener("close", () => exit(0));
 
   await new Promise<void>((res, rej) => {
     socket.addEventListener("open", () => res());
     socket.addEventListener("error", rej);
   });
 
-  registry.linkWebSocket(
-    socket,
+  const decoder = new Chain([p.parser(), (v) => v.value]);
+  socket.addEventListener("message", (m) => decoder.write(m.data));
+  socket.addEventListener("close", () => decoder.destroy());
 
-    JSON.stringify,
-    JSON.parse,
+  const encoder = new Stringer();
+  encoder.pipe(new Chain([(m) => socket.send(m)]));
+  socket.addEventListener("close", () => encoder.destroy());
+
+  registry.linkStream(
+    encoder,
+    decoder,
 
     (v) => v,
     (v) => v

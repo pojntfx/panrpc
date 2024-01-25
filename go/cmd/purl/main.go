@@ -314,7 +314,7 @@ Flags:
 						panic(err)
 					}
 
-					connChan <- websocket.NetConn(ctx, c, websocket.MessageText)
+					connChan <- websocket.NetConn(ctx, c, websocket.MessageBinary)
 				default:
 					w.WriteHeader(http.StatusMethodNotAllowed)
 				}
@@ -363,7 +363,7 @@ Flags:
 				panic(err)
 			}
 
-			cc := websocket.NetConn(ctx, c, websocket.MessageText)
+			cc := websocket.NetConn(ctx, c, websocket.MessageBinary)
 
 			if *verbose {
 				log.Println("Connected to", cc.RemoteAddr())
