@@ -250,7 +250,6 @@ export class Registry<L extends Object, R extends Object> {
     );
 
     this.remotes[remoteID] = r;
-    this.options?.onClientConnect?.(remoteID);
 
     let closed = false;
 
@@ -271,6 +270,8 @@ export class Registry<L extends Object, R extends Object> {
         this.options?.onClientDisconnect?.(remoteID);
       }
     });
+
+    this.options?.onClientConnect?.(remoteID);
   };
 
   linkStream = <T>(

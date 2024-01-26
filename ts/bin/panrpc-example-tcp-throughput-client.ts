@@ -4,27 +4,21 @@ import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Socket, createServer } from "net";
 import Chain from "stream-chain";
-import { ILocalContext, Registry } from "../index";
+import { IRemoteContext, Registry } from "../index";
 
-class Local {
-  constructor(private buf: number[]) {
-    this.GetBytes = this.GetBytes.bind(this);
-  }
+class Local {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async GetBytes(ctx: ILocalContext): Promise<number[]> {
-    return this.buf;
+class Remote {
+  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars
+  async GetBytes(ctx: IRemoteContext): Promise<string[]> {
+    return [];
   }
 }
-
-class Remote {}
-
-const buffer = parseInt(env.BUFFER || `${1 * 1024 * 1024}`, 10);
 
 let clients = 0;
 
 const registry = new Registry(
-  new Local(new Array(buffer)),
+  new Local(),
   new Remote(),
 
   {
@@ -32,6 +26,43 @@ const registry = new Registry(
       clients++;
 
       console.log(clients, "clients connected");
+
+      (async () => {
+        let bytesTransferred = 0;
+        let currentRuns = 0;
+
+        const interval = setInterval(() => {
+          console.log(`${Math.round(bytesTransferred / (1024 * 1024))} MB/s`);
+          bytesTransferred = 0;
+
+          currentRuns++;
+          if (currentRuns >= runs) {
+            clearInterval(interval);
+            process.exit(0);
+          }
+        }, 1000);
+
+        await registry.forRemotes(async (remoteID, remote) => {
+          for (let i = 0; i < concurrency; i++) {
+            // eslint-disable-next-line @typescript-eslint/no-loop-func
+            (async () => {
+              // eslint-disable-next-line no-constant-condition
+              while (true) {
+                try {
+                  // eslint-disable-next-line no-await-in-loop
+                  const res = await remote.GetBytes(undefined);
+
+                  bytesTransferred += res.length;
+                } catch (e) {
+                  console.error(`Got error for GetBytes func: ${e}`);
+
+                  return;
+                }
+              }
+            })();
+          }
+        });
+      })();
     },
     onClientDisconnect: () => {
       clients--;
@@ -42,7 +73,9 @@ const registry = new Registry(
 );
 
 const addr = env.ADDR || "127.0.0.1:1337";
-const listen = env.LISTEN !== "false";
+const listen = env.LISTEN === "true";
+const concurrency = parseInt(env.CONCURRENCY || "512", 10);
+const runs = parseInt(env.RUNS || "10", 10);
 
 if (listen) {
   const u = parse(`tcp://${addr}`);
