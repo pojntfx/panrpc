@@ -2,8 +2,11 @@
 import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
+import { JSONParser } from "@streamparser/json-node";
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";
+import { Readable, Writable, Transform, TransformCallback } from "stream";
 import { ILocalContext, Registry } from "../index";
 
 class Local {
@@ -43,24 +46,81 @@ const registry = new Registry(
 
 const addr = env.ADDR || "127.0.0.1:1337";
 const listen = env.LISTEN !== "false";
+const serializer = env.SERIALIZER || "json";
 
 if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
+    let encoder: Writable;
+    let decoder: Readable;
+
+    switch (serializer) {
+      case "json":
+        encoder = new (class extends Transform {
+          _transform(
+            chunk: any,
+            encoding: BufferEncoding,
+            callback: TransformCallback
+          ) {
+            this.push(JSON.stringify(chunk));
+            callback();
+          }
+        })({
+          objectMode: true,
+        });
+        encoder.pipe(socket);
+
+        decoder = socket
+          .pipe(
+            new JSONParser({
+              paths: ["$"],
+              separator: "",
+            })
+          )
+          .pipe(
+            new (class extends Transform {
+              _transform(
+                chunk: any,
+                encoding: BufferEncoding,
+                callback: TransformCallback
+              ) {
+                this.push(chunk?.value);
+                callback();
+              }
+            })({
+              objectMode: true,
+            })
+          );
+
+        break;
+
+      case "cbor":
+        encoder = new EncoderStream({
+          useRecords: false,
+        });
+        encoder.pipe(socket);
+
+        decoder = socket.pipe(
+          new DecoderStream({
+            useRecords: false,
+          })
+        );
+
+        break;
+
+      default:
+        throw new Error("unknown serializer");
+    }
+
     socket.on("error", (e) => {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new DecoderStream({
-      useRecords: false,
+    socket.on("close", () => {
+      encoder.destroy();
+      decoder.destroy();
     });
-    socket.pipe(decoder);
-
-    const encoder = new EncoderStream({
-      useRecords: false,
-    });
-    encoder.pipe(socket);
 
     registry.linkStream(
       encoder,
@@ -101,15 +161,71 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  const decoder = new DecoderStream({
-    useRecords: false,
-  });
-  socket.pipe(decoder);
+  let encoder: Writable;
+  let decoder: Readable;
 
-  const encoder = new EncoderStream({
-    useRecords: false,
+  switch (serializer) {
+    case "json":
+      encoder = new (class extends Transform {
+        _transform(
+          chunk: any,
+          encoding: BufferEncoding,
+          callback: TransformCallback
+        ) {
+          this.push(JSON.stringify(chunk));
+          callback();
+        }
+      })({
+        objectMode: true,
+      });
+      encoder.pipe(socket);
+
+      decoder = socket
+        .pipe(
+          new JSONParser({
+            paths: ["$"],
+            separator: "",
+          })
+        )
+        .pipe(
+          new (class extends Transform {
+            _transform(
+              chunk: any,
+              encoding: BufferEncoding,
+              callback: TransformCallback
+            ) {
+              this.push(chunk?.value);
+              callback();
+            }
+          })({
+            objectMode: true,
+          })
+        );
+
+      break;
+
+    case "cbor":
+      encoder = new EncoderStream({
+        useRecords: false,
+      });
+      encoder.pipe(socket);
+
+      decoder = socket.pipe(
+        new DecoderStream({
+          useRecords: false,
+        })
+      );
+
+      break;
+
+    default:
+      throw new Error("unknown serializer");
+  }
+
+  socket.on("close", () => {
+    encoder.destroy();
+    decoder.destroy();
   });
-  encoder.pipe(socket);
 
   registry.linkStream(
     encoder,
