@@ -2,8 +2,8 @@
 import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
+import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";
-import Chain from "stream-chain";
 import {
   ILocalContext,
   IRemoteContext,
@@ -63,10 +63,14 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new Chain([(v) => JSON.parse(v)]);
+    const decoder = new DecoderStream({
+      useRecords: false,
+    });
     socket.pipe(decoder);
 
-    const encoder = new Chain([(v) => JSON.stringify(v)]);
+    const encoder = new EncoderStream({
+      useRecords: false,
+    });
     encoder.pipe(socket);
 
     registry.linkStream(
@@ -108,10 +112,14 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  const decoder = new Chain([(v) => JSON.parse(v)]);
+  const decoder = new DecoderStream({
+    useRecords: false,
+  });
   socket.pipe(decoder);
 
-  const encoder = new Chain([(v) => JSON.stringify(v)]);
+  const encoder = new EncoderStream({
+    useRecords: false,
+  });
   encoder.pipe(socket);
 
   registry.linkStream(
