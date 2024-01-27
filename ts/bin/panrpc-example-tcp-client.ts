@@ -3,8 +3,9 @@ import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { DecoderStream, EncoderStream } from "cbor-x";
+import { JSONParser } from "@streamparser/json-node";
 import { Socket, createServer } from "net";
+import { Transform, TransformCallback } from "stream";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
@@ -100,19 +101,50 @@ if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
+    const encoder = new (class extends Transform {
+      _transform(
+        chunk: any,
+        encoding: BufferEncoding,
+        callback: TransformCallback
+      ) {
+        this.push(JSON.stringify(chunk));
+        callback();
+      }
+    })({
+      objectMode: true,
+    });
+    encoder.pipe(socket);
+
+    const decoder = socket
+      .pipe(
+        new JSONParser({
+          paths: ["$"],
+          separator: "",
+        })
+      )
+      .pipe(
+        new (class extends Transform {
+          _transform(
+            chunk: any,
+            encoding: BufferEncoding,
+            callback: TransformCallback
+          ) {
+            this.push(chunk?.value);
+            callback();
+          }
+        })({
+          objectMode: true,
+        })
+      );
+
     socket.on("error", (e) => {
       console.error("Client disconnected with error:", e);
     });
 
-    const decoder = new DecoderStream({
-      useRecords: false,
+    socket.on("close", () => {
+      encoder.destroy();
+      decoder.destroy();
     });
-    socket.pipe(decoder);
-
-    const encoder = new EncoderStream({
-      useRecords: false,
-    });
-    encoder.pipe(socket);
 
     registry.linkStream(
       encoder,
@@ -153,15 +185,46 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  const decoder = new DecoderStream({
-    useRecords: false,
-  });
-  socket.pipe(decoder);
-
-  const encoder = new EncoderStream({
-    useRecords: false,
+  const encoder = new (class extends Transform {
+    _transform(
+      chunk: any,
+      encoding: BufferEncoding,
+      callback: TransformCallback
+    ) {
+      this.push(JSON.stringify(chunk));
+      callback();
+    }
+  })({
+    objectMode: true,
   });
   encoder.pipe(socket);
+
+  const decoder = socket
+    .pipe(
+      new JSONParser({
+        paths: ["$"],
+        separator: "",
+      })
+    )
+    .pipe(
+      new (class extends Transform {
+        _transform(
+          chunk: any,
+          encoding: BufferEncoding,
+          callback: TransformCallback
+        ) {
+          this.push(chunk?.value);
+          callback();
+        }
+      })({
+        objectMode: true,
+      })
+    );
+
+  socket.on("close", () => {
+    encoder.destroy();
+    decoder.destroy();
+  });
 
   registry.linkStream(
     encoder,
