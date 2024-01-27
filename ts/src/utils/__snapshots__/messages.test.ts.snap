@@ -1,23 +1,5 @@
 // Bun Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Nested encoding Message can marshal a message with a request set 1`] = `"{"request":"eyJjYWxsIjoiMSIsImZ1bmN0aW9uIjoiUHJpbnRsbiIsImFyZ3MiOlsiSWtobGJHeHZMQ0IzYjNKc1pDRWkiXX0=","response":""}"`;
-
-exports[`Nested encoding Message can unmarshal a message with a request set 1`] = `
-{
-  "request": "eyJjYWxsIjoiMSIsImZ1bmN0aW9uIjoiUHJpbnRsbiIsImFyZ3MiOlsiSWtobGJHeHZMQ0IzYjNKc1pDRWkiXX0=",
-  "response": "",
-}
-`;
-
-exports[`Nested encoding Message can marshal a message with a response set 1`] = `"{"request":"","response":"eyJjYWxsIjoiMSIsInZhbHVlIjoiZEhKMVpRPT0iLCJlcnIiOiIifQ=="}"`;
-
-exports[`Nested encoding Message can unmarshal a message with a response set 1`] = `
-{
-  "request": "",
-  "response": "eyJjYWxsIjoiMSIsInZhbHVlIjoiZEhKMVpRPT0iLCJlcnIiOiIifQ==",
-}
-`;
-
 exports[`Nested encoding Request can marshal a simple request 1`] = `"eyJjYWxsIjoiMSIsImZ1bmN0aW9uIjoiUHJpbnRsbiIsImFyZ3MiOlsiSWtobGJHeHZMQ0IzYjNKc1pDRWkiXX0="`;
 
 exports[`Nested encoding Request can unmarshal a simple request 1`] = `
@@ -92,34 +74,6 @@ exports[`Nested encoding Response can unmarshal a complex response with error 1`
     "b": {
       "c": "test",
     },
-  },
-}
-`;
-
-exports[`Flat encoding Message can marshal a message with a request set 1`] = `"{"request":{"call":"1","function":"Println","args":["Hello, world!"]},"response":""}"`;
-
-exports[`Flat encoding Message can unmarshal a message with a request set 1`] = `
-{
-  "request": {
-    "args": [
-      "Hello, world!",
-    ],
-    "call": "1",
-    "function": "Println",
-  },
-  "response": "",
-}
-`;
-
-exports[`Flat encoding Message can marshal a message with a response set 1`] = `"{"request":"","response":{"call":"1","value":true,"err":""}}"`;
-
-exports[`Flat encoding Message can unmarshal a message with a response set 1`] = `
-{
-  "request": "",
-  "response": {
-    "call": "1",
-    "err": "",
-    "value": true,
   },
 }
 `;

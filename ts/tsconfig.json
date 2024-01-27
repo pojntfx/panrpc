@@ -11,6 +11,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Node"
   }
 }
