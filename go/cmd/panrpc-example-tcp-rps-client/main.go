@@ -54,7 +54,7 @@ func main() {
 	listen := flag.Bool("listen", false, "Whether to allow connecting to remotes by listening or dialing")
 	concurrency := flag.Int("concurrency", 512, "Amount of concurrent calls to allow per client")
 	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
-	dataType := flag.String("data-type", "int", "Data type to test one of int, int8, int16, int32, rune, int64, uint, uint8, byte, uint16, uint32, uint64, uintptr, float32, float64, complex64, complex128, bool, string, array, slice, struct")
+	dataType := flag.String("data-type", "int", "Data type to test (one of int, int8, int16, int32, rune, int64, uint, uint8, byte, uint16, uint32, uint64, uintptr, float32, float64, complex64, complex128, bool, string, array, slice, struct)")
 	runs := flag.Int("runs", 10, "Amount of test runs to do before exiting")
 
 	flag.Parse()
