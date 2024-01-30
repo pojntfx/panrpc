@@ -1,7 +1,6 @@
 import { EventEmitter } from "events";
 import "reflect-metadata";
-import { Readable, Writable } from "stream";
-import Chain from "stream-chain";
+import { Readable, Transform, Writable } from "stream";
 import { v4 } from "uuid";
 import {
   IMessage,
@@ -167,87 +166,79 @@ export class Registry<L extends Object, R extends Object> {
 
     const remoteID = v4();
 
-    requestReader.pipe(
-      new Chain([
-        async (message: T) => {
-          const { call, functionName, args } = unmarshalRequest<T>(
-            message,
-            unmarshal
-          );
+    requestReader.on("data", async (message: T) => {
+      const { call, functionName, args } = unmarshalRequest<T>(
+        message,
+        unmarshal
+      );
 
-          let resp: T;
-          try {
-            if (functionName === constructorFunctionName) {
-              throw new Error(ErrorCannotCallNonFunction);
-            }
+      let resp: T;
+      try {
+        if (functionName === constructorFunctionName) {
+          throw new Error(ErrorCannotCallNonFunction);
+        }
 
-            let fn = (this.local as any)[functionName];
-            if (typeof fn !== "function") {
-              fn = (this.closureManager as any)[functionName];
+        let fn = (this.local as any)[functionName];
+        if (typeof fn !== "function") {
+          fn = (this.closureManager as any)[functionName];
 
-              if (typeof fn !== "function") {
-                throw new Error(ErrorCannotCallNonFunction);
-              }
-            }
-
-            const remoteClosureParameterIndexes: number[] | undefined =
-              Reflect.getMetadata(remoteClosureKey, this.local, functionName);
-
-            const ctx: ILocalContext = { remoteID };
-
-            const rv = await fn(
-              ctx,
-              ...args.map((closureID, index) =>
-                remoteClosureParameterIndexes?.includes(index + 1)
-                  ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
-                      const rpc = makeRPC<T>(
-                        "CallClosure",
-                        responseResolver,
-
-                        requestWriter,
-
-                        marshal,
-
-                        this.closureManager
-                      );
-
-                      return rpc(closureCtx, closureID, closureArgs);
-                    }
-                  : closureID
-              )
-            );
-
-            resp = marshalResponse<T>(call, rv, "", marshal);
-          } catch (e) {
-            resp = marshalResponse<T>(
-              call,
-              undefined,
-              (e as Error).message,
-              marshal
-            );
+          if (typeof fn !== "function") {
+            throw new Error(ErrorCannotCallNonFunction);
           }
+        }
 
-          await new Promise<void>((res, rej) => {
-            responseWriter.write(resp, (e) => (e ? rej(e) : res()));
-          });
-        },
-      ])
-    );
+        const remoteClosureParameterIndexes: number[] | undefined =
+          Reflect.getMetadata(remoteClosureKey, this.local, functionName);
 
-    responseReader.pipe(
-      new Chain([
-        async (message: T) => {
-          const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
+        const ctx: ILocalContext = { remoteID };
 
-          const callResponse: ICallResponse = {
-            value,
-            err,
-          };
+        const rv = await fn(
+          ctx,
+          ...args.map((closureID, index) =>
+            remoteClosureParameterIndexes?.includes(index + 1)
+              ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
+                  const rpc = makeRPC<T>(
+                    "CallClosure",
+                    responseResolver,
 
-          responseResolver.emit(`rpc:${call}`, callResponse);
-        },
-      ])
-    );
+                    requestWriter,
+
+                    marshal,
+
+                    this.closureManager
+                  );
+
+                  return rpc(closureCtx, closureID, closureArgs);
+                }
+              : closureID
+          )
+        );
+
+        resp = marshalResponse<T>(call, rv, "", marshal);
+      } catch (e) {
+        resp = marshalResponse<T>(
+          call,
+          undefined,
+          (e as Error).message,
+          marshal
+        );
+      }
+
+      await new Promise<void>((res, rej) => {
+        responseWriter.write(resp, (e) => (e ? rej(e) : res()));
+      });
+    });
+
+    responseReader.on("data", async (message: T) => {
+      const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
+
+      const callResponse: ICallResponse = {
+        value,
+        err,
+      };
+
+      responseResolver.emit(`rpc:${call}`, callResponse);
+    });
 
     this.remotes[remoteID] = r;
 
@@ -281,43 +272,59 @@ export class Registry<L extends Object, R extends Object> {
     marshal: (value: any) => T,
     unmarshal: (text: T) => any
   ) => {
-    const requestWriter = new Chain([
-      (v: T) => {
-        const msg: IMessage<T> = { request: v };
+    const requestWriter = new Transform({
+      objectMode: true,
+      transform(chunk: T, encoding, callback) {
+        const msg: IMessage<T> = { request: chunk };
 
-        return msg;
+        this.push(msg);
+
+        callback();
       },
-    ]);
+    });
     requestWriter.pipe(encoder);
 
-    const responseWriter = new Chain([
-      (v: T) => {
-        const msg: IMessage<T> = { response: v };
+    const responseWriter = new Transform({
+      objectMode: true,
+      transform(chunk: T, encoding, callback) {
+        const msg: IMessage<T> = { response: chunk };
 
-        return msg;
+        this.push(msg);
+
+        callback();
       },
-    ]);
+    });
     responseWriter.pipe(encoder);
 
-    const requestReader = new Chain([(v: T) => v]);
-    const responseReader = new Chain([(v: T) => v]);
+    const requestReader = new Transform({
+      objectMode: true,
+      transform(chunk: T, encoding, callback) {
+        this.push(chunk);
+
+        callback();
+      },
+    });
+    const responseReader = new Transform({
+      objectMode: true,
+      transform(chunk: T, encoding, callback) {
+        this.push(chunk);
+
+        callback();
+      },
+    });
 
     decoder.on("close", () => {
       requestReader.destroy();
       responseReader.destroy();
     });
 
-    decoder.pipe(
-      new Chain([
-        (msg: IMessage<T>) => {
-          if (msg.request) {
-            requestReader.write(msg.request);
-          } else {
-            responseReader.write(msg.response);
-          }
-        },
-      ])
-    );
+    decoder.on("data", (msg: IMessage<T>) => {
+      if (msg.request) {
+        requestReader.write(msg.request);
+      } else {
+        responseReader.write(msg.response);
+      }
+    });
 
     this.linkMessage(
       requestWriter,
