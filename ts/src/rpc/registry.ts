@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import "reflect-metadata";
-import { Readable, Transform, Writable } from "stream";
+import { PassThrough, Readable, Writable } from "stream";
 import { v4 } from "uuid";
 import {
   IMessage,
@@ -272,45 +272,29 @@ export class Registry<L extends Object, R extends Object> {
     marshal: (value: any) => T,
     unmarshal: (text: T) => any
   ) => {
-    const requestWriter = new Transform({
+    const requestWriter = new Writable({
       objectMode: true,
-      transform(chunk: T, encoding, callback) {
+      write(chunk: T, encoding, callback) {
         const msg: IMessage<T> = { request: chunk };
 
-        this.push(msg);
-
-        callback();
+        encoder.write(msg, callback);
       },
     });
-    requestWriter.pipe(encoder);
 
-    const responseWriter = new Transform({
+    const responseWriter = new Writable({
       objectMode: true,
-      transform(chunk: T, encoding, callback) {
+      write(chunk: T, encoding, callback) {
         const msg: IMessage<T> = { response: chunk };
 
-        this.push(msg);
-
-        callback();
+        encoder.write(msg, callback);
       },
     });
-    responseWriter.pipe(encoder);
 
-    const requestReader = new Transform({
+    const requestReader = new PassThrough({
       objectMode: true,
-      transform(chunk: T, encoding, callback) {
-        this.push(chunk);
-
-        callback();
-      },
     });
-    const responseReader = new Transform({
+    const responseReader = new PassThrough({
       objectMode: true,
-      transform(chunk: T, encoding, callback) {
-        this.push(chunk);
-
-        callback();
-      },
     });
 
     decoder.on("close", () => {
