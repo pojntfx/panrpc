@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
 import "reflect-metadata";
-import { v4 } from "uuid";
 import {
   IMessage,
   marshalRequest,
@@ -79,7 +78,7 @@ const makeRPC =
         return arg;
       });
 
-      const callID = v4();
+      const callID = crypto.randomUUID();
 
       const abortListener = () => {
         ctx?.signal?.removeEventListener("abort", abortListener);
@@ -164,7 +163,7 @@ export class Registry<L extends Object, R extends Object> {
 
     let closed = false;
 
-    const remoteID = v4();
+    const remoteID = crypto.randomUUID();
 
     const that = this;
 
