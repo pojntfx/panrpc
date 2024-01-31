@@ -5,7 +5,7 @@ import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { JSONParser } from "@streamparser/json-node";
 import { Socket, createServer } from "net";
-import { Transform, TransformCallback, Readable, Writable } from "stream";
+import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {

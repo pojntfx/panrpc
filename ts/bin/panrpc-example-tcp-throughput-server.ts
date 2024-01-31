@@ -6,7 +6,7 @@ import { JSONParser } from "@streamparser/json-node";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";
-import { Readable, Writable, Transform, TransformCallback } from "stream";
+import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { ILocalContext, Registry } from "../index";
 
 class Local {
@@ -123,8 +123,8 @@ if (listen) {
     });
 
     registry.linkStream(
-      encoder,
-      decoder,
+      Writable.toWeb(encoder),
+      Readable.toWeb(decoder),
 
       (v) => v,
       (v) => v
@@ -228,8 +228,8 @@ if (listen) {
   });
 
   registry.linkStream(
-    encoder,
-    decoder,
+    Writable.toWeb(encoder),
+    Readable.toWeb(decoder),
 
     (v) => v,
     (v) => v

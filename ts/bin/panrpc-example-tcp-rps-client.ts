@@ -396,8 +396,8 @@ if (listen) {
     });
 
     registry.linkStream(
-      encoder,
-      decoder,
+      Writable.toWeb(encoder),
+      Readable.toWeb(decoder),
 
       (v) => v,
       (v) => v
@@ -501,8 +501,8 @@ if (listen) {
   });
 
   registry.linkStream(
-    encoder,
-    decoder,
+    Writable.toWeb(encoder),
+    Readable.toWeb(decoder),
 
     (v) => v,
     (v) => v

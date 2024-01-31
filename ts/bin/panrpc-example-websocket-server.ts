@@ -3,7 +3,7 @@
 import { JSONParser } from "@streamparser/json-node";
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { Transform, TransformCallback } from "stream";
+import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocket, WebSocketServer } from "ws";
@@ -148,8 +148,8 @@ if (listen) {
     });
 
     registry.linkStream(
-      encoder,
-      decoder,
+      Writable.toWeb(encoder),
+      Readable.toWeb(decoder),
 
       (v) => v,
       (v) => v
@@ -213,8 +213,8 @@ if (listen) {
   });
 
   registry.linkStream(
-    encoder,
-    decoder,
+    Writable.toWeb(encoder),
+    Readable.toWeb(decoder),
 
     (v) => v,
     (v) => v
