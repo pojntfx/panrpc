@@ -5,7 +5,7 @@ import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { JSONParser } from "@streamparser/json-node";
 import { Socket, createServer } from "net";
-import { Transform, TransformCallback } from "stream";
+import { Transform, TransformCallback, Readable, Writable } from "stream";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
@@ -143,8 +143,8 @@ if (listen) {
     });
 
     registry.linkStream(
-      encoder,
-      decoder,
+      Writable.toWeb(encoder),
+      Readable.toWeb(decoder),
 
       (v) => v,
       (v) => v
@@ -223,8 +223,8 @@ if (listen) {
   });
 
   registry.linkStream(
-    encoder,
-    decoder,
+    Writable.toWeb(encoder),
+    Readable.toWeb(decoder),
 
     (v) => v,
     (v) => v

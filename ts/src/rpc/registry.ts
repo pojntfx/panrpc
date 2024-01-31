@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
 import "reflect-metadata";
-import { PassThrough, Readable, Writable } from "stream";
 import { v4 } from "uuid";
 import {
   IMessage,
@@ -50,7 +49,7 @@ const makeRPC =
     name: string,
     responseResolver: EventEmitter,
 
-    requestWriter: Writable,
+    writeRequest: WritableStreamDefaultWriter<T>["write"],
 
     marshal: (value: any) => T,
 
@@ -108,10 +107,7 @@ const makeRPC =
       };
       responseResolver.addListener(`rpc:${callID}`, returnListener);
 
-      requestWriter.write(
-        marshalRequest<T>(callID, name, args, marshal),
-        (e) => e && rej(e)
-      );
+      writeRequest(marshalRequest<T>(callID, name, args, marshal)).catch(rej);
     });
 
 export class Registry<L extends Object, R extends Object> {
@@ -131,11 +127,11 @@ export class Registry<L extends Object, R extends Object> {
   }
 
   linkMessage = <T>(
-    requestWriter: Writable,
-    responseWriter: Writable,
+    writeRequest: WritableStreamDefaultWriter<T>["write"],
+    writeResponse: WritableStreamDefaultWriter<T>["write"],
 
-    requestReader: Readable,
-    responseReader: Readable,
+    readRequest: ReadableStreamDefaultReader<T>["read"],
+    readResponse: ReadableStreamDefaultReader<T>["read"],
 
     marshal: (value: any) => T,
     unmarshal: (text: T) => any
@@ -156,7 +152,7 @@ export class Registry<L extends Object, R extends Object> {
         functionName,
         responseResolver,
 
-        requestWriter,
+        writeRequest,
 
         marshal,
 
@@ -164,158 +160,232 @@ export class Registry<L extends Object, R extends Object> {
       );
     }
 
-    const remoteID = v4();
-
-    requestReader.on("data", async (message: T) => {
-      const { call, functionName, args } = unmarshalRequest<T>(
-        message,
-        unmarshal
-      );
-
-      let resp: T;
-      try {
-        if (functionName === constructorFunctionName) {
-          throw new Error(ErrorCannotCallNonFunction);
-        }
-
-        let fn = (this.local as any)[functionName];
-        if (typeof fn !== "function") {
-          fn = (this.closureManager as any)[functionName];
-
-          if (typeof fn !== "function") {
-            throw new Error(ErrorCannotCallNonFunction);
-          }
-        }
-
-        const remoteClosureParameterIndexes: number[] | undefined =
-          Reflect.getMetadata(remoteClosureKey, this.local, functionName);
-
-        const ctx: ILocalContext = { remoteID };
-
-        const rv = await fn(
-          ctx,
-          ...args.map((closureID, index) =>
-            remoteClosureParameterIndexes?.includes(index + 1)
-              ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
-                  const rpc = makeRPC<T>(
-                    "CallClosure",
-                    responseResolver,
-
-                    requestWriter,
-
-                    marshal,
-
-                    this.closureManager
-                  );
-
-                  return rpc(closureCtx, closureID, closureArgs);
-                }
-              : closureID
-          )
-        );
-
-        resp = marshalResponse<T>(call, rv, "", marshal);
-      } catch (e) {
-        resp = marshalResponse<T>(
-          call,
-          undefined,
-          (e as Error).message,
-          marshal
-        );
-      }
-
-      await new Promise<void>((res, rej) => {
-        responseWriter.write(resp, (e) => (e ? rej(e) : res()));
-      });
-    });
-
-    responseReader.on("data", async (message: T) => {
-      const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
-
-      const callResponse: ICallResponse = {
-        value,
-        err,
-      };
-
-      responseResolver.emit(`rpc:${call}`, callResponse);
-    });
-
-    this.remotes[remoteID] = r;
-
     let closed = false;
 
-    requestReader.on("close", () => {
-      if (!closed) {
-        closed = true;
+    const remoteID = v4();
 
-        delete this.remotes[remoteID];
-        this.options?.onClientDisconnect?.(remoteID);
+    const processRequest = async ({
+      done,
+      value: message,
+    }: {
+      done: boolean;
+      value?: T;
+    }) => {
+      if (done) {
+        if (!closed) {
+          closed = true;
+
+          delete this.remotes[remoteID];
+          this.options?.onClientDisconnect?.(remoteID);
+        }
+
+        return;
       }
-    });
 
-    responseReader.on("close", () => {
-      if (!closed) {
-        closed = true;
+      if (!message) {
+        readRequest().then(processRequest);
 
-        delete this.remotes[remoteID];
-        this.options?.onClientDisconnect?.(remoteID);
+        return;
       }
-    });
+
+      try {
+        const { call, functionName, args } = unmarshalRequest<T>(
+          message,
+          unmarshal
+        );
+
+        let resp: T;
+        try {
+          if (functionName === constructorFunctionName) {
+            throw new Error(ErrorCannotCallNonFunction);
+          }
+
+          let fn = (this.local as any)[functionName];
+          if (typeof fn !== "function") {
+            fn = (this.closureManager as any)[functionName];
+
+            if (typeof fn !== "function") {
+              throw new Error(ErrorCannotCallNonFunction);
+            }
+          }
+
+          const remoteClosureParameterIndexes: number[] | undefined =
+            Reflect.getMetadata(remoteClosureKey, this.local, functionName);
+
+          const ctx: ILocalContext = { remoteID };
+
+          const rv = await fn(
+            ctx,
+            ...args.map((closureID, index) =>
+              remoteClosureParameterIndexes?.includes(index + 1)
+                ? (closureCtx: IRemoteContext, ...closureArgs: any[]) => {
+                    const rpc = makeRPC<T>(
+                      "CallClosure",
+                      responseResolver,
+
+                      writeRequest,
+
+                      marshal,
+
+                      this.closureManager
+                    );
+
+                    return rpc(closureCtx, closureID, closureArgs);
+                  }
+                : closureID
+            )
+          );
+
+          resp = marshalResponse<T>(call, rv, "", marshal);
+        } catch (e) {
+          resp = marshalResponse<T>(
+            call,
+            undefined,
+            (e as Error).message,
+            marshal
+          );
+        }
+
+        await writeResponse(resp);
+      } finally {
+        readRequest().then(processRequest);
+      }
+    };
+    readRequest().then(processRequest);
+
+    const processResponse = async ({
+      done,
+      value: message,
+    }: {
+      done: boolean;
+      value?: T;
+    }) => {
+      if (done) {
+        if (!closed) {
+          closed = true;
+
+          delete this.remotes[remoteID];
+          this.options?.onClientDisconnect?.(remoteID);
+        }
+
+        return;
+      }
+
+      if (!message) {
+        readResponse().then(processResponse);
+
+        return;
+      }
+
+      try {
+        const { call, value, err } = unmarshalResponse<T>(message, unmarshal);
+
+        const callResponse: ICallResponse = {
+          value,
+          err,
+        };
+
+        responseResolver.emit(`rpc:${call}`, callResponse);
+      } finally {
+        readResponse().then(processResponse);
+      }
+    };
+    readResponse().then(processResponse);
+
+    this.remotes[remoteID] = r;
 
     this.options?.onClientConnect?.(remoteID);
   };
 
   linkStream = <T>(
-    encoder: Writable,
-    decoder: Readable,
+    encoder: WritableStream,
+    decoder: ReadableStream,
 
     marshal: (value: any) => T,
     unmarshal: (text: T) => any
   ) => {
-    const requestWriter = new Writable({
-      objectMode: true,
-      write(chunk: T, encoding, callback) {
+    const encoderWriter = encoder.getWriter();
+
+    const requestWriter = new WritableStream({
+      write(chunk: T) {
         const msg: IMessage<T> = { request: chunk };
 
-        encoder.write(msg, callback);
+        return encoderWriter.write(msg);
       },
     });
 
-    const responseWriter = new Writable({
-      objectMode: true,
-      write(chunk: T, encoding, callback) {
+    const responseWriter = new WritableStream({
+      write(chunk: T) {
         const msg: IMessage<T> = { response: chunk };
 
-        encoder.write(msg, callback);
+        return encoderWriter.write(msg);
       },
     });
 
-    const requestReader = new PassThrough({
-      objectMode: true,
-    });
-    const responseReader = new PassThrough({
-      objectMode: true,
+    const [requestDecoder, responseDecoder] = decoder.tee();
+    const [requestDecoderReader, responseDecoderReader] = [
+      requestDecoder.getReader(),
+      responseDecoder.getReader(),
+    ];
+
+    const requestReader = new ReadableStream({
+      start(controller) {
+        requestDecoderReader
+          .read()
+          .then(function process({
+            done,
+            value: message,
+          }: {
+            done: boolean;
+            value?: IMessage<T>;
+          }) {
+            if (done) {
+              controller.close();
+
+              return;
+            }
+
+            if (message?.request) {
+              controller.enqueue(unmarshal(message?.request));
+            }
+
+            requestDecoderReader.read().then(process);
+          });
+      },
     });
 
-    decoder.on("close", () => {
-      requestReader.destroy();
-      responseReader.destroy();
-    });
+    const responseReader = new ReadableStream({
+      start(controller) {
+        responseDecoderReader
+          .read()
+          .then(function process({
+            done,
+            value: message,
+          }: {
+            done: boolean;
+            value?: IMessage<T>;
+          }) {
+            if (done) {
+              controller.close();
 
-    decoder.on("data", (msg: IMessage<T>) => {
-      if (msg.request) {
-        requestReader.write(msg.request);
-      } else {
-        responseReader.write(msg.response);
-      }
+              return;
+            }
+
+            if (message?.response) {
+              controller.enqueue(unmarshal(message?.response));
+            }
+
+            responseDecoderReader.read().then(process);
+          });
+      },
     });
 
     this.linkMessage(
-      requestWriter,
-      responseWriter,
+      requestWriter.getWriter().write,
+      responseWriter.getWriter().write,
 
-      requestReader,
-      responseReader,
+      requestReader.getReader().read,
+      responseReader.getReader().read,
 
       marshal,
       unmarshal
