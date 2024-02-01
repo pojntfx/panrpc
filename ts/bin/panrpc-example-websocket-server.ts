@@ -145,10 +145,7 @@ if (listen) {
     const parserWriter = parser.writable.getWriter();
     socket.addEventListener("message", (m) => parserWriter.write(m.data));
 
-    socket.addEventListener("close", () => {
-      encoder.close();
-      decoder.cancel();
-    });
+    socket.addEventListener("close", () => parserReader.cancel());
 
     registry.linkStream(
       encoder,
@@ -214,10 +211,7 @@ if (listen) {
   const parserWriter = parser.writable.getWriter();
   socket.addEventListener("message", (m) => parserWriter.write(m.data));
 
-  socket.addEventListener("close", () => {
-    encoder.close();
-    decoder.cancel();
-  });
+  socket.addEventListener("close", () => parserReader.cancel());
 
   registry.linkStream(
     encoder,
