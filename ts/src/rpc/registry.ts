@@ -1,4 +1,3 @@
-import { EventEmitter } from "events";
 import "reflect-metadata";
 import {
   IMessage,
@@ -46,7 +45,7 @@ export const remoteClosure = (
 const makeRPC =
   <T>(
     name: string,
-    responseResolver: EventEmitter,
+    responseResolver: EventTarget,
 
     requestWriter: WritableStreamDefaultWriter<T>,
 
@@ -89,12 +88,16 @@ const makeRPC =
           err: ErrorCallCancelled,
         };
 
-        responseResolver.emit(`rpc:${callID}`, callResponse);
+        responseResolver.dispatchEvent(
+          new CustomEvent(`rpc:${callID}`, { detail: callResponse })
+        );
       };
       ctx?.signal?.addEventListener("abort", abortListener);
 
-      const returnListener = ({ value, err }: ICallResponse) => {
-        responseResolver.removeListener(`rpc:${callID}`, returnListener);
+      const returnListener = (event: Event) => {
+        const { value, err } = (event as CustomEvent<ICallResponse>).detail;
+
+        responseResolver.removeEventListener(`rpc:${callID}`, returnListener);
 
         closureFreers.map((free) => free());
 
@@ -104,7 +107,7 @@ const makeRPC =
           res(value);
         }
       };
-      responseResolver.addListener(`rpc:${callID}`, returnListener);
+      responseResolver.addEventListener(`rpc:${callID}`, returnListener);
 
       requestWriter
         .write(marshalRequest<T>(callID, name, args, marshal))
@@ -137,7 +140,7 @@ export class Registry<L extends Object, R extends Object> {
     marshal: (value: any) => T,
     unmarshal: (text: T) => any
   ) => {
-    const responseResolver = new EventEmitter();
+    const responseResolver = new EventTarget();
 
     const r: R = {} as R;
     // eslint-disable-next-line no-restricted-syntax
@@ -291,7 +294,9 @@ export class Registry<L extends Object, R extends Object> {
             err,
           };
 
-          responseResolver.emit(`rpc:${call}`, callResponse);
+          responseResolver.dispatchEvent(
+            new CustomEvent(`rpc:${call}`, { detail: callResponse })
+          );
         } finally {
           responseReader.read().then(process);
         }
