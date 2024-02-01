@@ -1,9 +1,8 @@
 /* eslint-disable no-console */
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { JSONParser } from "@streamparser/json-node";
+import { JSONParser } from "@streamparser/json-whatwg";
 import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
-import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocket, WebSocketServer } from "ws";
@@ -107,49 +106,53 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const encoder = new (class extends Transform {
-      _transform(
-        chunk: any,
-        encoding: BufferEncoding,
-        callback: TransformCallback
-      ) {
-        this.push(JSON.stringify(chunk));
-        callback();
-      }
-    })({
-      objectMode: true,
-    });
-    encoder.addListener("data", (chunk) => socket.send(chunk));
-
-    const decoder = new (class extends Transform {
-      _transform(
-        chunk: any,
-        encoding: BufferEncoding,
-        callback: TransformCallback
-      ) {
-        this.push(chunk?.value);
-        callback();
-      }
-    })({
-      objectMode: true,
+    const encoder = new WritableStream({
+      write(chunk) {
+        socket.send(JSON.stringify(chunk));
+      },
     });
 
     const parser = new JSONParser({
       paths: ["$"],
       separator: "",
     });
-    parser.pipe(decoder);
 
-    socket.addEventListener("message", (m) => parser.write(m.data));
+    const parserReader = parser.readable.getReader();
+    const decoder = new ReadableStream({
+      start(controller) {
+        parserReader
+          .read()
+          .then(function process({
+            done,
+            value: message,
+          }: {
+            done: boolean;
+            value?: any;
+          }) {
+            if (done) {
+              controller.close();
+
+              return;
+            }
+
+            controller.enqueue(message?.value);
+
+            parserReader.read().then(process);
+          });
+      },
+    });
+
+    const parserWriter = parser.writable.getWriter();
+    socket.addEventListener("message", (m) => parserWriter.write(m.data));
 
     socket.addEventListener("close", () => {
-      encoder.destroy();
-      decoder.destroy();
+      encoder.close();
+      decoder.cancel();
     });
 
     registry.linkStream(
-      Writable.toWeb(encoder),
-      Readable.toWeb(decoder),
+      encoder,
+      decoder,
 
       (v) => v,
       (v) => v
@@ -172,49 +175,53 @@ if (listen) {
     socket.addEventListener("error", rej);
   });
 
-  const encoder = new (class extends Transform {
-    _transform(
-      chunk: any,
-      encoding: BufferEncoding,
-      callback: TransformCallback
-    ) {
-      this.push(JSON.stringify(chunk));
-      callback();
-    }
-  })({
-    objectMode: true,
-  });
-  encoder.addListener("data", (chunk) => socket.send(chunk));
-
-  const decoder = new (class extends Transform {
-    _transform(
-      chunk: any,
-      encoding: BufferEncoding,
-      callback: TransformCallback
-    ) {
-      this.push(chunk?.value);
-      callback();
-    }
-  })({
-    objectMode: true,
+  const encoder = new WritableStream({
+    write(chunk) {
+      socket.send(JSON.stringify(chunk));
+    },
   });
 
   const parser = new JSONParser({
     paths: ["$"],
     separator: "",
   });
-  parser.pipe(decoder);
 
-  socket.addEventListener("message", (m) => parser.write(m.data));
+  const parserReader = parser.readable.getReader();
+  const decoder = new ReadableStream({
+    start(controller) {
+      parserReader
+        .read()
+        .then(function process({
+          done,
+          value: message,
+        }: {
+          done: boolean;
+          value?: any;
+        }) {
+          if (done) {
+            controller.close();
+
+            return;
+          }
+
+          controller.enqueue(message?.value);
+
+          parserReader.read().then(process);
+        });
+    },
+  });
+
+  const parserWriter = parser.writable.getWriter();
+  socket.addEventListener("message", (m) => parserWriter.write(m.data));
 
   socket.addEventListener("close", () => {
-    encoder.destroy();
-    decoder.destroy();
+    encoder.close();
+    decoder.cancel();
   });
 
   registry.linkStream(
-    Writable.toWeb(encoder),
-    Readable.toWeb(decoder),
+    encoder,
+    decoder,
 
     (v) => v,
     (v) => v
