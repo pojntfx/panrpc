@@ -358,15 +358,22 @@ export class Registry<L extends Object, R extends Object> {
             }
 
             if (!message?.request) {
-              messageDecoderForRequestsReader.read().then(process);
+              messageDecoderForRequestsReader
+                .read()
+                .then(process)
+                .catch((e) => controller.error(e));
 
               return;
             }
 
             controller.enqueue(unmarshal(message?.request));
 
-            messageDecoderForRequestsReader.read().then(process);
-          });
+            messageDecoderForRequestsReader
+              .read()
+              .then(process)
+              .catch((e) => controller.error(e));
+          })
+          .catch((e) => controller.error(e));
       },
     });
 
@@ -388,15 +395,22 @@ export class Registry<L extends Object, R extends Object> {
             }
 
             if (!message?.response) {
-              messageDecoderForResponsesReader.read().then(process);
+              messageDecoderForResponsesReader
+                .read()
+                .then(process)
+                .catch((e) => controller.error(e));
 
               return;
             }
 
             controller.enqueue(unmarshal(message?.response));
 
-            messageDecoderForResponsesReader.read().then(process);
-          });
+            messageDecoderForResponsesReader
+              .read()
+              .then(process)
+              .catch((e) => controller.error(e));
+          })
+          .catch((e) => controller.error(e));
       },
     });
 
