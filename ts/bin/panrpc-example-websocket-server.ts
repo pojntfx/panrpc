@@ -3,7 +3,7 @@ import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { DecoderStream, EncoderStream } from "cbor-x";
+import { JSONParser } from "@streamparser/json-whatwg";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocket, WebSocketServer } from "ws";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
@@ -106,28 +106,44 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
-    const marshaller = new EncoderStream({
-      useRecords: false,
-    });
-    marshaller.on("data", (chunk) => socket.send(chunk));
     const encoder = new WritableStream({
       write(chunk) {
-        marshaller.write(chunk);
+        socket.send(JSON.stringify(chunk));
       },
     });
 
-    const parser = new DecoderStream({
-      useRecords: false,
+    const parser = new JSONParser({
+      paths: ["$"],
+      separator: "",
     });
+    const parserWriter = parser.writable.getWriter();
+    const parserReader = parser.readable.getReader();
     const decoder = new ReadableStream({
       start(controller) {
-        parser.on("data", (chunk) => controller.enqueue(chunk));
-        parser.on("close", () => controller.close());
-        parser.on("error", () => controller.error());
+        parserReader
+          .read()
+          .then(async function process({ done, value }) {
+            if (done) {
+              controller.close();
+
+              return;
+            }
+
+            controller.enqueue(value?.value);
+
+            parserReader
+              .read()
+              .then(process)
+              .catch((e) => controller.error(e));
+          })
+          .catch((e) => controller.error(e));
       },
     });
-    socket.addEventListener("message", (m) => parser.write(m.data));
-    socket.addEventListener("close", () => parser.destroy());
+    socket.addEventListener("message", (m) => parserWriter.write(m.data));
+    socket.addEventListener("close", () => {
+      parserReader.cancel();
+      parserWriter.abort();
+    });
 
     registry.linkStream(
       encoder,
@@ -154,28 +170,44 @@ if (listen) {
     socket.addEventListener("error", rej);
   });
 
-  const marshaller = new EncoderStream({
-    useRecords: false,
-  });
-  marshaller.on("data", (chunk) => socket.send(chunk));
   const encoder = new WritableStream({
     write(chunk) {
-      marshaller.write(chunk);
+      socket.send(JSON.stringify(chunk));
     },
   });
 
-  const parser = new DecoderStream({
-    useRecords: false,
+  const parser = new JSONParser({
+    paths: ["$"],
+    separator: "",
   });
+  const parserWriter = parser.writable.getWriter();
+  const parserReader = parser.readable.getReader();
   const decoder = new ReadableStream({
     start(controller) {
-      parser.on("data", (chunk) => controller.enqueue(chunk));
-      parser.on("close", () => controller.close());
-      parser.on("error", () => controller.error());
+      parserReader
+        .read()
+        .then(async function process({ done, value }) {
+          if (done) {
+            controller.close();
+
+            return;
+          }
+
+          controller.enqueue(value?.value);
+
+          parserReader
+            .read()
+            .then(process)
+            .catch((e) => controller.error(e));
+        })
+        .catch((e) => controller.error(e));
     },
   });
-  socket.addEventListener("message", (m) => parser.write(m.data));
-  socket.addEventListener("close", () => parser.destroy());
+  socket.addEventListener("message", (m) => parserWriter.write(m.data));
+  socket.addEventListener("close", () => {
+    parserReader.cancel();
+    parserWriter.close();
+  });
 
   registry.linkStream(
     encoder,
