@@ -116,7 +116,25 @@ if (listen) {
     marshaller.on("data", (chunk) => socket.send(chunk));
     const encoder = new WritableStream({
       write(chunk) {
-        marshaller.write(chunk);
+        return new Promise<void>((res) => {
+          const isDrained = marshaller.write(chunk, "utf8");
+
+          if (!isDrained) {
+            marshaller.once("drain", res);
+          } else {
+            res();
+          }
+        });
+      },
+      close() {
+        return new Promise((res) => {
+          marshaller.end(res);
+        });
+      },
+      abort(reason) {
+        marshaller.destroy(
+          reason instanceof Error ? reason : new Error(reason)
+        );
       },
     });
 
@@ -125,9 +143,22 @@ if (listen) {
     });
     const decoder = new ReadableStream({
       start(controller) {
-        parser.on("data", (chunk) => controller.enqueue(chunk));
-        parser.on("close", () => controller.close());
-        parser.on("error", () => controller.error());
+        parser.on("data", (chunk) => {
+          controller.enqueue(chunk);
+
+          if (controller.desiredSize && controller.desiredSize <= 0) {
+            parser.pause();
+          }
+        });
+
+        parser.on("end", () => controller.close());
+        parser.on("error", (err) => controller.error(err));
+      },
+      pull() {
+        parser.resume();
+      },
+      cancel() {
+        parser.destroy();
       },
     });
     socket.addEventListener("message", (m) => parser.write(m.data));
@@ -164,7 +195,23 @@ if (listen) {
   marshaller.on("data", (chunk) => socket.send(chunk));
   const encoder = new WritableStream({
     write(chunk) {
-      marshaller.write(chunk);
+      return new Promise<void>((res) => {
+        const isDrained = marshaller.write(chunk, "utf8");
+
+        if (!isDrained) {
+          marshaller.once("drain", res);
+        } else {
+          res();
+        }
+      });
+    },
+    close() {
+      return new Promise((res) => {
+        marshaller.end(res);
+      });
+    },
+    abort(reason) {
+      marshaller.destroy(reason instanceof Error ? reason : new Error(reason));
     },
   });
 
@@ -173,9 +220,22 @@ if (listen) {
   });
   const decoder = new ReadableStream({
     start(controller) {
-      parser.on("data", (chunk) => controller.enqueue(chunk));
-      parser.on("close", () => controller.close());
-      parser.on("error", () => controller.error());
+      parser.on("data", (chunk) => {
+        controller.enqueue(chunk);
+
+        if (controller.desiredSize && controller.desiredSize <= 0) {
+          parser.pause();
+        }
+      });
+
+      parser.on("end", () => controller.close());
+      parser.on("error", (err) => controller.error(err));
+    },
+    pull() {
+      parser.resume();
+    },
+    cancel() {
+      parser.destroy();
     },
   });
   socket.addEventListener("message", (m) => parser.write(m.data));
