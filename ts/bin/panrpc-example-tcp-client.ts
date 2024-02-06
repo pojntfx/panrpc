@@ -3,7 +3,7 @@ import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { JSONParser } from "@streamparser/json-whatwg";
+import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
@@ -100,13 +100,17 @@ if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
+    const marshaller = new EncoderStream({
+      useRecords: false,
+    });
+    marshaller.pipe(socket as unknown as WritableStream);
     const encoder = new WritableStream({
       write(chunk) {
         return new Promise<void>((res) => {
-          const isDrained = socket.write(JSON.stringify(chunk));
+          const isDrained = marshaller.write(chunk, "utf8");
 
           if (!isDrained) {
-            socket.once("drain", res);
+            marshaller.once("drain", res);
           } else {
             res();
           }
@@ -114,46 +118,41 @@ if (listen) {
       },
       close() {
         return new Promise((res) => {
-          socket.end(res);
+          marshaller.end(res);
         });
       },
       abort(reason) {
-        socket.destroy(reason instanceof Error ? reason : new Error(reason));
+        marshaller.destroy(
+          reason instanceof Error ? reason : new Error(reason)
+        );
       },
     });
 
-    const parser = new JSONParser({
-      paths: ["$"],
-      separator: "",
+    const parser = new DecoderStream({
+      useRecords: false,
     });
-    const parserWriter = parser.writable.getWriter();
-    const parserReader = parser.readable.getReader();
     const decoder = new ReadableStream({
       start(controller) {
-        parserReader
-          .read()
-          .then(async function process({ done, value }) {
-            if (done) {
-              controller.close();
+        parser.on("data", (chunk) => {
+          controller.enqueue(chunk);
 
-              return;
-            }
+          if (controller.desiredSize && controller.desiredSize <= 0) {
+            parser.pause();
+          }
+        });
 
-            controller.enqueue(value?.value);
-
-            parserReader
-              .read()
-              .then(process)
-              .catch((e) => controller.error(e));
-          })
-          .catch((e) => controller.error(e));
+        parser.on("close", () => controller.close());
+        parser.on("error", (err) => controller.error(err));
+      },
+      pull() {
+        parser.resume();
+      },
+      cancel() {
+        parser.destroy();
       },
     });
-    socket.on("data", (m) => parserWriter.write(m));
-    socket.on("close", () => {
-      parserReader.cancel();
-      parserWriter.abort();
-    });
+    socket.on("data", (m) => parser.write(m));
+    socket.on("close", () => parser.destroy());
 
     registry.linkStream(
       encoder,
@@ -194,13 +193,17 @@ if (listen) {
     socket.on("error", rej);
   });
 
+  const marshaller = new EncoderStream({
+    useRecords: false,
+  });
+  marshaller.pipe(socket as unknown as WritableStream);
   const encoder = new WritableStream({
     write(chunk) {
       return new Promise<void>((res) => {
-        const isDrained = socket.write(JSON.stringify(chunk));
+        const isDrained = marshaller.write(chunk, "utf8");
 
         if (!isDrained) {
-          socket.once("drain", res);
+          marshaller.once("drain", res);
         } else {
           res();
         }
@@ -208,46 +211,39 @@ if (listen) {
     },
     close() {
       return new Promise((res) => {
-        socket.end(res);
+        marshaller.end(res);
       });
     },
     abort(reason) {
-      socket.destroy(reason instanceof Error ? reason : new Error(reason));
+      marshaller.destroy(reason instanceof Error ? reason : new Error(reason));
     },
   });
 
-  const parser = new JSONParser({
-    paths: ["$"],
-    separator: "",
+  const parser = new DecoderStream({
+    useRecords: false,
   });
-  const parserWriter = parser.writable.getWriter();
-  const parserReader = parser.readable.getReader();
   const decoder = new ReadableStream({
     start(controller) {
-      parserReader
-        .read()
-        .then(async function process({ done, value }) {
-          if (done) {
-            controller.close();
+      parser.on("data", (chunk) => {
+        controller.enqueue(chunk);
 
-            return;
-          }
+        if (controller.desiredSize && controller.desiredSize <= 0) {
+          parser.pause();
+        }
+      });
 
-          controller.enqueue(value?.value);
-
-          parserReader
-            .read()
-            .then(process)
-            .catch((e) => controller.error(e));
-        })
-        .catch((e) => controller.error(e));
+      parser.on("close", () => controller.close());
+      parser.on("error", (err) => controller.error(err));
+    },
+    pull() {
+      parser.resume();
+    },
+    cancel() {
+      parser.destroy();
     },
   });
-  socket.on("data", (m) => parserWriter.write(m));
-  socket.on("close", () => {
-    parserReader.cancel();
-    parserWriter.abort();
-  });
+  socket.on("data", (m) => parser.write(m));
+  socket.on("close", () => parser.destroy());
 
   registry.linkStream(
     encoder,
