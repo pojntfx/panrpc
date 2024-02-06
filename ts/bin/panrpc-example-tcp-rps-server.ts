@@ -2,7 +2,7 @@
 import { env, exit } from "process";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { JSONParser } from "@streamparser/json-node";
+import { JSONParser } from "@streamparser/json-whatwg";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";

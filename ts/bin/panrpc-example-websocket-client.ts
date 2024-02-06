@@ -210,7 +210,7 @@ if (listen) {
   socket.addEventListener("message", (m) => parserWriter.write(m.data));
   socket.addEventListener("close", () => {
     parserReader.cancel();
-    parserWriter.close();
+    parserWriter.abort();
   });
 
   registry.linkStream(

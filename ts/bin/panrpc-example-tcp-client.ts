@@ -3,9 +3,8 @@ import { env, exit, stdin, stdout } from "process";
 import { createInterface } from "readline/promises";
 import { parse } from "url";
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { JSONParser } from "@streamparser/json-node";
+import { JSONParser } from "@streamparser/json-whatwg";
 import { Socket, createServer } from "net";
-import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
@@ -101,54 +100,64 @@ if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
-    const encoder = new (class extends Transform {
-      _transform(
-        chunk: any,
-        encoding: BufferEncoding,
-        callback: TransformCallback
-      ) {
-        this.push(JSON.stringify(chunk));
-        callback();
-      }
-    })({
-      objectMode: true,
-    });
-    encoder.pipe(socket);
+    const encoder = new WritableStream({
+      write(chunk) {
+        return new Promise<void>((res) => {
+          const isDrained = socket.write(JSON.stringify(chunk));
 
-    const decoder = socket
-      .pipe(
-        new JSONParser({
-          paths: ["$"],
-          separator: "",
-        })
-      )
-      .pipe(
-        new (class extends Transform {
-          _transform(
-            chunk: any,
-            encoding: BufferEncoding,
-            callback: TransformCallback
-          ) {
-            this.push(chunk?.value);
-            callback();
+          if (!isDrained) {
+            socket.once("drain", res);
+          } else {
+            res();
           }
-        })({
-          objectMode: true,
-        })
-      );
-
-    socket.on("error", (e) => {
-      console.error("Client disconnected with error:", e);
+        });
+      },
+      close() {
+        return new Promise((res) => {
+          socket.end(res);
+        });
+      },
+      abort(reason) {
+        socket.destroy(reason instanceof Error ? reason : new Error(reason));
+      },
     });
 
+    const parser = new JSONParser({
+      paths: ["$"],
+      separator: "",
+    });
+    const parserWriter = parser.writable.getWriter();
+    const parserReader = parser.readable.getReader();
+    const decoder = new ReadableStream({
+      start(controller) {
+        parserReader
+          .read()
+          .then(async function process({ done, value }) {
+            if (done) {
+              controller.close();
+
+              return;
+            }
+
+            controller.enqueue(value?.value);
+
+            parserReader
+              .read()
+              .then(process)
+              .catch((e) => controller.error(e));
+          })
+          .catch((e) => controller.error(e));
+      },
+    });
+    socket.on("data", (m) => parserWriter.write(m));
     socket.on("close", () => {
-      encoder.destroy();
-      decoder.destroy();
+      parserReader.cancel();
+      parserWriter.abort();
     });
 
     registry.linkStream(
-      Writable.toWeb(encoder),
-      Readable.toWeb(decoder),
+      encoder,
+      decoder,
 
       (v) => v,
       (v) => v
@@ -185,50 +194,64 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  const encoder = new (class extends Transform {
-    _transform(
-      chunk: any,
-      encoding: BufferEncoding,
-      callback: TransformCallback
-    ) {
-      this.push(JSON.stringify(chunk));
-      callback();
-    }
-  })({
-    objectMode: true,
-  });
-  encoder.pipe(socket);
+  const encoder = new WritableStream({
+    write(chunk) {
+      return new Promise<void>((res) => {
+        const isDrained = socket.write(JSON.stringify(chunk));
 
-  const decoder = socket
-    .pipe(
-      new JSONParser({
-        paths: ["$"],
-        separator: "",
-      })
-    )
-    .pipe(
-      new (class extends Transform {
-        _transform(
-          chunk: any,
-          encoding: BufferEncoding,
-          callback: TransformCallback
-        ) {
-          this.push(chunk?.value);
-          callback();
+        if (!isDrained) {
+          socket.once("drain", res);
+        } else {
+          res();
         }
-      })({
-        objectMode: true,
-      })
-    );
+      });
+    },
+    close() {
+      return new Promise((res) => {
+        socket.end(res);
+      });
+    },
+    abort(reason) {
+      socket.destroy(reason instanceof Error ? reason : new Error(reason));
+    },
+  });
 
+  const parser = new JSONParser({
+    paths: ["$"],
+    separator: "",
+  });
+  const parserWriter = parser.writable.getWriter();
+  const parserReader = parser.readable.getReader();
+  const decoder = new ReadableStream({
+    start(controller) {
+      parserReader
+        .read()
+        .then(async function process({ done, value }) {
+          if (done) {
+            controller.close();
+
+            return;
+          }
+
+          controller.enqueue(value?.value);
+
+          parserReader
+            .read()
+            .then(process)
+            .catch((e) => controller.error(e));
+        })
+        .catch((e) => controller.error(e));
+    },
+  });
+  socket.on("data", (m) => parserWriter.write(m));
   socket.on("close", () => {
-    encoder.destroy();
-    decoder.destroy();
+    parserReader.cancel();
+    parserWriter.abort();
   });
 
   registry.linkStream(
-    Writable.toWeb(encoder),
-    Readable.toWeb(decoder),
+    encoder,
+    decoder,
 
     (v) => v,
     (v) => v
