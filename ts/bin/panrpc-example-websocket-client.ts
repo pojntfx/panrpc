@@ -143,7 +143,9 @@ if (listen) {
           .catch((e) => controller.error(e));
       },
     });
-    socket.addEventListener("message", (m) => parserWriter.write(m.data));
+    socket.addEventListener("message", (m) =>
+      parserWriter.write(m.data as string)
+    );
     socket.addEventListener("close", () => {
       parserReader.cancel();
       parserWriter.abort();
@@ -207,7 +209,9 @@ if (listen) {
         .catch((e) => controller.error(e));
     },
   });
-  socket.addEventListener("message", (m) => parserWriter.write(m.data));
+  socket.addEventListener("message", (m) =>
+    parserWriter.write(m.data as string)
+  );
   socket.addEventListener("close", () => {
     parserReader.cancel();
     parserWriter.abort();

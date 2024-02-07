@@ -6,7 +6,6 @@ import { JSONParser } from "@streamparser/json-whatwg";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DecoderStream, EncoderStream } from "cbor-x";
 import { Socket, createServer } from "net";
-import { Readable, Transform, TransformCallback, Writable } from "stream";
 import { IRemoteContext, Registry } from "../index";
 
 class Local {}
@@ -85,79 +84,140 @@ if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
-    let encoder: Writable;
-    let decoder: Readable;
+    socket.on("error", (e) => {
+      console.error("Client disconnected with error:", e);
+    });
+
+    let encoder: WritableStream;
+    let decoder: ReadableStream;
 
     switch (serializer) {
-      case "json":
-        encoder = new (class extends Transform {
-          _transform(
-            chunk: any,
-            encoding: BufferEncoding,
-            callback: TransformCallback
-          ) {
-            this.push(JSON.stringify(chunk));
-            callback();
-          }
-        })({
-          objectMode: true,
-        });
-        encoder.pipe(socket);
+      case "json": {
+        encoder = new WritableStream({
+          write(chunk) {
+            return new Promise<void>((res) => {
+              const isDrained = socket.write(JSON.stringify(chunk));
 
-        decoder = socket
-          .pipe(
-            new JSONParser({
-              paths: ["$"],
-              separator: "",
-            })
-          )
-          .pipe(
-            new (class extends Transform {
-              _transform(
-                chunk: any,
-                encoding: BufferEncoding,
-                callback: TransformCallback
-              ) {
-                this.push(chunk?.value);
-                callback();
+              if (!isDrained) {
+                socket.once("drain", res);
+              } else {
+                res();
               }
-            })({
-              objectMode: true,
-            })
-          );
+            });
+          },
+          close() {
+            return new Promise((res) => {
+              socket.end(res);
+            });
+          },
+          abort(reason) {
+            socket.destroy(
+              reason instanceof Error ? reason : new Error(reason)
+            );
+          },
+        });
+
+        const parser = new JSONParser({
+          paths: ["$"],
+          separator: "",
+        });
+        const parserWriter = parser.writable.getWriter();
+        const parserReader = parser.readable.getReader();
+        decoder = new ReadableStream({
+          start(controller) {
+            parserReader
+              .read()
+              .then(async function process({ done, value }) {
+                if (done) {
+                  controller.close();
+
+                  return;
+                }
+
+                controller.enqueue(value?.value);
+
+                parserReader
+                  .read()
+                  .then(process)
+                  .catch((e) => controller.error(e));
+              })
+              .catch((e) => controller.error(e));
+          },
+        });
+        socket.on("data", (m) => parserWriter.write(m));
+        socket.on("close", () => {
+          parserReader.cancel();
+          parserWriter.abort();
+        });
 
         break;
+      }
 
-      case "cbor":
-        encoder = new EncoderStream({
+      case "cbor": {
+        const marshaller = new EncoderStream({
           useRecords: false,
         });
-        encoder.pipe(socket);
+        marshaller.pipe(socket);
+        encoder = new WritableStream({
+          write(chunk) {
+            return new Promise<void>((res) => {
+              const isDrained = marshaller.write(chunk, "utf8");
 
-        decoder = socket.pipe(
-          new DecoderStream({
-            useRecords: false,
-          })
-        );
+              if (!isDrained) {
+                marshaller.once("drain", res);
+              } else {
+                res();
+              }
+            });
+          },
+          close() {
+            return new Promise((res) => {
+              marshaller.end(res);
+            });
+          },
+          abort(reason) {
+            marshaller.destroy(
+              reason instanceof Error ? reason : new Error(reason)
+            );
+          },
+        });
+
+        const parser = new DecoderStream({
+          useRecords: false,
+        });
+        decoder = new ReadableStream({
+          start(controller) {
+            parser.on("data", (chunk) => {
+              controller.enqueue(chunk);
+
+              if (controller.desiredSize && controller.desiredSize <= 0) {
+                parser.pause();
+              }
+            });
+
+            parser.on("close", () => controller.close());
+            parser.on("error", (err) => controller.error(err));
+          },
+          pull() {
+            parser.resume();
+          },
+          cancel() {
+            parser.destroy();
+          },
+        });
+        socket.on("data", (m) => parser.write(m));
+        socket.on("close", () => parser.destroy());
 
         break;
+      }
 
       default:
         throw new Error("unknown serializer");
     }
 
-    socket.on("error", (e) => {
-      console.error("Client disconnected with error:", e);
-    });
-
-    socket.on("close", () => {
-      encoder.destroy();
-      decoder.destroy();
-    });
-
     registry.linkStream(
-      Writable.toWeb(encoder),
-      Readable.toWeb(decoder),
+      encoder,
+      decoder,
 
       (v) => v,
       (v) => v
@@ -194,75 +254,134 @@ if (listen) {
     socket.on("error", rej);
   });
 
-  let encoder: Writable;
-  let decoder: Readable;
+  let encoder: WritableStream;
+  let decoder: ReadableStream;
 
   switch (serializer) {
-    case "json":
-      encoder = new (class extends Transform {
-        _transform(
-          chunk: any,
-          encoding: BufferEncoding,
-          callback: TransformCallback
-        ) {
-          this.push(JSON.stringify(chunk));
-          callback();
-        }
-      })({
-        objectMode: true,
-      });
-      encoder.pipe(socket);
+    case "json": {
+      encoder = new WritableStream({
+        write(chunk) {
+          return new Promise<void>((res) => {
+            const isDrained = socket.write(JSON.stringify(chunk));
 
-      decoder = socket
-        .pipe(
-          new JSONParser({
-            paths: ["$"],
-            separator: "",
-          })
-        )
-        .pipe(
-          new (class extends Transform {
-            _transform(
-              chunk: any,
-              encoding: BufferEncoding,
-              callback: TransformCallback
-            ) {
-              this.push(chunk?.value);
-              callback();
+            if (!isDrained) {
+              socket.once("drain", res);
+            } else {
+              res();
             }
-          })({
-            objectMode: true,
-          })
-        );
+          });
+        },
+        close() {
+          return new Promise((res) => {
+            socket.end(res);
+          });
+        },
+        abort(reason) {
+          socket.destroy(reason instanceof Error ? reason : new Error(reason));
+        },
+      });
+
+      const parser = new JSONParser({
+        paths: ["$"],
+        separator: "",
+      });
+      const parserWriter = parser.writable.getWriter();
+      const parserReader = parser.readable.getReader();
+      decoder = new ReadableStream({
+        start(controller) {
+          parserReader
+            .read()
+            .then(async function process({ done, value }) {
+              if (done) {
+                controller.close();
+
+                return;
+              }
+
+              controller.enqueue(value?.value);
+
+              parserReader
+                .read()
+                .then(process)
+                .catch((e) => controller.error(e));
+            })
+            .catch((e) => controller.error(e));
+        },
+      });
+      socket.on("data", (m) => parserWriter.write(m));
+      socket.on("close", () => {
+        parserReader.cancel();
+        parserWriter.abort();
+      });
 
       break;
+    }
 
-    case "cbor":
-      encoder = new EncoderStream({
+    case "cbor": {
+      const marshaller = new EncoderStream({
         useRecords: false,
       });
-      encoder.pipe(socket);
+      marshaller.pipe(socket);
+      encoder = new WritableStream({
+        write(chunk) {
+          return new Promise<void>((res) => {
+            const isDrained = marshaller.write(chunk, "utf8");
 
-      decoder = socket.pipe(
-        new DecoderStream({
-          useRecords: false,
-        })
-      );
+            if (!isDrained) {
+              marshaller.once("drain", res);
+            } else {
+              res();
+            }
+          });
+        },
+        close() {
+          return new Promise((res) => {
+            marshaller.end(res);
+          });
+        },
+        abort(reason) {
+          marshaller.destroy(
+            reason instanceof Error ? reason : new Error(reason)
+          );
+        },
+      });
+
+      const parser = new DecoderStream({
+        useRecords: false,
+      });
+      decoder = new ReadableStream({
+        start(controller) {
+          parser.on("data", (chunk) => {
+            controller.enqueue(chunk);
+
+            if (controller.desiredSize && controller.desiredSize <= 0) {
+              parser.pause();
+            }
+          });
+
+          parser.on("close", () => controller.close());
+          parser.on("error", (err) => controller.error(err));
+        },
+        pull() {
+          parser.resume();
+        },
+        cancel() {
+          parser.destroy();
+        },
+      });
+      socket.on("data", (m) => parser.write(m));
+      socket.on("close", () => parser.destroy());
 
       break;
+    }
 
     default:
       throw new Error("unknown serializer");
   }
 
-  socket.on("close", () => {
-    encoder.destroy();
-    decoder.destroy();
-  });
-
   registry.linkStream(
-    Writable.toWeb(encoder),
-    Readable.toWeb(decoder),
+    encoder,
+    decoder,
 
     (v) => v,
     (v) => v

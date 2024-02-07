@@ -1,4 +1,3 @@
-import { v4 } from "uuid";
 import { ILocalContext } from "./context";
 
 export const ErrorClosureDoesNotExist = "closure does not exist";
@@ -23,7 +22,7 @@ export class ClosureManager {
 }
 
 export const registerClosure = (m: ClosureManager, fn: Function) => {
-  const closureID = v4();
+  const closureID = crypto.randomUUID();
 
   // eslint-disable-next-line no-param-reassign
   m.closures[closureID] = fn;

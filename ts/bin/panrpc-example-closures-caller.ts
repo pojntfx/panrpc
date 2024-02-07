@@ -116,6 +116,10 @@ if (listen) {
   const u = parse(`tcp://${addr}`);
 
   const server = createServer(async (socket) => {
+    socket.on("error", (e) => {
+      console.error("Client disconnected with error:", e);
+    });
+
     const encoder = new WritableStream({
       write(chunk) {
         return new Promise<void>((res) => {
