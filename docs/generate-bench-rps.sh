@@ -7,12 +7,22 @@ export DATA_TYPES=(int int8 int16 int32 rune int64 uint uint8 byte uint16 uint32
 mkdir -p ./out
 cd go
 
-echo "data_type,runs" >../out/rps-${SERIALIZER}.csv
+echo "language,data_type,runs" >../out/rps-${SERIALIZER}.csv
 for data_type in "${DATA_TYPES[@]}"; do
-    export RESULTS=$(go run ./cmd/panrpc-example-tcp-rps-client/ --data-type ${data_type} --serializer ${SERIALIZER})
+    export RESULTS=$(go run ./cmd/panrpc-example-tcp-rps-client/ --addr localhost:1337 --data-type ${data_type} --serializer ${SERIALIZER})
 
     IFS=$'\n'
     for result in ${RESULTS}; do
-        echo "${data_type},${result}" >>../out/rps-${SERIALIZER}.csv
+        echo "go,${data_type},${result}" >>../out/rps-${SERIALIZER}.csv
+    done
+done
+
+cd ../ts
+for data_type in "${DATA_TYPES[@]}"; do
+    export RESULTS=$(ADDR=localhost:1338 DATA_TYPE=${data_type} tsx ./bin/panrpc-example-tcp-rps-client.ts)
+
+    IFS=$'\n'
+    for result in ${RESULTS}; do
+        echo "typescript,${data_type},${result}" >>../out/rps-${SERIALIZER}.csv
     done
 done
