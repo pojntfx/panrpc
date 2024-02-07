@@ -132,7 +132,7 @@ const registry = new Registry(
     onClientConnect: () => {
       clients++;
 
-      console.log(clients, "clients connected");
+      console.error(clients, "clients connected");
 
       (async () => {
         let rps = 0;
@@ -308,7 +308,7 @@ const registry = new Registry(
     onClientDisconnect: () => {
       clients--;
 
-      console.log(clients, "clients connected");
+      console.error(clients, "clients connected");
     },
   }
 );
@@ -469,7 +469,7 @@ if (listen) {
       host: u.hostname as string,
       port: parseInt(u.port as string, 10),
     },
-    () => console.log("Listening on", addr)
+    () => console.error("Listening on", addr)
   );
 } else {
   const u = parse(`tcp://${addr}`);
@@ -627,5 +627,5 @@ if (listen) {
     (v) => v
   );
 
-  console.log("Connected to", addr);
+  console.error("Connected to", addr);
 }
