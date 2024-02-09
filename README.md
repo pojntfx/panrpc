@@ -486,10 +486,12 @@ To reproduce the tests, see the [benchmark source code](./cmd/) and the [visuali
 
 <img src="./docs/throughput.png" alt="Bar chart of the throughput benchmark results for JSON and CBOR" width="550px">
 
-| Serializer | Average Throughput |
-| ---------- | ------------------ |
-| JSON       | 98 MB/s            |
-| CBOR       | 1351 MB/s          |
+| Serializer        | Average Throughput |
+| ----------------- | ------------------ |
+| CBOR (go)         | 1389 MB/s          |
+| JSON (go)         | 105 MB/s           |
+| CBOR (typescript) | 24 MB/s            |
+| JSON (typescript) | 12 MB/s            |
 
 ### Protocol
 
