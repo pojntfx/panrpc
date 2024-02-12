@@ -1,6 +1,6 @@
 # panrpc
 
-![Logo](./docs/logo-readme.png)
+![Logo](./docs/logo-readme.svg)
 
 Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.
 
