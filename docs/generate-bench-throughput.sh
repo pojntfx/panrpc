@@ -7,7 +7,7 @@ cd go
 
 echo "language,throughput" >../out/throughput-${SERIALIZER}.csv
 
-export RESULTS=$(go run ./cmd/panrpc-example-tcp-throughput-client/ --addr localhost:1337 --serializer ${SERIALIZER})
+export RESULTS=$(go run ./cmd/panrpc-example-tcp-throughput-client-cli/ --addr localhost:1337 --serializer ${SERIALIZER})
 
 IFS=$'\n'
 for result in ${RESULTS}; do
@@ -16,7 +16,7 @@ done
 
 cd ../ts
 
-export RESULTS=$(ADDR=localhost:1338 tsx ./bin/panrpc-example-tcp-throughput-client.ts)
+export RESULTS=$(ADDR=localhost:1338 tsx ./bin/panrpc-example-tcp-throughput-client-cli.ts)
 
 IFS=$'\n'
 for result in ${RESULTS}; do
