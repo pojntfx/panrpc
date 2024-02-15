@@ -50,17 +50,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, `Like cURL, but for panrpc: Command-line tool for interacting with panrpc servers
 
 Usage of %v:
-	%v [flags] <(ws|wss|tcp|tls|weron)://(host:port/function|password:key@community/channel[/remote]/function)> <[args...]>
+	%v [flags] <(tcp|tls|unix|unixs|ws|wss|weron)://(host:port/function|path/function|password:key@community/channel[/remote]/function)> <[args...]>
 
 Examples:
 	%v tcp://localhost:1337/Increment '[1]'
 	%v tls://localhost:443/Increment '[1]'
+	%v unix:///tmp/panrpc.sock/Increment '[1]'
+	%v unixs:///tmp/panrpc.sock/Increment '[1]'
 	%v ws://localhost:1337/Increment '[1]'
 	%v wss://localhost:443/Increment '[1]'
 	%v weron://examplepass:examplekey@examplecommunity/panrpc.example.webrtc/Increment '[1]'
 
 Flags:
-`, bin, bin, bin, bin, bin, bin, bin)
+`, bin, bin, bin, bin, bin, bin, bin, bin, bin)
 
 		flag.PrintDefaults()
 	}
@@ -93,11 +95,14 @@ Flags:
 	var (
 		flagArgs = flag.Args()
 
-		wsEnabled    = false
 		tlsEnabled   = false
+		unixEnabled  = false
+		wsEnabled    = false
 		weronEnabled = false
 
 		addr = ""
+
+		uds = ""
 
 		password  = ""
 		key       = ""
@@ -122,22 +127,6 @@ Flags:
 		p := u.Port()
 
 		switch u.Scheme {
-		case "ws":
-			wsEnabled = true
-			tlsEnabled = false
-
-			if p == "" {
-				p = "80"
-			}
-
-		case "wss":
-			wsEnabled = true
-			tlsEnabled = true
-
-			if p == "" {
-				p = "443"
-			}
-
 		case "tcp":
 			wsEnabled = false
 			tlsEnabled = false
@@ -148,6 +137,33 @@ Flags:
 
 		case "tls":
 			wsEnabled = false
+			tlsEnabled = true
+
+			if p == "" {
+				p = "443"
+			}
+
+		case "unix":
+			unixEnabled = true
+
+			uds = path.Dir(u.Path)
+
+		case "unixs":
+			unixEnabled = true
+			tlsEnabled = true
+
+			uds = path.Dir(u.Path)
+
+		case "ws":
+			wsEnabled = true
+			tlsEnabled = false
+
+			if p == "" {
+				p = "80"
+			}
+
+		case "wss":
+			wsEnabled = true
 			tlsEnabled = true
 
 			if p == "" {
@@ -284,13 +300,21 @@ Flags:
 		var lis net.Listener
 		if tlsConfig == nil {
 			var err error
-			lis, err = net.Listen("tcp", addr)
+			if unixEnabled {
+				lis, err = net.Listen("unix", uds)
+			} else {
+				lis, err = net.Listen("tcp", addr)
+			}
 			if err != nil {
 				panic(err)
 			}
 		} else {
 			var err error
-			lis, err = tls.Listen("tcp", addr, tlsConfig)
+			if unixEnabled {
+				lis, err = tls.Listen("unix", uds, tlsConfig)
+			} else {
+				lis, err = tls.Listen("tcp", addr, tlsConfig)
+			}
 			if err != nil {
 				panic(err)
 			}
@@ -372,7 +396,15 @@ Flags:
 			conn = cc
 		} else {
 			if tlsConfig == nil {
-				c, err := net.Dial("tcp", addr)
+				var (
+					c   net.Conn
+					err error
+				)
+				if unixEnabled {
+					c, err = net.Dial("unix", uds)
+				} else {
+					c, err = net.Dial("tcp", addr)
+				}
 				if err != nil {
 					panic(err)
 				}
@@ -383,7 +415,15 @@ Flags:
 
 				conn = c
 			} else {
-				c, err := tls.Dial("tcp", addr, tlsConfig)
+				var (
+					c   net.Conn
+					err error
+				)
+				if unixEnabled {
+					c, err = tls.Dial("unix", uds, tlsConfig)
+				} else {
+					c, err = tls.Dial("tcp", addr, tlsConfig)
+				}
 				if err != nil {
 					panic(err)
 				}
