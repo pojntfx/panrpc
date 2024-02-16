@@ -53,14 +53,12 @@ func main() {
 
 	log.Printf(`Run one of the following commands to run a function on the remote(s):
 
-- kill -%v %v: Increment remote counter by one
-- kill -%v %v: Decrement remote counter by one`,
-		1, os.Getpid(),
-		5, os.Getpid())
+- kill -SIGHUP %v: Increment remote counter by one
+- kill -SIGUSR2 %v: Decrement remote counter by one`, os.Getpid(), os.Getpid())
 
 	go func() {
 		done := make(chan os.Signal, 1)
-		signal.Notify(done, syscall.Signal(1))
+		signal.Notify(done, syscall.SIGHUP)
 
 		<-done
 
@@ -84,7 +82,7 @@ func main() {
 
 	go func() {
 		done := make(chan os.Signal, 1)
-		signal.Notify(done, syscall.Signal(5))
+		signal.Notify(done, syscall.SIGUSR2)
 
 		<-done
 

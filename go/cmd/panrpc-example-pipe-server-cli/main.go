@@ -53,11 +53,11 @@ func main() {
 
 	log.Printf(`Run one of the following commands to run a function on the remote(s):
 
-- kill -%v %v: Print "Hello, world!"`, 1, os.Getpid())
+- kill -SIGHUP %v: Print "Hello, world!"`, os.Getpid())
 
 	go func() {
 		done := make(chan os.Signal, 1)
-		signal.Notify(done, syscall.Signal(1))
+		signal.Notify(done, syscall.SIGHUP)
 
 		<-done
 
