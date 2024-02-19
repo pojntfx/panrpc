@@ -21,6 +21,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
+	"github.com/pojntfx/panrpc/go/pkg/utils"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
 	"github.com/rs/zerolog"
 	"nhooyr.io/websocket"
@@ -454,7 +455,7 @@ Flags:
 			req json.RawMessage
 			err error
 		)
-		req, err = json.Marshal(rpc.Request[json.RawMessage]{
+		req, err = json.Marshal(utils.Request[json.RawMessage]{
 			Call:     callID,
 			Function: callFunctionName,
 			Args:     callArgsEncoded,
@@ -471,7 +472,7 @@ Flags:
 
 		var (
 			timeoutChan  = time.After(*timeout)
-			responseChan = make(chan rpc.Response[json.RawMessage])
+			responseChan = make(chan utils.Response[json.RawMessage])
 		)
 		go func() {
 			decoder := json.NewDecoder(conn)
@@ -489,7 +490,7 @@ Flags:
 					continue
 				}
 
-				var response rpc.Response[json.RawMessage]
+				var response utils.Response[json.RawMessage]
 				if err := json.Unmarshal(*msg.Response, &response); err != nil {
 					panic(err)
 				}
@@ -533,7 +534,7 @@ Flags:
 			req cbor.RawMessage
 			err error
 		)
-		req, err = cbor.Marshal(rpc.Request[cbor.RawMessage]{
+		req, err = cbor.Marshal(utils.Request[cbor.RawMessage]{
 			Call:     callID,
 			Function: callFunctionName,
 			Args:     callArgsEncoded,
@@ -550,7 +551,7 @@ Flags:
 
 		var (
 			timeoutChan  = time.After(*timeout)
-			responseChan = make(chan rpc.Response[cbor.RawMessage])
+			responseChan = make(chan utils.Response[cbor.RawMessage])
 		)
 		go func() {
 			decoder := cbor.NewDecoder(conn)
@@ -568,7 +569,7 @@ Flags:
 					continue
 				}
 
-				var response rpc.Response[cbor.RawMessage]
+				var response utils.Response[cbor.RawMessage]
 				if err := cbor.Unmarshal(*msg.Response, &response); err != nil {
 					panic(err)
 				}

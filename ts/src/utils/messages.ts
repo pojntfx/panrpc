@@ -1,8 +1,3 @@
-export interface IMessage<T> {
-  request?: T;
-  response?: T;
-}
-
 interface IRequest<T> {
   call: string;
   function: string;
@@ -28,18 +23,18 @@ export const marshalRequest = <T>(
 export const unmarshalRequest = <T>(
   request: T,
 
-  parse: (text: T) => any
+  unmarshal: (text: T) => any
 ): {
   call: string;
   functionName: string;
   args: any[];
 } => {
-  const req: IRequest<T> = parse(request);
+  const req: IRequest<T> = unmarshal(request);
 
   return {
     call: req.call,
     functionName: req.function,
-    args: req.args.map((arg) => parse(arg)),
+    args: req.args.map((arg) => unmarshal(arg)),
   };
 };
 

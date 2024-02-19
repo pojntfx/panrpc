@@ -1,6 +1,5 @@
 import "reflect-metadata";
 import {
-  IMessage,
   marshalRequest,
   marshalResponse,
   unmarshalRequest,
@@ -13,6 +12,11 @@ export const ErrorCallCancelled = "call timed out";
 export const ErrorCannotCallNonFunction = "can not call non function";
 
 const constructorFunctionName = "constructor";
+
+export interface IMessage<T> {
+  request?: T;
+  response?: T;
+}
 
 interface ICallResponse {
   value?: any;

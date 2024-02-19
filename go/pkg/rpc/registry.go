@@ -34,18 +34,6 @@ type Message[T any] struct {
 	Response *T `json:"response"`
 }
 
-type Request[T any] struct {
-	Call     string `json:"call"`
-	Function string `json:"function"`
-	Args     []T    `json:"args"`
-}
-
-type Response[T any] struct {
-	Call  string `json:"call"`
-	Value T      `json:"value"`
-	Err   string `json:"err"`
-}
-
 type callResponse[T any] struct {
 	value     T
 	err       error
@@ -138,7 +126,7 @@ func (r Registry[R, T]) makeRPC(
 
 		callID := uuid.NewString()
 
-		cmd := Request[T]{
+		cmd := utils.Request[T]{
 			Call:     callID,
 			Function: name,
 			Args:     []T{},
@@ -350,8 +338,8 @@ func (r Registry[R, T]) LinkMessage(
 					return
 				}
 
-				var req Request[T]
-				if err := unmarshal(b, &req); err != nil {
+				var req utils.Request[T]
+				if err := req.Unmarshal(b, unmarshal); err != nil {
 					setErr(err)
 
 					return
@@ -512,11 +500,13 @@ func (r Registry[R, T]) LinkMessage(
 								return
 							}
 
-							b, err := marshal(Response[T]{
+							res := &utils.Response[T]{
 								Call:  req.Call,
 								Value: v,
 								Err:   "",
-							})
+							}
+
+							b, err := res.Marshal(marshal)
 							if err != nil {
 								setErr(err)
 
@@ -537,11 +527,13 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								b, err := marshal(Response[T]{
+								res := &utils.Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[0].Interface().(error).Error(),
-								})
+								}
+
+								b, err := res.Marshal(marshal)
 								if err != nil {
 									setErr(err)
 
@@ -561,11 +553,13 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								b, err := marshal(Response[T]{
+								res := &utils.Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
-								})
+								}
+
+								b, err := res.Marshal(marshal)
 								if err != nil {
 									setErr(err)
 
@@ -587,11 +581,13 @@ func (r Registry[R, T]) LinkMessage(
 							}
 
 							if res[1].Interface() == nil {
-								b, err := marshal(Response[T]{
+								res := &utils.Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   "",
-								})
+								}
+
+								b, err := res.Marshal(marshal)
 								if err != nil {
 									setErr(err)
 
@@ -604,11 +600,13 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 							} else {
-								b, err := marshal(Response[T]{
+								res := &utils.Response[T]{
 									Call:  req.Call,
 									Value: v,
 									Err:   res[1].Interface().(error).Error(),
-								})
+								}
+
+								b, err := marshal(res)
 								if err != nil {
 									setErr(err)
 
@@ -639,8 +637,8 @@ func (r Registry[R, T]) LinkMessage(
 					return
 				}
 
-				var res Response[T]
-				if err := unmarshal(b, &res); err != nil {
+				var res utils.Response[T]
+				if err := res.Unmarshal(b, unmarshal); err != nil {
 					setErr(err)
 
 					return
