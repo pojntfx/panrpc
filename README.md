@@ -416,27 +416,53 @@ To make getting started with panrpc easier, take a look at the following example
 
 - **Transports**
   - **TCP (Stream-Oriented API)**
-    - [TCP Server](./cmd/panrpc-example-tcp-server/main.go)
-    - [TCP Client](./cmd/panrpc-example-tcp-client/main.go)
+    - [Go TCP Server CLI Example](./go/cmd/panrpc-example-tcp-server-cli/main.go)
+    - [Go TCP Client CLI Example](./go/cmd/panrpc-example-tcp-client-cli/main.go)
+    - [TypeScript TCP Server CLI Example](./ts/bin/panrpc-example-tcp-server-cli.ts)
+    - [TypeScript TCP Client CLI Example](./ts/bin/panrpc-example-tcp-client-cli.ts)
+  - **UNIX Socket (Stream-Oriented API)**
+    - [Go UNIX Socket Server CLI Example](./go/cmd/panrpc-example-unix-server-cli/main.go)
+    - [Go UNIX Socket Client CLI Example](./go/cmd/panrpc-example-unix-client-cli/main.go)
+    - [TypeScript UNIX Socket Server CLI Example](./ts/bin/panrpc-example-unix-server-cli.ts)
+    - [TypeScript UNIX Socket Client CLI Example](./ts/bin/panrpc-example-unix-client-cli.ts)
+  - **`stdin/stdout` Pipe (Stream-Oriented API)**
+    - [Go `stdin/stdout` Pipe Socket Server CLI Example](./go/cmd/panrpc-example-pipe-server-cli/main.go)
+    - [Go `stdin/stdout` Pipe Socket Client CLI Example](./go/cmd/panrpc-example-pipe-client-cli/main.go)
+    - [TypeScript `stdin/stdout` Pipe Server CLI Example](./ts/bin/panrpc-example-pipe-server-cli.ts)
+    - [TypeScript `stdin/stdout` Pipe Client CLI Example](./ts/bin/panrpc-example-pipe-client-cli.ts)
   - **WebSocket (Stream-Oriented API)**
-    - [WebSocket Server](./cmd/panrpc-example-websocket-server/main.go)
-    - [WebSocket Client](./cmd/panrpc-example-websocket-client/main.go)
+    - [Go WebSocket Server CLI Example](./go/cmd/panrpc-example-websocket-server-cli/main.go)
+    - [Go WebSocket Client CLI Example](./go/cmd/panrpc-example-websocket-client-cli/main.go)
+    - [TypeScript WebSocket Server CLI Example](./ts/bin/panrpc-example-websocket-server-cli.ts)
+    - [TypeScript WebSocket Client CLI Example](./ts/bin/panrpc-example-websocket-client-cli.ts)
+    - [TypeScript WebSocket Client Web Example](./ts/bin/panrpc-example-websocket-client-web)
   - **WebRTC (Stream-Oriented API)**
-    - [WebRTC Peer](./cmd/panrpc-example-webrtc-peer/main.go)
+    - [Go WebRTC Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
+    - [TypeScript WebRTC Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
   - **Redis (Message-Oriented API)**
-    - [Redis Server](./cmd/panrpc-example-redis-server/main.go)
-    - [Redis Client](./cmd/panrpc-example-redis-client/main.go)
+    - [Go Redis Server CLI Example](./go/cmd/panrpc-example-redis-server-cli/main.go)
+    - [Go Redis Client CLI Example](./go/cmd/panrpc-example-redis-client-cli/main.go)
+    - [TypeScript Redis Server CLI Example](./ts/bin/panrpc-example-redis-server-cli.ts)
+    - [TypeScript Redis Client CLI Example](./ts/bin/panrpc-example-redis-client-cli.ts)
 - **Callbacks**
-  - [Callbacks Demo Server](./cmd/panrpc-example-callbacks-callee/main.go)
-  - [Callbacks Demo Client](./cmd/panrpc-example-callbacks-caller/main.go)
+  - [Go Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-callbacks-callee-cli/main.go)
+  - [Go Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-callbacks-caller-cli/main.go)
+  - [TypeScript Callbacks Demo Server CLI Example](./ts/bin/panrpc-example-callbacks-callee-cli.ts)
+  - [TypeScript Callbacks Demo Client CLI Example](./ts/bin/panrpc-example-callbacks-caller-cli.ts)
 - **Closures**
-  - [Closures Demo Server](./cmd/panrpc-example-closures-callee/main.go)
-  - [Closures Demo Client](./cmd/panrpc-example-closures-caller/main.go)
+  - [Go Closures Demo Server CLI Example](./go/cmd/panrpc-example-closures-callee-cli/main.go)
+  - [Go Closures Demo Client CLI Example](./go/cmd/panrpc-example-closures-caller-cli/main.go)
+  - [TypeScript Closures Demo Server CLI Example](./ts/bin/panrpc-example-closures-callee-cli.ts)
+  - [TypeScript Closures Demo Client CLI Example](./ts/bin/panrpc-example-closures-caller-cli.ts)
 - **Benchmarks**
-  - [Requests/Second Benchmark Server](./cmd/panrpc-example-tcp-rps-server/main.go)
-  - [Requests/Second Benchmark Client](./cmd/panrpc-example-tcp-rps-client/main.go)
-  - [Throughput Benchmark Server](./cmd/panrpc-example-tcp-throughput-server/main.go)
-  - [Throughput Benchmark Client](./cmd/panrpc-example-tcp-throughput-client/main.go)
+  - [Go Requests/Second Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-rps-server-cli/main.go)
+  - [Go Requests/Second Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-rps-client-cli/main.go)
+  - [TypeScript Requests/Second Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-rps-server-cli.ts)
+  - [TypeScript Requests/Second Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-rps-client-cli.ts)
+  - [Go Throughput Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-throughput-server-cli/main.go)
+  - [Go Throughput Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-throughput-client-cli/main.go)
+  - [TypeScript Throughput Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-throughput-server-cli.ts)
+  - [TypeScript Throughput Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-throughput-client-cli.ts)
 
 ### Benchmarks
 
@@ -450,7 +476,7 @@ All benchmarks were conducted on a test machine with the following specification
 | CPU          | 12th Gen Intel i7-1280P (20) @ 4.700GHz |
 | Memory       | 31687MiB LPDDR5, 6400 MT/s              |
 
-To reproduce the tests, see the [benchmark source code](./cmd/) and the [visualization source code](./docs/).
+To reproduce the tests, see the [benchmark source code](#examples) and the [visualization source code](./docs/).
 
 #### Requests/Second
 
@@ -539,11 +565,13 @@ $ purl --help
 Like cURL, but for panrpc: Command-line tool for interacting with panrpc servers
 
 Usage of purl:
-	purl [flags] <(ws|wss|tcp|tls|weron)://(host:port/function|password:key@community/channel[/remote]/function)> <[args...]>
+	purl [flags] <(tcp|tls|unix|unixs|ws|wss|weron)://(host:port/function|path/function|password:key@community/channel[/remote]/function)> <[args...]>
 
 Examples:
 	purl tcp://localhost:1337/Increment '[1]'
 	purl tls://localhost:443/Increment '[1]'
+	purl unix:///tmp/panrpc.sock/Increment '[1]'
+	purl unixs:///tmp/panrpc.sock/Increment '[1]'
 	purl ws://localhost:1337/Increment '[1]'
 	purl wss://localhost:443/Increment '[1]'
 	purl weron://examplepass:examplekey@examplecommunity/panrpc.example.webrtc/Increment '[1]'
@@ -583,10 +611,19 @@ To build and start a development version of panrpc locally, run the following:
 
 ```shell
 $ git clone https://github.com/pojntfx/panrpc.git
-$ cd panrpc
-$ go run ./cmd/panrpc-example-tcp-server/ # Starts the TCP example server
+
+# For Go
+$ cd panrpc/go
+$ go run ./cmd/panrpc-example-tcp-server-cli/ # Starts the Go TCP example server CLI
 # In another terminal
-$ go run ./cmd/panrpc-example-tcp-client/ # Starts the TCP example client
+$ go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client CLI
+
+# For TypeScript
+$ cd panrpc/ts
+$ bun install
+$ bun run ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
+# In another terminal
+$ bun run ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
 ```
 
 Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)!
