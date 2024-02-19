@@ -166,7 +166,7 @@ func (r Registry[R, T]) makeRPC(
 			}
 		}
 
-		b, err := marshal(cmd)
+		b, err := cmd.Marshal(marshal)
 		if err != nil {
 			panic(err)
 		}
