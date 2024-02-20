@@ -39,9 +39,9 @@ jobs:
         working-directory: ts
       - name: Publish to npm
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: JS-DevTools/npm-publish@v1
+        uses: JS-DevTools/npm-publish@v3
         with:
-          package: ts
+          package: ts/
           token: ${{ secrets.NPM_AUTH_TOKEN }}
           access: "public"
       - name: Publish docs to GitHub pages

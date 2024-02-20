@@ -34,41 +34,37 @@ It enables you to ...
 You can add panrpc to your Go project by running the following:
 
 ```shell
-$ go get github.com/pojntfx/panrpc/...@latest
+go get github.com/pojntfx/panrpc/...@latest
 ```
 
-There is also a TypeScript version for browser and Node.js support (without transparent support for closures); you can install it like so:
+For TypeScript, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
 
 ```shell
-$ npm i -s @pojntfx/panrpc
+npm i -s @pojntfx/panrpc
 ```
-
-This README's documentation only covers the Go version. For the TypeScript version, please check out [Hydrapp](https://github.com/pojntfx/hydrapp), it uses panrpc in its examples; you can also find the complete package reference here: [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc) as well as example in [ts/panrpc-example-websocket-client.ts](./ts/panrpc-example-websocket-client.ts).
 
 ### `purl` Tool
 
-In addition to the library, the CLI tool `purl` is also available; `purl` is like [cURL](https://curl.se/) or [gRPCurl](https://github.com/fullstorydev/grpcurl), but for panrpc: A command-line tool for interacting with panrpc servers.
-
-Static binaries are available on [GitHub releases](https://github.com/pojntfx/panrpc/releases).
+In addition to the library, the CLI tool `purl` is also available; `purl` is like [cURL](https://curl.se/) and [gRPCurl](https://github.com/fullstorydev/grpcurl), but for panrpc: A command-line tool for interacting with panrpc servers. `purl` is provided in the form of static binaries.
 
 On Linux, you can install them like so:
 
 ```shell
-$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.linux-$(uname -m)"
-$ sudo install /tmp/purl /usr/local/bin
+curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.linux-$(uname -m)"
+sudo install /tmp/purl /usr/local/bin
 ```
 
 On macOS, you can use the following:
 
 ```shell
-$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.darwin-$(uname -m)"
-$ sudo install /tmp/purl /usr/local/bin
+curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.darwin-$(uname -m)"
+sudo install /tmp/purl /usr/local/bin
 ```
 
 On Windows, the following should work (using PowerShell as administrator):
 
-```shell
-PS> Invoke-WebRequest https://github.com/pojntfx/panrpc/releases/latest/download/purl.windows-x86_64.exe -OutFile \Windows\System32\purl.exe
+```PowerShell
+Invoke-WebRequest https://github.com/pojntfx/panrpc/releases/latest/download/purl.windows-x86_64.exe -OutFile \Windows\System32\purl.exe
 ```
 
 You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/panrpc/releases).
@@ -610,20 +606,20 @@ To contribute, please use the [GitHub flow](https://guides.github.com/introducti
 To build and start a development version of panrpc locally, run the following:
 
 ```shell
-$ git clone https://github.com/pojntfx/panrpc.git
+git clone https://github.com/pojntfx/panrpc.git
 
 # For Go
-$ cd panrpc/go
-$ go run ./cmd/panrpc-example-tcp-server-cli/ # Starts the Go TCP example server CLI
+cd panrpc/go
+go run ./cmd/panrpc-example-tcp-server-cli/ # Starts the Go TCP example server CLI
 # In another terminal
-$ go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client CLI
+go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client CLI
 
 # For TypeScript
-$ cd panrpc/ts
-$ bun install
-$ bun run ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
+cd panrpc/ts
+bun install
+bun run ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
 # In another terminal
-$ bun run ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
+bun run ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
 ```
 
 Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)!
