@@ -31,13 +31,13 @@ It enables you to ...
 
 ### Library
 
-You can add panrpc to your Go project by running the following:
+You can add panrpc to your **Go** project by running the following:
 
 ```shell
 go get github.com/pojntfx/panrpc/...@latest
 ```
 
-For TypeScript, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
+For **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
 
 ```shell
 npm i -s @pojntfx/panrpc
@@ -71,9 +71,14 @@ You can find binaries for more operating systems and architectures on [GitHub re
 
 ## Usage
 
+### Go
+
+<details>
+  <summary>Expand instructions</summary>
+
 > TL;DR: Define the local and remote functions as struct methods, add them to a registry and link it with a transport
 
-### 1. Define Local Functions
+#### 1. Define Local Functions
 
 panrpc uses reflection to create the glue code required to expose and call functions. Start by defining your server's exposed functions like so:
 
@@ -113,7 +118,7 @@ The following limitations on which functions you can expose exist:
 - Functions can not have variadic arguments
 - Functions must return either an error or a single value and an error
 
-### 2. Define Remote Functions
+#### 2. Define Remote Functions
 
 Next, define the functions exposed by the client to the server using a struct without method implementations:
 
@@ -135,7 +140,7 @@ type remote struct {
 }
 ```
 
-### 3. Add Functions to a Registry
+#### 3. Add Functions to a Registry
 
 For the server, you can now create the registry, which will expose its functions:
 
@@ -167,7 +172,7 @@ registry := rpc.NewRegistry[remote, json.RawMessage](
 
 Note the second generic parameter; it is the type that should be used for encoding nested messages. For JSON, this is typically `json.RawMessage`, for CBOR, this is `cbor.RawMessage`. Using such a nested message type is recommended, as it leads to a faster encoding/decoding since it doesn't require multiple encoding/decoding steps in order to function, but using `[]byte` (which will use multiple encoding/decoding steps) is also possible if this is not an option (for more infromation, see [Protocol](#protocol)).
 
-### 4. Link the Registry to a Transport and Serializer
+#### 4. Link the Registry to a Transport and Serializer
 
 Next, expose the functions by linking them to a transport. There are two available transport APIs; the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream) (which is useful for stream-like transports such as TCP, WebSockets, WebRTC or anything else that provides an `io.ReadWriteCloser`), and the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage) (which is useful for transports that use messages, such as message brokers like Redis, UDP or other packet-based protocols). In this example, we'll use the stream-oriented API; for more information on using the m, meaning it can run in the browser!essage-oriented API, see [Examples](#examples).
 
@@ -268,7 +273,7 @@ if err := registry.LinkStream(
 }
 ```
 
-### 5. Call the Functions
+#### 5. Call the Functions
 
 Now you can call the functions exposed on the server from the client and vise versa. For example, to call `Println`, a function exposed by the client from the server:
 
@@ -336,7 +341,7 @@ registry := rpc.NewRegistry[remote, json.RawMessage](
 service.ForRemotes = registry.ForRemotes
 ```
 
-### 6. Using Closures and Callbacks
+#### 6. Using Closures and Callbacks
 
 Because panrpc is bidirectional, it is possible to pass closures and callbacks as function arguments, just like you would locally. For example, on the server:
 
@@ -402,9 +407,18 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 }
 ```
 
-🚀 That's it! We can't wait to see what you're going to build with panrpc.
+🚀 That's it! We can't wait to see what you're going to build with panrpc. Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information.
+
+</details>
+
+### TypeScript
 
 ## Reference
+
+### Library API
+
+- [![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc)
+- [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc)
 
 ### Examples
 
@@ -554,7 +568,7 @@ Here, `response` specifies that the message is a function return. `call` is the 
 
 Keep in mind that panrpc is bidirectional, meaning that both the client and server can send and receive both types of messages to each other.
 
-## Reference
+### `purl` Command Line Arguments
 
 ```shell
 $ purl --help
