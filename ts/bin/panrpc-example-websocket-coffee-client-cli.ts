@@ -26,7 +26,9 @@ class CoffeeMachine {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     variant: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    size: number
+    size: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onProgress: (ctx: ILocalContext, percentage: number) => Promise<void>
   ): Promise<number> {
     return 0;
   }
@@ -79,12 +81,14 @@ const registry = new Registry(
             const res = await remote.BrewCoffee(
               undefined,
               "latte",
-              line === "1" ? 100 : 200
+              line === "1" ? 100 : 200,
+              async (ctx, percentage) =>
+                console.log(`Brewing Cafè Latte ... ${percentage}% done`)
             );
 
             console.log("Remaining water:", res, "ml");
           } catch (e) {
-            console.error(`Couldn't brew coffee: ${e}`);
+            console.error(`Couldn't brew Cafè Latte: ${e}`);
           }
 
           break;
@@ -96,12 +100,14 @@ const registry = new Registry(
             const res = await remote.BrewCoffee(
               undefined,
               "americano",
-              line === "3" ? 100 : 200
+              line === "3" ? 100 : 200,
+              async (ctx, percentage) =>
+                console.log(`Brewing Americano ... ${percentage}% done`)
             );
 
             console.log("Remaining water:", res, "ml");
           } catch (e) {
-            console.error(`Couldn't brew coffee: ${e}`);
+            console.error(`Couldn't brew Americano: ${e}`);
           }
 
           break;

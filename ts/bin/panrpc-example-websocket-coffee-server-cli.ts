@@ -3,7 +3,12 @@
 import { JSONParser } from "@streamparser/json-whatwg";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { WebSocketServer } from "ws";
-import { ILocalContext, IRemoteContext, Registry } from "../index";
+import {
+  ILocalContext,
+  IRemoteContext,
+  Registry,
+  remoteClosure,
+} from "../index";
 
 class CoffeeMachine {
   constructor(private supportedVariants: string[], private waterLevel: number) {
@@ -13,7 +18,9 @@ class CoffeeMachine {
   async BrewCoffee(
     ctx: ILocalContext,
     variant: string,
-    size: number
+    size: number,
+    @remoteClosure
+    onProgress: (ctx: IRemoteContext, percentage: number) => Promise<void>
   ): Promise<number> {
     if (!this.supportedVariants.includes(variant)) {
       throw new Error("unsupported variant");
@@ -25,9 +32,27 @@ class CoffeeMachine {
 
     console.log("Brewing coffee variant", variant, "in size", size, "ml");
 
+    await onProgress(undefined, 0);
+
     await new Promise((r) => {
-      setTimeout(r, 5000);
+      setTimeout(r, 500);
     });
+    await onProgress(undefined, 25);
+
+    await new Promise((r) => {
+      setTimeout(r, 500);
+    });
+    await onProgress(undefined, 50);
+
+    await new Promise((r) => {
+      setTimeout(r, 500);
+    });
+    await onProgress(undefined, 75);
+
+    await new Promise((r) => {
+      setTimeout(r, 500);
+    });
+    await onProgress(undefined, 100);
 
     this.waterLevel -= size;
 
