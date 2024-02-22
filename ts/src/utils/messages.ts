@@ -53,7 +53,7 @@ export const marshalResponse = <T>(
 ): T => {
   const res: IResponse<T> = {
     call,
-    value: marshal(value),
+    value: marshal(value === undefined ? null : value), // We need to include `undefined` values as null or else the field gets dropped
     err,
   };
 
