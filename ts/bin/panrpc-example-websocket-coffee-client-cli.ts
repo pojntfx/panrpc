@@ -119,7 +119,7 @@ const registry = new Registry(
   }
 })();
 
-const socket = new WebSocket("ws://localhost:1337");
+const socket = new WebSocket("ws://127.0.0.1:1337");
 
 socket.addEventListener("error", (e) => {
   console.error("Disconnected with error:", e);

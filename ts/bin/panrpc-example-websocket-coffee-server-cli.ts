@@ -86,7 +86,7 @@ const registry = new Registry(
 );
 
 const server = new WebSocketServer({
-  host: "localhost",
+  host: "127.0.0.1",
   port: 1337,
 });
 
