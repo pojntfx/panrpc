@@ -17,6 +17,10 @@ import (
 type coffeeMachine struct {
 	supportedVariants []string
 	waterLevel        int
+
+	ForRemotes func(
+		cb func(remoteID string, remote remoteControl) error,
+	) error
 }
 
 func (s *coffeeMachine) BrewCoffee(
@@ -25,6 +29,26 @@ func (s *coffeeMachine) BrewCoffee(
 	size int,
 	onProgress func(ctx context.Context, percentage int) error,
 ) (int, error) {
+	targetID := rpc.GetRemoteID(ctx)
+
+	if err := s.ForRemotes(func(remoteID string, remote remoteControl) error {
+		if remoteID == targetID {
+			return nil
+		}
+
+		return remote.SetCoffeeMachineBrewing(ctx, true)
+	}); err != nil {
+		return 0, err
+	}
+
+	defer s.ForRemotes(func(remoteID string, remote remoteControl) error {
+		if remoteID == targetID {
+			return nil
+		}
+
+		return remote.SetCoffeeMachineBrewing(ctx, false)
+	})
+
 	if !slices.Contains(s.supportedVariants, variant) {
 		return 0, errors.New("unsupported variant")
 	}
@@ -72,13 +96,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	clients := 0
+	service := &coffeeMachine{
+		supportedVariants: []string{"latte", "americano"},
+		waterLevel:        1000,
+	}
 
+	clients := 0
 	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
-		&coffeeMachine{
-			supportedVariants: []string{"latte", "americano"},
-			waterLevel:        1000,
-		},
+		service,
 
 		ctx,
 
@@ -95,6 +120,7 @@ func main() {
 			},
 		},
 	)
+	service.ForRemotes = registry.ForRemotes
 
 	lis, err := net.Listen("tcp", "127.0.0.1:1337")
 	if err != nil {

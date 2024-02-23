@@ -40,7 +40,6 @@ func main() {
 	defer cancel()
 
 	clients := 0
-
 	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
 		&remoteControl{},
 
