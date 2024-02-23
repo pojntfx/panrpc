@@ -20,7 +20,7 @@ class Local {
   async Increment(ctx: ILocalContext, delta: number): Promise<number> {
     const { remoteID: targetID } = ctx;
 
-    await registry.forRemotes(async (remoteID, remote) => {
+    await this.forRemotes?.(async (remoteID, remote) => {
       if (remoteID === targetID) {
         await remote.Println(undefined, `Incrementing counter by ${delta}`);
       }

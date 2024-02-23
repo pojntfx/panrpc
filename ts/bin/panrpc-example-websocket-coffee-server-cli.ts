@@ -11,6 +11,10 @@ import {
 } from "../index";
 
 class CoffeeMachine {
+  public forRemotes?: (
+    cb: (remoteID: string, remote: RemoteControl) => Promise<void>
+  ) => Promise<void>;
+
   constructor(private supportedVariants: string[], private waterLevel: number) {
     this.BrewCoffee = this.BrewCoffee.bind(this);
   }
@@ -22,37 +26,57 @@ class CoffeeMachine {
     @remoteClosure
     onProgress: (ctx: IRemoteContext, percentage: number) => Promise<void>
   ): Promise<number> {
-    if (!this.supportedVariants.includes(variant)) {
-      throw new Error("unsupported variant");
+    const { remoteID: targetID } = ctx;
+
+    try {
+      await this.forRemotes?.(async (remoteID, remote) => {
+        if (remoteID === targetID) {
+          return;
+        }
+
+        await remote.SetCoffeeMachineBrewing(undefined, true);
+      });
+
+      if (!this.supportedVariants.includes(variant)) {
+        throw new Error("unsupported variant");
+      }
+
+      if (this.waterLevel - size < 0) {
+        throw new Error("not enough water");
+      }
+
+      console.log("Brewing coffee variant", variant, "in size", size, "ml");
+
+      await onProgress(undefined, 0);
+
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 25);
+
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 50);
+
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 75);
+
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 100);
+    } finally {
+      await this.forRemotes?.(async (remoteID, remote) => {
+        if (remoteID === targetID) {
+          return;
+        }
+
+        await remote.SetCoffeeMachineBrewing(undefined, false);
+      });
     }
-
-    if (this.waterLevel - size < 0) {
-      throw new Error("not enough water");
-    }
-
-    console.log("Brewing coffee variant", variant, "in size", size, "ml");
-
-    await onProgress(undefined, 0);
-
-    await new Promise((r) => {
-      setTimeout(r, 500);
-    });
-    await onProgress(undefined, 25);
-
-    await new Promise((r) => {
-      setTimeout(r, 500);
-    });
-    await onProgress(undefined, 50);
-
-    await new Promise((r) => {
-      setTimeout(r, 500);
-    });
-    await onProgress(undefined, 75);
-
-    await new Promise((r) => {
-      setTimeout(r, 500);
-    });
-    await onProgress(undefined, 100);
 
     this.waterLevel -= size;
 
@@ -65,10 +89,12 @@ class RemoteControl {
   async SetCoffeeMachineBrewing(ctx: IRemoteContext, brewing: boolean) {}
 }
 
+const service = new CoffeeMachine(["latte", "americano"], 1000);
+
 let clients = 0;
 
 const registry = new Registry(
-  new CoffeeMachine(["latte", "americano"], 1000),
+  service,
   new RemoteControl(),
 
   {
@@ -84,6 +110,8 @@ const registry = new Registry(
     },
   }
 );
+
+service.forRemotes = registry.forRemotes;
 
 const server = new WebSocketServer({
   host: "127.0.0.1",
