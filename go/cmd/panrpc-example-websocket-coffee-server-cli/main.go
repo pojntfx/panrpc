@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"log"
 	"net"
 	"net/http"
@@ -70,8 +69,6 @@ type remoteControl struct {
 }
 
 func main() {
-	flag.Parse()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -99,7 +96,7 @@ func main() {
 		},
 	)
 
-	lis, err := net.Listen("tcp", "localhost:1337")
+	lis, err := net.Listen("tcp", "127.0.0.1:1337")
 	if err != nil {
 		panic(err)
 	}
