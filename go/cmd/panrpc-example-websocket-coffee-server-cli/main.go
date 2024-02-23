@@ -31,6 +31,14 @@ func (s *coffeeMachine) BrewCoffee(
 ) (int, error) {
 	targetID := rpc.GetRemoteID(ctx)
 
+	defer s.ForRemotes(func(remoteID string, remote remoteControl) error {
+		if remoteID == targetID {
+			return nil
+		}
+
+		return remote.SetCoffeeMachineBrewing(ctx, false)
+	})
+
 	if err := s.ForRemotes(func(remoteID string, remote remoteControl) error {
 		if remoteID == targetID {
 			return nil
@@ -40,14 +48,6 @@ func (s *coffeeMachine) BrewCoffee(
 	}); err != nil {
 		return 0, err
 	}
-
-	defer s.ForRemotes(func(remoteID string, remote remoteControl) error {
-		if remoteID == targetID {
-			return nil
-		}
-
-		return remote.SetCoffeeMachineBrewing(ctx, false)
-	})
 
 	if !slices.Contains(s.supportedVariants, variant) {
 		return 0, errors.New("unsupported variant")
@@ -102,6 +102,7 @@ func main() {
 	}
 
 	clients := 0
+
 	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
 		service,
 
