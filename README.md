@@ -665,11 +665,11 @@ Flags:
   -timeout duration
     	Time to wait for a response to a call (default 10s)
   -tls-cert string
-    	TLS certificate (only valid for wss:// and tls://)
+    	TLS certificate (only valid for tls://, unixs:// and wss://)
   -tls-key string
-    	TLS key (only valid for wss:// and tls://)
+    	TLS key (only valid for tls://, unixs:// and wss://)
   -tls-verify
-    	Whether to verify TLS peer certificates (only valid for wss:// and tls://) (default true)
+    	Whether to verify TLS peer certificates (only valid for tls://, unixs:// and wss://) (default true)
   -verbose
     	Whether to enable verbose logging
   -weron-force-relay

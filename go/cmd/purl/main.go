@@ -72,9 +72,9 @@ Flags:
 	serializer := flag.String("serializer", "json", "Serializer to use (json or cbor)")
 	timeout := flag.Duration("timeout", time.Second*10, "Time to wait for a response to a call")
 
-	tlsCert := flag.String("tls-cert", "", "TLS certificate (only valid for wss:// and tls://)")
-	tlsKey := flag.String("tls-key", "", "TLS key (only valid for wss:// and tls://)")
-	tlsVerify := flag.Bool("tls-verify", true, "Whether to verify TLS peer certificates (only valid for wss:// and tls://)")
+	tlsCert := flag.String("tls-cert", "", "TLS certificate (only valid for tls://, unixs:// and wss://)")
+	tlsKey := flag.String("tls-key", "", "TLS key (only valid for tls://, unixs:// and wss://)")
+	tlsVerify := flag.Bool("tls-verify", true, "Whether to verify TLS peer certificates (only valid for tls://, unixs:// and wss://)")
 
 	weronSignaler := flag.String("weron-signaler", "wss://weron.up.railway.app/", "Signaler address (only valid for weron://)")
 	weronICE := flag.String("weron-ice", "stun:stun.l.google.com:19302", "Comma-separated list of STUN servers (in format stun:host:port) and TURN servers to use (in format username:credential@turn:host:port) (i.e. username:credential@turn:global.turn.twilio.com:3478?transport=tcp) (only valid for weron://)")
