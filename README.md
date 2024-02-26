@@ -413,6 +413,77 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 
 ### TypeScript
 
+<details>
+  <summary>Expand instructions</summary>
+
+> Just looking for sample code? Check out the sources for the example [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts).
+
+#### 1. Choosing a Transport and Serializer
+
+- Supports multiple transports
+- Common ones are TCP, WebSockets, UNIX sockets or WebRTC
+- Really anything with that exposes a stream-like interface works with the `LinkStream` (see [examples](#examples))
+- For message-based transports (for use in message brokers like Redis or NATS) the `LinkMessage` API can also be used (see [examples](#examples))
+- For this example, we'll use WebSockets
+- Multiple serializers are supported
+- The only requirement is that it supports streaming encode/decode
+- Common ones are JSON and CBOR (see see [examples](#examples))
+- For this example, we'll use JSON
+
+#### 2. Creating a Server
+
+- For this example we're creating a coffee machine server
+- Creating the service with the RPCs (simple unary `BrewCoffee` RPC that simulates brewing coffee by waiting for 5 seconds before returning the new water level)
+- Note how errors can simply be thrown and how no manual serialization needs to happen
+- Adding the service to the RPC registry
+- Creating a WebSocket server
+- Creating a JSON encoder/decoder stream
+- Passing the encoder/decoder streams to `registry.linkStream`
+- Starting the server and watching it listen
+
+#### 3. Creating a Client
+
+- We're creating a remote control CLI that can control the coffee machine server
+- Client will simply call the `BrewCoffee` function
+- Defining the remote coffee machine server's RPCs
+- Adding the remote RPCs to the RPC registry
+- Creating a WebSocket client
+- Creating a JSON encode/decoder stream
+- Passing the encoder/decoder streams to `registry.linkStream`
+- Starting the client and watching it connect
+
+#### 4. Calling the Server's RPCs from the Client
+
+- Client and server are connected, but we aren't calling the RPCs yet
+- We'll create a simple TUI that will read a letter from `stdin` and brew a specific variant and size of coffee
+- We'll then print the remaining water level back to the terminal
+- Starting the client again, pressing "a", watching the new level being returned to the terminal
+
+#### 5. Calling the Client's RPCs from the Server
+
+- So far we've added RPCs to the server and called them from the client, like with most RPC frameworks
+- Now we'll add RPCs to the client that the server can call
+- This RPC will be called on all remote controls that are connected to the coffee machine to let them know that the coffee machine is currently brewing coffee
+- We'll start by creating a service with a `SetCoffeeMachineBrewing` RPC that the client will expose (simply logs to the console)
+- Add this service to the client's registry
+- On the server's `BrewCoffee` RPC, before brewing coffee and after finishing, we'll call `SetCoffeeMachine` RPC for all clients that are connected (except the one that is calling the RPC itself - we can do that by checking the client's ID) with `this.forRemotes?`
+- We can set `forRemotes` by getting it from the registry
+- Starting the server again and starting three clients, then pressing "a" on one of them, and watching the other connected clients logging the brewing state before it has started/after it has stopped brewing except on the client that requested coffee to be brewed
+
+#### 6. Passing Closures to RPCs
+
+- In addition to calling RPCs on the client from the server and vice-versa, we can also pass functions (closures) to RPCs as arguments like with local functions and call them on the other end like if they were local
+- We'll use this to report back progress of the coffee brewing process to the client while the `BrewCoffee` RPC is being called instead of just returning after it is done
+- Add `onProgress` argument to remote `BrewCoffee` service on coffee machine server and decorate it with `@remoteClosure` to let `panrpc` know that it should be a closure
+- Call the `onProgress` closure during the call to report progress
+- On the client, extend the remote coffee machine service with the new remote closure argument, and pass along an anonymous function that logs the progress to `stdout`
+- Restart the server and client
+- Press "a", instead of just returning the water level after it's done it will stream in the progress as a percentage one by one
+
+🚀 That's it! We can't wait to see what you're going to build with panrpc. Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information.
+
+</details>
+
 ## Reference
 
 ### Library API
