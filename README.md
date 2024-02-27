@@ -443,14 +443,159 @@ npm install @streamparser/json-whatwg
 
 #### 2. Creating a Server
 
-- For this example we're creating a coffee machine server
-- Creating the service with the RPCs (simple unary `BrewCoffee` RPC that simulates brewing coffee by waiting for 5 seconds before returning the new water level)
-- Note how errors can simply be thrown and how no manual serialization needs to happen
-- Adding the service to the RPC registry
-- Creating a WebSocket server
-- Creating a JSON encoder/decoder stream
-- Passing the encoder/decoder streams to `registry.linkStream`
-- Starting the server and watching it listen
+In this tutorial we'll be creating a simple coffee machine server that simulates brewing coffee, and can be controlled by using a remote control (the coffee machine client). To start with implementing the coffee machine server, create a new file `coffee-machine.ts` and define a basic class with a `BrewCoffee` method. This method simulates brewing coffee by validating the coffee variant, checking if there is enough water available to brew the coffee, sleeping for five seconds, and returning the new water level to the remote control:
+
+```typescript
+// coffee-machine.ts
+
+import { ILocalContext, Registry } from "@pojntfx/panrpc";
+
+class CoffeeMachine {
+  constructor(private supportedVariants: string[], private waterLevel: number) {
+    this.BrewCoffee = this.BrewCoffee.bind(this);
+  }
+
+  async BrewCoffee(
+    ctx: ILocalContext,
+    variant: string,
+    size: number
+  ): Promise<number> {
+    if (!this.supportedVariants.includes(variant)) {
+      throw new Error("unsupported variant");
+    }
+
+    if (this.waterLevel - size < 0) {
+      throw new Error("not enough water");
+    }
+
+    console.log("Brewing coffee variant", variant, "in size", size, "ml");
+
+    await new Promise((r) => {
+      setTimeout(r, 5000);
+    });
+
+    this.waterLevel -= size;
+
+    return this.waterLevel;
+  }
+}
+```
+
+To start turning the `BrewCoffee` method into an RPC, create an instance of the class and pass it to a [panrpc Registry](https://pojntfx.github.io/panrpc/classes/Registry.html) like so:
+
+```typescript
+// coffee-machine.ts
+
+const service = new CoffeeMachine(["latte", "americano"], 1000);
+
+let clients = 0;
+
+const registry = new Registry(
+  service,
+  new (class {})(),
+
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "remote controls connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "remote controls connected");
+    },
+  }
+);
+```
+
+Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this:
+
+<details>
+  <summary>Expand boilerplate code snippet</summary>
+
+```typescript
+// coffee-machine.ts
+
+import { JSONParser } from "@streamparser/json-whatwg";
+import { WebSocketServer } from "ws";
+
+const server = new WebSocketServer({
+  host: "127.0.0.1",
+  port: 1337,
+});
+
+server.on("connection", (socket) => {
+  socket.addEventListener("error", (e) => {
+    console.error("Remote control disconnected with error:", e);
+  });
+
+  const encoder = new WritableStream({
+    write(chunk) {
+      socket.send(JSON.stringify(chunk));
+    },
+  });
+
+  const parser = new JSONParser({
+    paths: ["$"],
+    separator: "",
+  });
+  const parserWriter = parser.writable.getWriter();
+  const parserReader = parser.readable.getReader();
+  const decoder = new ReadableStream({
+    start(controller) {
+      parserReader
+        .read()
+        .then(async function process({ done, value }) {
+          if (done) {
+            controller.close();
+
+            return;
+          }
+
+          controller.enqueue(value?.value);
+
+          parserReader
+            .read()
+            .then(process)
+            .catch((e) => controller.error(e));
+        })
+        .catch((e) => controller.error(e));
+    },
+  });
+  socket.addEventListener("message", (m) =>
+    parserWriter.write(m.data as string)
+  );
+  socket.addEventListener("close", () => {
+    parserReader.cancel();
+    parserWriter.abort();
+  });
+
+  registry.linkStream(
+    encoder,
+    decoder,
+
+    (v) => v,
+    (v) => v
+  );
+});
+
+console.log("Listening on localhost:1337");
+```
+
+</details>
+
+**Congratulations!** You've created your first panrpc server. You can start it from your terminal like so:
+
+```shell
+npx tsx coffee-machine.ts
+```
+
+You should now see the following in your terminal, which means that the server is available on `localhost:1337`:
+
+```plaintext
+Listening on localhost:1337
+```
 
 #### 3. Creating a Client
 
