@@ -40,7 +40,7 @@ go get github.com/pojntfx/panrpc/...@latest
 For **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
 
 ```shell
-npm i -s @pojntfx/panrpc
+npm install @pojntfx/panrpc
 ```
 
 ### `purl` Tool
@@ -420,15 +420,26 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 
 #### 1. Choosing a Transport and Serializer
 
-- Supports multiple transports
-- Common ones are TCP, WebSockets, UNIX sockets or WebRTC
-- Really anything with that exposes a stream-like interface works with the `LinkStream` (see [examples](#examples))
-- For message-based transports (for use in message brokers like Redis or NATS) the `LinkMessage` API can also be used (see [examples](#examples))
-- For this example, we'll use WebSockets
-- Multiple serializers are supported
-- The only requirement is that it supports streaming encode/decode
-- Common ones are JSON and CBOR (see see [examples](#examples))
-- For this example, we'll use JSON
+Start by creating a new npm module for the tutorial and installing `@pojntfx/panrpc`:
+
+```shell
+mkdir -p panrpc-tutorial
+cd panrpc-tutorial
+npm init -y
+npm install @pojntfx/panrpc
+```
+
+The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [WHATWG stream](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) can be used with the panrpc [`linkStream` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`linkMessage` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `ws` library, which you can install like so:
+
+```shell
+npm install ws
+```
+
+In addition to supporting many transports, the TypeScript version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a WHATWG stream can be used. For this tutorial, we'll be using JSON as the serializer through the `@streamparser/json-whatwg` library, which you can install like so:
+
+```shell
+npm install @streamparser/json-whatwg
+```
 
 #### 2. Creating a Server
 
@@ -701,10 +712,10 @@ go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client C
 
 # For TypeScript
 cd panrpc/ts
-bun install
-bun run ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
+npm install
+npx tsx ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
 # In another terminal
-bun run ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
+npx tsx ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
 ```
 
 Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)!
