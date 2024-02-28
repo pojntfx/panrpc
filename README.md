@@ -599,14 +599,138 @@ Listening on localhost:1337
 
 #### 3. Creating a Client
 
-- We're creating a remote control CLI that can control the coffee machine server
-- Client will simply call the `BrewCoffee` function
-- Defining the remote coffee machine server's RPCs
-- Adding the remote RPCs to the RPC registry
-- Creating a WebSocket client
-- Creating a JSON encode/decoder stream
-- Passing the encoder/decoder streams to `registry.linkStream`
-- Starting the client and watching it connect
+In order to interact with the coffee machine server, we'll now create the remote control (the coffee machine client), which will call the `BrewCoffee` RPC. To start with implementing the remote control, create a new file `remote-control.ts` and define a basic class with a placeholder method that mirrors the `BrewCoffee` RPC:
+
+```typescript
+// remote-control.ts
+
+import { IRemoteContext, Registry } from "../index";
+
+class CoffeeMachine {
+  async BrewCoffee(
+    ctx: IRemoteContext,
+    variant: string,
+    size: number
+  ): Promise<number> {
+    return 0;
+  }
+}
+```
+
+In order to make the `BrewCoffee` placeholder method do RPC calls, create an instance of the class and pass it to a [panrpc Registry](https://pojntfx.github.io/panrpc/classes/Registry.html) like so:
+
+```typescript
+// remote-control.ts
+
+let clients = 0;
+
+const registry = new Registry(
+  new (class {})(),
+  new CoffeeMachine(),
+
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "coffee machines connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "coffee machines connected");
+    },
+  }
+);
+```
+
+Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this:
+
+<details>
+  <summary>Expand boilerplate code snippet</summary>
+
+```typescript
+// remote-control.ts
+
+import { JSONParser } from "@streamparser/json-whatwg";
+import { WebSocket } from "ws";
+
+const socket = new WebSocket("ws://127.0.0.1:1337");
+
+socket.addEventListener("error", (e) => {
+  console.error("Disconnected with error:", e);
+
+  exit(1);
+});
+socket.addEventListener("close", () => exit(0));
+
+await new Promise<void>((res, rej) => {
+  socket.addEventListener("open", () => res());
+  socket.addEventListener("error", rej);
+});
+
+const encoder = new WritableStream({
+  write(chunk) {
+    socket.send(JSON.stringify(chunk));
+  },
+});
+
+const parser = new JSONParser({
+  paths: ["$"],
+  separator: "",
+});
+const parserWriter = parser.writable.getWriter();
+const parserReader = parser.readable.getReader();
+const decoder = new ReadableStream({
+  start(controller) {
+    parserReader
+      .read()
+      .then(async function process({ done, value }) {
+        if (done) {
+          controller.close();
+
+          return;
+        }
+
+        controller.enqueue(value?.value);
+
+        parserReader
+          .read()
+          .then(process)
+          .catch((e) => controller.error(e));
+      })
+      .catch((e) => controller.error(e));
+  },
+});
+socket.addEventListener("message", (m) => parserWriter.write(m.data as string));
+socket.addEventListener("close", () => {
+  parserReader.cancel();
+  parserWriter.abort();
+});
+
+registry.linkStream(
+  encoder,
+  decoder,
+
+  (v) => v,
+  (v) => v
+);
+
+console.log("Connected to localhost:1337");
+```
+
+</details>
+
+**Congratulations!** You've created your first panrpc client. You can start it from your terminal like so:
+
+```shell
+npx tsx remote-control.ts
+```
+
+You should now see the following in your terminal, which means that the client has connected to the panrpc server at `localhost:1337`:
+
+```plaintext
+Connected to localhost:1337
+```
 
 #### 4. Calling the Server's RPCs from the Client
 
