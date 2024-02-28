@@ -19,10 +19,16 @@ class RemoteControl {
 }
 
 class CoffeeMachine {
+  // eslint-disable-next-line class-methods-use-this
   async BrewCoffee(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ctx: IRemoteContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     variant: string,
-    size: number
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    size: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onProgress: (ctx: ILocalContext, percentage: number) => Promise<void>
   ): Promise<number> {
     return 0;
   }
@@ -31,7 +37,7 @@ class CoffeeMachine {
 let clients = 0;
 
 const registry = new Registry(
-  new (class {})(),
+  new RemoteControl(),
   new CoffeeMachine(),
 
   {

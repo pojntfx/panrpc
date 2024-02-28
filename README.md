@@ -448,7 +448,7 @@ In this tutorial we'll be creating a simple coffee machine server that simulates
 ```typescript
 // coffee-machine.ts
 
-import { ILocalContext, Registry } from "@pojntfx/panrpc";
+import { ILocalContext } from "@pojntfx/panrpc";
 
 class CoffeeMachine {
   constructor(private supportedVariants: string[], private waterLevel: number) {
@@ -485,6 +485,8 @@ To start turning the `BrewCoffee` method into an RPC, create an instance of the 
 
 ```typescript
 // coffee-machine.ts
+
+import { Registry } from "@pojntfx/panrpc";
 
 const service = new CoffeeMachine(["latte", "americano"], 1000);
 
@@ -604,7 +606,7 @@ In order to interact with the coffee machine server, we'll now create the remote
 ```typescript
 // remote-control.ts
 
-import { IRemoteContext, Registry } from "../index";
+import { IRemoteContext } from "@pojntfx/panrpc";
 
 class CoffeeMachine {
   async BrewCoffee(
@@ -621,6 +623,8 @@ In order to make the `BrewCoffee` placeholder method do RPC calls, create an ins
 
 ```typescript
 // remote-control.ts
+
+import { Registry } from "@pojntfx/panrpc";
 
 let clients = 0;
 
@@ -730,14 +734,121 @@ You should now see the following in your terminal, which means that the client h
 
 ```plaintext
 Connected to localhost:1337
+1 coffee machines connected
+```
+
+Similarly so, the coffee machine server should output the following:
+
+```plaintext
+1 remote controls connected
 ```
 
 #### 4. Calling the Server's RPCs from the Client
 
-- Client and server are connected, but we aren't calling the RPCs yet
-- We'll create a simple TUI that will read a letter from `stdin` and brew a specific variant and size of coffee
-- We'll then print the remaining water level back to the terminal
-- Starting the client again, pressing "a", watching the new level being returned to the terminal
+The coffee machine and the client are now connected to each other, but we haven't added the ability to call the `BrewCoffee` RPC from the remote control just yet. To fix this, we'll create a simple TUI interface that will print a list of available coffee variants and sizes to the terminal, waits for the user to make their choice by entering a number, and then calls the `BrewCoffee` RPC with the correct arguments. After the coffee has been brewed, we'll print the new water level to the terminal.
+
+To achieve this, we can call this RPC transparently from the remote control by accessing the connected coffee machine(s) with `registry.forRemotes`, and we can handle errors with `try catch` just like if we were making a local function call:
+
+```typescript
+// remote-control.ts
+
+import { createInterface } from "readline/promises";
+
+(async () => {
+  console.log(`Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano`);
+
+  const rl = createInterface({ input: stdin, output: stdout });
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const line =
+      // eslint-disable-next-line no-await-in-loop
+      await rl.question("");
+
+    // eslint-disable-next-line no-await-in-loop
+    await registry.forRemotes(async (remoteID, remote) => {
+      switch (line) {
+        case "1":
+        case "2":
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await remote.BrewCoffee(
+              undefined,
+              "latte",
+              line === "1" ? 100 : 200
+            );
+
+            console.log("Remaining water:", res, "ml");
+          } catch (e) {
+            console.error(`Couldn't brew Cafè Latte: ${e}`);
+          }
+
+          break;
+
+        case "3":
+        case "4":
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await remote.BrewCoffee(
+              undefined,
+              "americano",
+              line === "3" ? 100 : 200
+            );
+
+            console.log("Remaining water:", res, "ml");
+          } catch (e) {
+            console.error(`Couldn't brew Americano: ${e}`);
+          }
+
+          break;
+
+        default:
+          console.log(`Unknown letter ${line}, ignoring input`);
+      }
+    });
+  }
+})();
+```
+
+Now we can restart the remote control like so:
+
+```shell
+npx tsx remote-control.ts
+```
+
+After which you should see the following output:
+
+```plaintext
+Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano
+1 coffee machines connected
+Connected to localhost:1337
+```
+
+It is now possible to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And after the coffee has been brewed, the remote control should return the remaining water level like so:
+
+```plaintext
+Remaining water: 900 ml
+```
+
+**Enjoy your (virtual) coffee!** You've successfully called an RPC provided by a server from the client. Feel free to try out the other supported variants and sizes until there is no more water remaining.
 
 #### 5. Calling the Client's RPCs from the Server
 
