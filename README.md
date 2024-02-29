@@ -765,19 +765,14 @@ import { createInterface } from "readline/promises";
 
   const rl = createInterface({ input: stdin, output: stdout });
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
-    const line =
-      // eslint-disable-next-line no-await-in-loop
-      await rl.question("");
+    const line = await rl.question("");
 
-    // eslint-disable-next-line no-await-in-loop
     await registry.forRemotes(async (remoteID, remote) => {
       switch (line) {
         case "1":
         case "2":
           try {
-            // eslint-disable-next-line no-await-in-loop
             const res = await remote.BrewCoffee(
               undefined,
               "latte",
@@ -794,7 +789,6 @@ import { createInterface } from "readline/promises";
         case "3":
         case "4":
           try {
-            // eslint-disable-next-line no-await-in-loop
             const res = await remote.BrewCoffee(
               undefined,
               "americano",
@@ -852,11 +846,140 @@ Remaining water: 900 ml
 
 #### 5. Calling the Client's RPCs from the Server
 
-- So far we've added RPCs to the server and called them from the client, like with most RPC frameworks
-- Now we'll add RPCs to the client that the server can call
-- This RPC will be called on all remote controls that are connected to the coffee machine to let them know that the coffee machine is currently brewing coffee
-- We'll start by creating a service with a `SetCoffeeMachineBrewing` RPC that the client will expose (simply logs to the console)
-- Add this service to the client's registry
+So far, we've enabled a remote control/client to call the `BrewCoffee` RPC on the coffee machine/server. This however means that if multiple remote controls are connected to one coffee machine, only the remote control that called the RPC is aware of coffee being brewed. In order to notify the other remote controls that coffee is being brewed, we will use panrpc to call a new RPC on the remote control/client from the coffee machine/server each time we brew coffee.
+
+To get started, we can once again create a basic class on the client with a method `SetCoffeeMachineBrewing`, which will print the state of the coffee machine to the remote control's terminal:
+
+```typescript
+// remote-control.ts
+
+class RemoteControl {
+  async SetCoffeeMachineBrewing(ctx: ILocalContext, brewing: boolean) {
+    if (brewing) {
+      console.log("Coffee machine is now brewing");
+    } else {
+      console.log("Coffee machine has stopped brewing");
+    }
+  }
+}
+```
+
+To start turning this new `SetCoffeeMachineBrewing` method into an RPC that server can call, create an instance of the class and pass it to the client's registry like so:
+
+```typescript
+// remote-control.ts
+
+const registry = new Registry(
+  new RemoteControl(), // This line is new
+  new CoffeeMachine(),
+
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "coffee machines connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "coffee machines connected");
+    },
+  }
+);
+```
+
+The remote control/client now exposes the `SetCoffeeMachineBrewing` RPC, and we can start enabling the coffee machine/server to call it by defining a basic class with a method that mirrors the RPC, just like we did before on the remote control for `BrewCoffee`:
+
+```typescript
+// coffee-machine.ts
+
+class RemoteControl {
+  async SetCoffeeMachineBrewing(ctx: IRemoteContext, brewing: boolean) {}
+}
+```
+
+In order to make the `SetCoffeeMachineBrewing` placeholder method do RPC calls, create an instance of the class and pass it to the server's registry like so:
+
+```typescript
+// coffee-machine.ts
+
+const registry = new Registry(
+  service,
+  new RemoteControl(), // This line is new
+
+  {
+    onClientConnect: () => {
+      clients++;
+
+      console.log(clients, "remote controls connected");
+    },
+    onClientDisconnect: () => {
+      clients--;
+
+      console.log(clients, "remote controls connected");
+    },
+  }
+);
+```
+
+The coffee machine/server and the remote control/client now both know of the new `SetCoffeeMachineBrewing` RPC, but the server doesn't call it yet. To fix this, we can call this RPC transparently from the coffee machine by accessing the connected remote control(s) with `registry.forRemotes` just like we did before in the remote control, and we can handle errors with `try catch` just like if we were making a local function call:
+
+```typescript
+// coffee-machine.ts
+
+class CoffeeMachine {
+  public forRemotes?: (
+    cb: (remoteID: string, remote: RemoteControl) => Promise<void>
+  ) => Promise<void>;
+
+  // ...
+
+  async BrewCoffee(
+    ctx: ILocalContext,
+    variant: string,
+    size: number
+  ): Promise<number> {
+    const { remoteID: targetID } = ctx;
+
+    try {
+      await this.forRemotes?.(async (remoteID, remote) => {
+        if (remoteID === targetID) {
+          return;
+        }
+
+        await remote.SetCoffeeMachineBrewing(undefined, true);
+      });
+
+      if (!this.supportedVariants.includes(variant)) {
+        throw new Error("unsupported variant");
+      }
+
+      if (this.waterLevel - size < 0) {
+        throw new Error("not enough water");
+      }
+
+      console.log("Brewing coffee variant", variant, "in size", size, "ml");
+
+      await new Promise((r) => {
+        setTimeout(r, 5000);
+      });
+    } finally {
+      await this.forRemotes?.(async (remoteID, remote) => {
+        if (remoteID === targetID) {
+          return;
+        }
+
+        await remote.SetCoffeeMachineBrewing(undefined, false);
+      });
+    }
+
+    this.waterLevel -= size;
+
+    return this.waterLevel;
+  }
+}
+```
+
 - On the server's `BrewCoffee` RPC, before brewing coffee and after finishing, we'll call `SetCoffeeMachine` RPC for all clients that are connected (except the one that is calling the RPC itself - we can do that by checking the client's ID) with `this.forRemotes?`
 - We can set `forRemotes` by getting it from the registry
 - Starting the server again and starting three clients, then pressing "a" on one of them, and watching the other connected clients logging the brewing state before it has started/after it has stopped brewing except on the client that requested coffee to be brewed
