@@ -922,7 +922,7 @@ const registry = new Registry(
 );
 ```
 
-The coffee machine/server and the remote control/client now both know of the new `SetCoffeeMachineBrewing` RPC, but the server doesn't call it yet. To fix this, we can call this RPC transparently from the coffee machine by accessing the connected remote control(s) with `registry.forRemotes` just like we did before in the remote control, and we can handle errors with `try catch` just like if we were making a local function call:
+The coffee machine/server and the remote control/client now both know of the new `SetCoffeeMachineBrewing` RPC, but the server doesn't call it yet. To fix this, we can call this RPC transparently from the coffee machine by accessing the connected remote control(s) with `registry.forRemotes` just like we did before in the remote control, and we can handle errors with `try catch` just like if we were making a local function call. We'll also use the first argument to the RPC, `ILocalContext`, to get the ID of the remote control/client that is calling `BrewCoffee`, so that we don't call `SetCoffeeMachineBrewing` on the remote control/client that is calling `BrewCoffee` itself:
 
 ```typescript
 // coffee-machine.ts
@@ -939,10 +939,13 @@ class CoffeeMachine {
     variant: string,
     size: number
   ): Promise<number> {
+    // Get the ID of the remote control that's calling `BrewCoffee`
     const { remoteID: targetID } = ctx;
 
     try {
+      // Notify connected remote controls that coffee is brewing
       await this.forRemotes?.(async (remoteID, remote) => {
+        // Don't call `SetCoffeeMachineBrewing` if it's the remote control that's calling `BrewCoffee`
         if (remoteID === targetID) {
           return;
         }
@@ -964,7 +967,9 @@ class CoffeeMachine {
         setTimeout(r, 5000);
       });
     } finally {
+      // Notify connected remote controls that coffee is no longer brewing
       await this.forRemotes?.(async (remoteID, remote) => {
+        // Don't call `SetCoffeeMachineBrewing` if it's the remote control that's calling `BrewCoffee`
         if (remoteID === targetID) {
           return;
         }
@@ -980,9 +985,52 @@ class CoffeeMachine {
 }
 ```
 
-- On the server's `BrewCoffee` RPC, before brewing coffee and after finishing, we'll call `SetCoffeeMachine` RPC for all clients that are connected (except the one that is calling the RPC itself - we can do that by checking the client's ID) with `this.forRemotes?`
-- We can set `forRemotes` by getting it from the registry
-- Starting the server again and starting three clients, then pressing "a" on one of them, and watching the other connected clients logging the brewing state before it has started/after it has stopped brewing except on the client that requested coffee to be brewed
+Note that we've added the `forRemotes` field to the coffee machine/server; we can get the implementation for it from the registry like so:
+
+```typescript
+// coffee-machine.ts
+
+const service = // ...
+
+const registry = // ...
+
+service.forRemotes = registry.forRemotes;
+```
+
+Now that's we've added support for this RPC to the coffee machine/server, we can restart it like so:
+
+```shell
+npx tsx coffee-machine.ts
+```
+
+To test if it works, connect two remote controls/clients to it like so:
+
+```shell
+npx tsx remote-control.ts
+# In another terminal
+npx tsx remote-control.ts
+```
+
+You can now brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And after the coffee has been brewed, the remote control that you've chosen to brew the coffee with should once again return the remaining water level like so:
+
+```plaintext
+Remaining water: 900 ml
+```
+
+The other connected remote controls will be notified that the coffee machine is brewing, and then once it has finished brewing:
+
+```plaintext
+Coffee machine is now brewing
+Coffee machine has stopped brewing
+```
+
+**Enjoy your distributed coffee machine!** You've successfully called an RPC provided by a client from the server to implement multicast notifications, something that usually is quite complex to do with RPC systems.
 
 #### 6. Passing Closures to RPCs
 
