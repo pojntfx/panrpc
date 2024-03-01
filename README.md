@@ -69,12 +69,12 @@ Invoke-WebRequest https://github.com/pojntfx/panrpc/releases/latest/download/pur
 
 You can find binaries for more operating systems and architectures on [GitHub releases](https://github.com/pojntfx/panrpc/releases).
 
-## Usage
+## Tutorial
 
 ### Go
 
 <details>
-  <summary>Expand instructions</summary>
+  <summary>Expand tutorial</summary>
 
 > TL;DR: Define the local and remote functions as struct methods, add them to a registry and link it with a transport
 
@@ -413,12 +413,12 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 
 ### TypeScript
 
-<details>
-  <summary>Expand instructions</summary>
-
 > Just looking for sample code? Check out the sources for the example [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts).
 
 #### 1. Choosing a Transport and Serializer
+
+<details>
+  <summary>Expand section</summary>
 
 Start by creating a new npm module for the tutorial and installing `@pojntfx/panrpc`:
 
@@ -441,7 +441,12 @@ In addition to supporting many transports, the TypeScript version of panrpc also
 npm install @streamparser/json-whatwg
 ```
 
+</details>
+
 #### 2. Creating a Server
+
+<details>
+  <summary>Expand section</summary>
 
 In this tutorial we'll be creating a simple coffee machine server that simulates brewing coffee, and can be controlled by using a remote control (the coffee machine client). To start with implementing the coffee machine server, create a new file `coffee-machine.ts` and define a basic class with a `BrewCoffee` method. This method simulates brewing coffee by validating the coffee variant, checking if there is enough water available to brew the coffee, sleeping for five seconds, and returning the new water level to the remote control:
 
@@ -599,7 +604,12 @@ You should now see the following in your terminal, which means that the server i
 Listening on localhost:1337
 ```
 
+</details>
+
 #### 3. Creating a Client
+
+<details>
+  <summary>Expand section</summary>
 
 In order to interact with the coffee machine server, we'll now create the remote control (the coffee machine client), which will call the `BrewCoffee` RPC. To start with implementing the remote control, create a new file `remote-control.ts` and define a basic class with a placeholder method that mirrors the `BrewCoffee` RPC:
 
@@ -724,7 +734,7 @@ console.log("Connected to localhost:1337");
 
 </details>
 
-**Congratulations!** You've created your first panrpc client. You can start it from your terminal like so:
+**Cheers!** You've created your first panrpc client. You can start it from your terminal like so:
 
 ```shell
 npx tsx remote-control.ts
@@ -743,7 +753,12 @@ Similarly so, the coffee machine server should output the following:
 1 remote controls connected
 ```
 
+</details>
+
 #### 4. Calling the Server's RPCs from the Client
+
+<details>
+  <summary>Expand section</summary>
 
 The coffee machine and the client are now connected to each other, but we haven't added the ability to call the `BrewCoffee` RPC from the remote control just yet. To fix this, we'll create a simple TUI interface that will print a list of available coffee variants and sizes to the terminal, waits for the user to make their choice by entering a number, and then calls the `BrewCoffee` RPC with the correct arguments. After the coffee has been brewed, we'll print the new water level to the terminal.
 
@@ -844,7 +859,12 @@ Remaining water: 900 ml
 
 **Enjoy your (virtual) coffee!** You've successfully called an RPC provided by a server from the client. Feel free to try out the other supported variants and sizes until there is no more water remaining.
 
+</details>
+
 #### 5. Calling the Client's RPCs from the Server
+
+<details>
+  <summary>Expand section</summary>
 
 So far, we've enabled a remote control/client to call the `BrewCoffee` RPC on the coffee machine/server. This however means that if multiple remote controls are connected to one coffee machine, only the remote control that called the RPC is aware of coffee being brewed. In order to notify the other remote controls that coffee is being brewed, we will use panrpc to call a new RPC on the remote control/client from the coffee machine/server each time we brew coffee.
 
@@ -997,7 +1017,7 @@ const registry = // ...
 service.forRemotes = registry.forRemotes;
 ```
 
-Now that's we've added support for this RPC to the coffee machine/server, we can restart it like so:
+Now that we've added support for this RPC to the coffee machine/server, we can restart it like so:
 
 ```shell
 npx tsx coffee-machine.ts
@@ -1011,7 +1031,7 @@ npx tsx remote-control.ts
 npx tsx remote-control.ts
 ```
 
-You can now brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
+You can now request the coffee machine to brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
 
 ```plaintext
 Brewing coffee variant latte in size 100 ml
@@ -1032,17 +1052,156 @@ Coffee machine has stopped brewing
 
 **Enjoy your distributed coffee machine!** You've successfully called an RPC provided by a client from the server to implement multicast notifications, something that usually is quite complex to do with RPC systems.
 
+</details>
+
 #### 6. Passing Closures to RPCs
 
-- In addition to calling RPCs on the client from the server and vice-versa, we can also pass functions (closures) to RPCs as arguments like with local functions and call them on the other end like if they were local
-- We'll use this to report back progress of the coffee brewing process to the client while the `BrewCoffee` RPC is being called instead of just returning after it is done
-- Add `onProgress` argument to remote `BrewCoffee` service on coffee machine server and decorate it with `@remoteClosure` to let `panrpc` know that it should be a closure
-- Call the `onProgress` closure during the call to report progress
-- On the client, extend the remote coffee machine service with the new remote closure argument, and pass along an anonymous function that logs the progress to `stdout`
-- Restart the server and client
-- Press "a", instead of just returning the water level after it's done it will stream in the progress as a percentage one by one
+<details>
+  <summary>Expand section</summary>
 
-🚀 That's it! We can't wait to see what you're going to build with panrpc. Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information.
+So far, when the remote control/client calls the `BrewCoffee` RPC, there is no way of knowing the incremental progress of the brew other than waiting for `BrewCoffee` to return the new water level. In order to know of the progress of the coffee machine as it is brewing, we can make use of the closure/callback support in panrpc, which allows us to pass a function to an RPC call, just like you could do locally. First, we'll add a `onProgress` callback to the coffee machine's `BrewCoffee` implementation and decorate it with [panrpc's @remoteClosure decorator](https://pojntfx.github.io/panrpc/functions/remoteClosure.html), which we then call incrementally during the brewing process:
+
+```typescript
+// coffee-machine.ts
+
+import { remoteClosure } from "@pojntfx/panrpc";
+
+class CoffeeMachine {
+  // ...
+
+  async BrewCoffee(
+    ctx: ILocalContext,
+    variant: string,
+    size: number,
+    @remoteClosure
+    onProgress: (ctx: IRemoteContext, percentage: number) => Promise<void> // This is new
+  ): Promise<number> {
+    // ...
+
+    try {
+      // ...
+
+      // Report 0% brewing process
+      await onProgress(undefined, 0);
+
+      // Report 25% brewing process
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 25);
+
+      // Report 50% brewing process
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 50);
+
+      // Report 75% brewing process
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 75);
+
+      // Report 100% brewing process
+      await new Promise((r) => {
+        setTimeout(r, 500);
+      });
+      await onProgress(undefined, 100);
+    }
+
+    // ..
+
+    return this.waterLevel;
+  }
+}
+```
+
+In the remote control, we'll also extend the class with the `BrewCoffee` placeholder method with this new RPC argument:
+
+```typescript
+// remote-control.ts
+
+class CoffeeMachine {
+  async BrewCoffee(
+    ctx: IRemoteContext,
+    variant: string,
+    size: number,
+    onProgress: (ctx: ILocalContext, percentage: number) => Promise<void> // This is new
+  ): Promise<number> {
+    return 0;
+  }
+}
+```
+
+And finally, where we call the `BrewCoffee` RPC in the remote control/client, we can pass in the implementation of this closure:
+
+```typescript
+// remote-control.ts
+
+(async () => {
+  // ...
+  await registry.forRemotes(async (remoteID, remote) => {
+    switch (line) {
+      case "1":
+      case "2":
+        // ...
+        const res = await remote.BrewCoffee(
+          undefined,
+          "latte",
+          line === "1" ? 100 : 200,
+          async (ctx, percentage) =>
+            console.log(`Brewing Cafè Latte ... ${percentage}% done`) // This is new
+        );
+
+      // ...
+
+      case "3":
+      case "4":
+        // ...
+        const res = await remote.BrewCoffee(
+          undefined,
+          "americano",
+          line === "3" ? 100 : 200,
+          async (ctx, percentage) =>
+            console.log(`Brewing Americano ... ${percentage}% done`) // This is new
+        );
+
+      // ..
+    }
+  });
+})();
+```
+
+Now that we can restart the coffee machine/server again like so:
+
+```shell
+npx tsx coffee-machine.ts
+```
+
+And connect the remote control/client to it again like so:
+
+```shell
+npx tsx remote-control.ts
+```
+
+You can now request the coffee machine to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And the remote control will print the progress as reported by the coffee machine to the terminal, before once again returning the remaining water level like so:
+
+```plaintext
+Brewing Cafè Latte ... 0% done
+Brewing Cafè Latte ... 25% done
+Brewing Cafè Latte ... 50% done
+Brewing Cafè Latte ... 75% done
+Brewing Cafè Latte ... 100% done
+Remaining water: 900 ml
+```
+
+**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts) for a recap.
 
 </details>
 
