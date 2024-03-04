@@ -73,7 +73,7 @@ You can find binaries for more operating systems and architectures on [GitHub re
 
 ### Go
 
-> Just looking for sample code? Check out the sources for the example [coffee machine server](./cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./cmd/panrpc-example-websocket-coffee-client-cli/main.go).
+> Just looking for sample code? Check out the sources for the example [coffee machine server](./go/cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./go/cmd/panrpc-example-websocket-coffee-client-cli/main.go).
 
 #### 1. Choosing a Transport and Serializer
 
