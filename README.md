@@ -73,341 +73,237 @@ You can find binaries for more operating systems and architectures on [GitHub re
 
 ### Go
 
+> Just looking for sample code? Check out the sources for the example [coffee machine server](./cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./cmd/panrpc-example-websocket-coffee-client-cli/main.go).
+
+#### 1. Choosing a Transport and Serializer
+
 <details>
-  <summary>Expand tutorial</summary>
+  <summary>Expand section</summary>
 
-> TL;DR: Define the local and remote functions as struct methods, add them to a registry and link it with a transport
+Start by creating a new Go module for the tutorial and installing `github.com/pojntfx/panrpc/go`:
 
-#### 1. Define Local Functions
-
-panrpc uses reflection to create the glue code required to expose and call functions. Start by defining your server's exposed functions like so:
-
-```go
-// server.go
-
-type local struct {
-	counter int64
-}
-
-func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
-	log.Println("Incrementing counter by", delta, "for peer with ID", rpc.GetRemoteID(ctx))
-
-	return atomic.AddInt64(&s.counter, delta), nil
-}
+```shell
+mkdir -p panrpc-tutorial-go
+cd panrpc-tutorial-go
+go mod init panrpc-tutorial-go
+go get github.com/pojntfx/panrpc/go@latest
 ```
 
-In your client, define the exposed functions like so:
+The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
 
-```go
-// client.go
-
-type local struct{}
-
-func (s *local) Println(ctx context.Context, msg string) error {
-	log.Println("Printing message", msg, "for peer with ID", rpc.GetRemoteID(ctx))
-
-	fmt.Println(msg)
-
-	return nil
-}
+```shell
+go get nhooyr.io/websocket@latest
 ```
 
-The following limitations on which functions you can expose exist:
+In addition to supporting many transports, the TypeScript version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a `io.ReadWriter` stream can be used. For this tutorial, we'll be using JSON as the serializer through the `encoding/json` Go standard library.
 
-- Functions must have `context.Context` as their first argument
-- Functions can not have variadic arguments
-- Functions must return either an error or a single value and an error
+</details>
 
-#### 2. Define Remote Functions
+#### 2. Creating a Server
 
-Next, define the functions exposed by the client to the server using a struct without method implementations:
+<details>
+  <summary>Expand section</summary>
 
-```go
-// server.go
-
-type remote struct {
-	Println func(ctx context.Context, msg string) error
-}
-```
-
-And do the same for the client:
+In this tutorial we'll be creating a simple coffee machine server that simulates brewing coffee, and can be controlled by using a remote control (the coffee machine client). To start with implementing the coffee machine server, create a new file `cmd/coffee-machine/main.go` and define a basic struct with a `BrewCoffee` method. This method simulates brewing coffee by validating the coffee variant, checking if there is enough water available to brew the coffee, sleeping for five seconds, and returning the new water level to the remote control:
 
 ```go
-// client.go
+// cmd/coffee-machine/main.go
 
-type remote struct {
-	Increment func(ctx context.Context, delta int64) (int64, error)
-}
-```
+package main
 
-#### 3. Add Functions to a Registry
-
-For the server, you can now create the registry, which will expose its functions:
-
-```go
-// server.go
-
-registry := rpc.NewRegistry[remote, json.RawMessage](
-	&local{},
-
-	context.Background(),
-
-	nil,
+import (
+	"context"
+	"errors"
+	"log"
+	"slices"
+	"time"
 )
-```
 
-And do the same for the client:
-
-```go
-// client.go
-
-registry := rpc.NewRegistry[remote, json.RawMessage](
-	&local{},
-
-	context.Background(),
-
-	nil,
-)
-```
-
-Note the second generic parameter; it is the type that should be used for encoding nested messages. For JSON, this is typically `json.RawMessage`, for CBOR, this is `cbor.RawMessage`. Using such a nested message type is recommended, as it leads to a faster encoding/decoding since it doesn't require multiple encoding/decoding steps in order to function, but using `[]byte` (which will use multiple encoding/decoding steps) is also possible if this is not an option (for more infromation, see [Protocol](#protocol)).
-
-#### 4. Link the Registry to a Transport and Serializer
-
-Next, expose the functions by linking them to a transport. There are two available transport APIs; the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream) (which is useful for stream-like transports such as TCP, WebSockets, WebRTC or anything else that provides an `io.ReadWriteCloser`), and the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage) (which is useful for transports that use messages, such as message brokers like Redis, UDP or other packet-based protocols). In this example, we'll use the stream-oriented API; for more information on using the m, meaning it can run in the browser!essage-oriented API, see [Examples](#examples).
-
-Similarly so, as mentioned in [Add Functions to a Registry](#3-add-functions-to-a-registry), it is possible to use almost any serialization framework you want, as long as it can provide the necessary import interface. In this example, we'll be using the `encoding/json` package from the Go standard library, but in most cases, a more performant and compact framework such as CBOR is the better choice. See [Benchmarks](#benchmarks) for usage examples with other serialization frameworks and a performance comparison.
-
-Start by creating a TCP listener in your `main` func (you could also use WebSockets, WebRTC or anything that provides a `io.ReadWriteCloser`) and passing in your serialization framework:
-
-```go
-// server.go
-
-lis, err := net.Listen("tcp", "localhost:1337")
-if err != nil {
-	panic(err)
+type coffeeMachine struct {
+	supportedVariants []string
+	waterLevel        int
 }
-defer lis.Close()
 
-for {
-	func() {
-		conn, err := lis.Accept()
-		if err != nil {
-			return
-		}
+func (s *coffeeMachine) BrewCoffee(
+	ctx context.Context,
+	variant string,
+	size int,
+) (int, error) {
+	if !slices.Contains(s.supportedVariants, variant) {
+		return 0, errors.New("unsupported variant")
+	}
 
-		go func() {
-			defer func() {
-				_ = conn.Close()
+	if s.waterLevel-size < 0 {
+		return 0, errors.New("not enough water")
+	}
 
-				if err := recover(); err != nil {
-					log.Printf("Client disconnected with error: %v", err)
+	log.Println("Brewing coffee variant", variant, "in size", size, "ml")
+
+	time.Sleep(time.Second * 5)
+
+	s.waterLevel -= size
+
+	return s.waterLevel, nil
+}
+```
+
+To start turning the `BrewCoffee` method into an RPC, create an instance of the class and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
+
+```go
+// cmd/coffee-machine/main.go
+
+import "github.com/pojntfx/panrpc/go/pkg/rpc"
+
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	service := &coffeeMachine{
+		supportedVariants: []string{"latte", "americano"},
+		waterLevel:        1000,
+	}
+
+	clients := 0
+
+	registry := rpc.NewRegistry[struct{}, json.RawMessage](
+		service,
+
+		ctx,
+
+		&rpc.Options{
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v remote controls connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v remote controls connected", clients)
+			},
+		},
+	)
+}
+```
+
+Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate to upgrade from HTTP to WebSockets, so feel free to copy-and-paste this:
+
+<details>
+  <summary>Expand boilerplate code snippet</summary>
+
+```go
+// cmd/coffee-machine/main.go
+
+import (
+	"encoding/json"
+	"net"
+	"net/http"
+
+	"github.com/pojntfx/panrpc/go/pkg/rpc"
+	"nhooyr.io/websocket"
+)
+
+func main() {
+  // ...
+
+  lis, err := net.Listen("tcp", "127.0.0.1:1337")
+	if err != nil {
+		panic(err)
+	}
+	defer lis.Close()
+
+	log.Println("Listening on", lis.Addr())
+
+	if err := http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+
+				log.Printf("Remote control disconnected with error: %v", err)
+			}
+		}()
+
+		switch r.Method {
+		case http.MethodGet:
+			c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+				OriginPatterns: []string{"*"},
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			pings := time.NewTicker(time.Second / 2)
+			defer pings.Stop()
+
+			errs := make(chan error)
+			go func() {
+				for range pings.C {
+					if err := c.Ping(ctx); err != nil {
+						errs <- err
+
+						return
+					}
 				}
 			}()
+
+			conn := websocket.NetConn(ctx, c, websocket.MessageText)
+			defer conn.Close()
 
 			encoder := json.NewEncoder(conn)
 			decoder := json.NewDecoder(conn)
 
-			if err := registry.LinkStream(
-				func(v rpc.Message[json.RawMessage]) error {
-					return encoder.Encode(v)
-				},
-				func(v *rpc.Message[json.RawMessage]) error {
-					return decoder.Decode(v)
-				},
+			go func() {
+				if err := registry.LinkStream(
+					func(v rpc.Message[json.RawMessage]) error {
+						return encoder.Encode(v)
+					},
+					func(v *rpc.Message[json.RawMessage]) error {
+						return decoder.Decode(v)
+					},
 
-				func(v any) (json.RawMessage, error) {
-					b, err := json.Marshal(v)
-					if err != nil {
-						return nil, err
-					}
+					func(v any) (json.RawMessage, error) {
+						b, err := json.Marshal(v)
+						if err != nil {
+							return nil, err
+						}
 
-					return json.RawMessage(b), nil
-				},
-				func(data json.RawMessage, v any) error {
-					return json.Unmarshal([]byte(data), v)
-				},
-			); err != nil {
-					panic(err)
+						return json.RawMessage(b), nil
+					},
+					func(data json.RawMessage, v any) error {
+						return json.Unmarshal([]byte(data), v)
+					},
+				); err != nil {
+					errs <- err
+
+					return
 				}
 			}()
-	}()
-}
-```
 
-For the client, do the same, except this time connect to the server by dialing it:
-
-```go
-// client.go
-
-conn, err := net.Dial("tcp", *addr)
-if err != nil {
-	panic(err)
-}
-defer conn.Close()
-
-encoder := json.NewEncoder(conn)
-decoder := json.NewDecoder(conn)
-
-if err := registry.LinkStream(
-	func(v rpc.Message[json.RawMessage]) error {
-		return encoder.Encode(v)
-	},
-	func(v *rpc.Message[json.RawMessage]) error {
-		return decoder.Decode(v)
-	},
-
-	func(v any) (json.RawMessage, error) {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
+			if err := <-errs; err != nil {
+				panic(err)
+			}
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-
-		return json.RawMessage(b), nil
-	},
-	func(data json.RawMessage, v any) error {
-		return json.Unmarshal([]byte(data), v)
-	},
-); err != nil {
-	panic(err)
-}
-```
-
-#### 5. Call the Functions
-
-Now you can call the functions exposed on the server from the client and vise versa. For example, to call `Println`, a function exposed by the client from the server:
-
-```go
-// server.go
-
-if err := registry.ForRemotes(func(remoteID string, remote remote) error {
-	return remote.Println(ctx, "Hello, world!")
-}); err != nil {
-	panic(err)
-}
-```
-
-Or to call the `Increment` function exposed by the server on the client:
-
-```go
-// client.go
-
-if err := registry.ForRemotes(func(remoteID string, remote remote) error {
-	new, err := remote.Increment(ctx, 1)
-	if err != nil {
-		return err
+	})); err != nil {
+		panic(err)
 	}
-
-	log.Println(new)
-}); err != nil {
-	panic(err)
 }
 ```
 
-By passing the `ForRemotes()` method to the local service itself, you can also access remote functions in the other direction:
+</details>
 
-```go
-// server.go
+**Congratulations!** You've created your first panrpc server. You can start it from your terminal like so:
 
-type local struct {
-	counter int64
-
-	ForRemotes func(cb func(remoteID string, remote R) error) error
-}
-
-func (s *local) Increment(ctx context.Context, delta int64) (int64, error) {
-	remoteID := rpc.GetRemoteID(ctx)
-
-	if err := registry.ForRemotes(func(candidateID string, remote remote) error {
-		if candidateID == remoteID {
-			return peer.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta))
-		}
-	}); err != nil {
-		return -1, err
-	}
-
-	return atomic.AddInt64(&s.counter, delta), nil
-}
-
-// In `main`:
-service := &local{}
-registry := rpc.NewRegistry[remote, json.RawMessage](
-	service,
-
-	context.Background(),
-
-	nil,
-)
-service.ForRemotes = registry.ForRemotes
+```shell
+go run ./cmd/coffee-machine/main.go
 ```
 
-#### 6. Using Closures and Callbacks
+You should now see the following in your terminal, which means that the server is available on `localhost:1337`:
 
-Because panrpc is bidirectional, it is possible to pass closures and callbacks as function arguments, just like you would locally. For example, on the server:
-
-```go
-// server.go
-
-type local struct{}
-
-func (s *local) Iterate(
-	ctx context.Context,
-	length int,
-	onIteration func(i int, b string) (string, error),
-) (int, error) {
-	for i := 0; i < length; i++ {
-		rv, err := onIteration(i, "This is from the callee")
-		if err != nil {
-			return -1, err
-		}
-
-		log.Println("Closure returned:", rv)
-	}
-
-	return length, nil
-}
-
-type remote struct{}
+```plaintext
+Listening on localhost:1337
 ```
-
-And the client:
-
-```go
-// client.go
-
-type local struct{}
-
-type remote struct {
-	Iterate func(
-		ctx context.Context,
-		length int,
-		onIteration func(i int, b string) (string, error),
-	) (int, error)
-}
-```
-
-When you call `peer.Iterate`, you can now pass in a closure:
-
-```go
-// client.go
-
-if err := registry.ForRemotes(func(remoteID string, remote remote) error {
-	length, err := remote.Iterate(ctx, 5, func(i int, b string) (string, error) {
-		log.Println("In iteration", i, b)
-
-		return "This is from the caller", nil
-	})
-	if err != nil {
-		return err
-	}
-
-	log.Println(length)
-}); err != nil {
-	panic(err)
-}
-```
-
-🚀 That's it! We can't wait to see what you're going to build with panrpc. Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information.
 
 </details>
 
@@ -423,8 +319,8 @@ if err := registry.ForRemotes(func(remoteID string, remote remote) error {
 Start by creating a new npm module for the tutorial and installing `@pojntfx/panrpc`:
 
 ```shell
-mkdir -p panrpc-tutorial
-cd panrpc-tutorial
+mkdir -p panrpc-tutorial-typescript
+cd panrpc-tutorial-typescript
 npm init -y
 npm install @pojntfx/panrpc
 ```
