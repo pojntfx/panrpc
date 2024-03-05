@@ -147,7 +147,7 @@ func (s *coffeeMachine) BrewCoffee(
 }
 ```
 
-To start turning the `BrewCoffee` method into an RPC, create an instance of the class and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
+To start turning the `BrewCoffee` method into an RPC, create an instance of the struct and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
 
 ```go
 // cmd/coffee-machine/main.go
@@ -303,6 +303,142 @@ You should now see the following in your terminal, which means that the server i
 
 ```plaintext
 Listening on localhost:1337
+```
+
+</details>
+
+#### 3. Creating a Client
+
+<details>
+  <summary>Expand section</summary>
+
+In order to interact with the coffee machine server, we'll now create the remote control (the coffee machine client), which will call the `BrewCoffee` RPC. To start with implementing the remote control, create a new file `cmd/remote-control/main.go` and define a basic struct with a placeholder method that mirrors the `BrewCoffee` RPC:
+
+```typescript
+// cmd/remote-control/main.go
+
+package main
+
+import "context"
+
+type coffeeMachine struct {
+	BrewCoffee func(
+		ctx context.Context,
+		variant string,
+		size int,
+	) (int, error)
+}
+```
+
+In order to make the `BrewCoffee` placeholder method do RPC calls, create an instance of the struct and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
+
+```typescript
+// cmd/remote-control/main.go
+
+import "github.com/pojntfx/panrpc/go/pkg/rpc"
+
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	clients := 0
+
+	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
+		&struct{}{},
+
+		ctx,
+
+		&rpc.Options{
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v coffee machines connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v coffee machines connected", clients)
+			},
+		},
+	)
+}
+```
+
+Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate to connect to the WebSocket, so feel free to copy-and-paste this:
+
+<details>
+  <summary>Expand boilerplate code snippet</summary>
+
+```typescript
+// cmd/remote-control/main.go
+
+import (
+	"encoding/json"
+
+	"github.com/pojntfx/panrpc/go/pkg/rpc"
+	"nhooyr.io/websocket"
+)
+
+func main() {
+  // ...
+
+  c, _, err := websocket.Dial(ctx, "ws://127.0.0.1:1337", nil)
+	if err != nil {
+		panic(err)
+	}
+
+	conn := websocket.NetConn(ctx, c, websocket.MessageText)
+	defer conn.Close()
+
+	log.Println("Connected to localhost:1337")
+
+	encoder := json.NewEncoder(conn)
+	decoder := json.NewDecoder(conn)
+
+	if err := registry.LinkStream(
+		func(v rpc.Message[json.RawMessage]) error {
+			return encoder.Encode(v)
+		},
+		func(v *rpc.Message[json.RawMessage]) error {
+			return decoder.Decode(v)
+		},
+
+		func(v any) (json.RawMessage, error) {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return nil, err
+			}
+
+			return json.RawMessage(b), nil
+		},
+		func(data json.RawMessage, v any) error {
+			return json.Unmarshal([]byte(data), v)
+		},
+	); err != nil {
+		panic(err)
+	}
+}
+```
+
+</details>
+
+**Cheers!** You've created your first panrpc client. You can start it from your terminal like so:
+
+```shell
+go run ./cmd/remote-control/main.go
+```
+
+You should now see the following in your terminal, which means that the client has connected to the panrpc server at `localhost:1337`:
+
+```plaintext
+Connected to localhost:1337
+1 coffee machines connected
+```
+
+Similarly so, the coffee machine server should output the following:
+
+```plaintext
+1 remote controls connected
 ```
 
 </details>

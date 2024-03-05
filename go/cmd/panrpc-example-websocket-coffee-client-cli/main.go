@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"flag"
 	"log"
 	"os"
 
@@ -34,8 +33,6 @@ type coffeeMachine struct {
 }
 
 func main() {
-	flag.Parse()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
