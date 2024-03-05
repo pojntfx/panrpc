@@ -496,11 +496,6 @@ func main() {
 								return 200
 							}
 						}(),
-						func(ctx context.Context, percentage int) error {
-							log.Printf(`Brewing Cafè Latte ... %v%% done`, percentage)
-
-							return nil
-						},
 					)
 					if err != nil {
 						log.Println("Couldn't brew Cafè Latte:", err)
@@ -523,11 +518,6 @@ func main() {
 								return 200
 							}
 						}(),
-						func(ctx context.Context, percentage int) error {
-							log.Printf(`Brewing Americano ... %v%% done`, percentage)
-
-							return nil
-						},
 					)
 					if err != nil {
 						log.Println("Couldn't brew Americano:", err)
@@ -587,6 +577,215 @@ Remaining water: 900 ml
 ```
 
 **Enjoy your (virtual) coffee!** You've successfully called an RPC provided by a server from the client. Feel free to try out the other supported variants and sizes until there is no more water remaining.
+
+</details>
+
+#### 5. Calling the Client's RPCs from the Server
+
+<details>
+  <summary>Expand section</summary>
+
+So far, we've enabled a remote control/client to call the `BrewCoffee` RPC on the coffee machine/server. This however means that if multiple remote controls are connected to one coffee machine, only the remote control that called the RPC is aware of coffee being brewed. In order to notify the other remote controls that coffee is being brewed, we will use panrpc to call a new RPC on the remote control/client from the coffee machine/server each time we brew coffee.
+
+To get started, we can once again create a basic struct on the client with a method `SetCoffeeMachineBrewing`, which will print the state of the coffee machine to the remote control's terminal:
+
+```go
+// cmd/remote-control/main.go
+
+type remoteControl struct{}
+
+func (s *remoteControl) SetCoffeeMachineBrewing(ctx context.Context, brewing bool) error {
+	if brewing {
+		log.Println("Coffee machine is now brewing")
+	} else {
+		log.Println("Coffee machine has stopped brewing")
+	}
+
+	return nil
+}
+```
+
+To start turning this new `SetCoffeeMachineBrewing` method into an RPC that server can call, create an instance of the struct and pass it to the client's registry like so:
+
+```go
+// cmd/remote-control/main.go
+
+func main() {
+  // ...
+
+  registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
+		&remoteControl{},
+
+		ctx,
+
+		&rpc.Options{
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v coffee machines connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v coffee machines connected", clients)
+			},
+		},
+	)
+
+  // ...
+}
+```
+
+The remote control/client now exposes the `SetCoffeeMachineBrewing` RPC, and we can start enabling the coffee machine/server to call it by defining a basic struct with a method that mirrors the RPC, just like we did before on the remote control for `BrewCoffee`:
+
+```go
+// cmd/coffee-machine/main.go
+
+type remoteControl struct {
+	SetCoffeeMachineBrewing func(ctx context.Context, brewing bool) error
+}
+```
+
+In order to make the `SetCoffeeMachineBrewing` placeholder method do RPC calls, create an instance of the struct and pass it to the server's registry like so:
+
+```typescript
+// cmd/coffee-machine/main.go
+
+func main() {
+  // ...
+
+	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
+		service,
+
+		ctx,
+
+		&rpc.Options{
+			OnClientConnect: func(remoteID string) {
+				clients++
+
+				log.Printf("%v remote controls connected", clients)
+			},
+			OnClientDisconnect: func(remoteID string) {
+				clients--
+
+				log.Printf("%v remote controls connected", clients)
+			},
+		},
+	)
+
+  // ...
+}
+```
+
+The coffee machine/server and the remote control/client now both know of the new `SetCoffeeMachineBrewing` RPC, but the server doesn't call it yet. To fix this, we can call this RPC transparently from the coffee machine by accessing the connected remote control(s) with `registry.ForRemotes` just like we did before in the remote control, and we can handle errors by checking with `if err := ..., err != nil { ... }` just like if we were making a local function call. We'll also use the first argument to the RPC, `ctx`, in conjunction with `rpc.GetRemoteID` to get the ID of the remote control/client that is calling `BrewCoffee`, so that we don't call `SetCoffeeMachineBrewing` on the remote control/client that is calling `BrewCoffee` itself:
+
+```go
+// cmd/remote-control/main.go
+
+type coffeeMachine struct {
+	supportedVariants []string
+	waterLevel        int
+
+	ForRemotes func(
+		cb func(remoteID string, remote remoteControl) error,
+	) error
+}
+
+func (s *coffeeMachine) BrewCoffee(
+	ctx context.Context,
+	variant string,
+	size int,
+) (int, error) {
+  // Get the ID of the remote control that's calling `BrewCoffee`
+	targetID := rpc.GetRemoteID(ctx)
+
+  // Notify connected remote controls that coffee is no longer brewing
+	defer s.ForRemotes(func(remoteID string, remote remoteControl) error {
+    // Don't call `SetCoffeeMachineBrewing` if it's the remote control that's calling `BrewCoffee`
+		if remoteID == targetID {
+			return nil
+		}
+
+		return remote.SetCoffeeMachineBrewing(ctx, false)
+	})
+
+  // Notify connected remote controls that coffee is brewing
+	if err := s.ForRemotes(func(remoteID string, remote remoteControl) error {
+    // Don't call `SetCoffeeMachineBrewing` if it's the remote control that's calling `BrewCoffee`
+		if remoteID == targetID {
+			return nil
+		}
+
+		return remote.SetCoffeeMachineBrewing(ctx, true)
+	}); err != nil {
+		return 0, err
+	}
+
+	if !slices.Contains(s.supportedVariants, variant) {
+		return 0, errors.New("unsupported variant")
+	}
+
+	if s.waterLevel-size < 0 {
+		return 0, errors.New("not enough water")
+	}
+
+	log.Println("Brewing coffee variant", variant, "in size", size, "ml")
+
+	time.Sleep(time.Second * 5)
+
+	s.waterLevel -= size
+
+	return s.waterLevel, nil
+}
+```
+
+Note that we've added the `forRemotes` field to the coffee machine/server; we can get the implementation for it from the registry like so:
+
+```go
+// cmd/coffee-machine/main.go
+
+func main{
+  service := // ...
+
+  registry := // ...
+  service.forRemotes = registry.ForRemotes;
+}
+```
+
+Now that we've added support for this RPC to the coffee machine/server, we can restart it like so:
+
+```shell
+go run ./cmd/coffee-machine/main.go
+```
+
+To test if it works, connect two remote controls/clients to it like so:
+
+```shell
+go run ./cmd/remote-control/main.go
+# In another terminal
+go run ./cmd/remote-control/main.go
+```
+
+You can now request the coffee machine to brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And after the coffee has been brewed, the remote control that you've chosen to brew the coffee with should once again return the remaining water level like so:
+
+```plaintext
+Remaining water: 900 ml
+```
+
+The other connected remote controls will be notified that the coffee machine is brewing, and then once it has finished brewing:
+
+```plaintext
+Coffee machine is now brewing
+Coffee machine has stopped brewing
+```
+
+**Enjoy your distributed coffee machine!** You've successfully called an RPC provided by a client from the server to implement multicast notifications, something that usually is quite complex to do with RPC systems.
 
 </details>
 
