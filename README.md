@@ -314,7 +314,7 @@ Listening on localhost:1337
 
 In order to interact with the coffee machine server, we'll now create the remote control (the coffee machine client), which will call the `BrewCoffee` RPC. To start with implementing the remote control, create a new file `cmd/remote-control/main.go` and define a basic struct with a placeholder method that mirrors the `BrewCoffee` RPC:
 
-```typescript
+```go
 // cmd/remote-control/main.go
 
 package main
@@ -332,7 +332,7 @@ type coffeeMachine struct {
 
 In order to make the `BrewCoffee` placeholder method do RPC calls, create an instance of the struct and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
 
-```typescript
+```go
 // cmd/remote-control/main.go
 
 import "github.com/pojntfx/panrpc/go/pkg/rpc"
@@ -369,7 +369,7 @@ Now that we have a registry that turns the remote control's placeholder methods 
 <details>
   <summary>Expand boilerplate code snippet</summary>
 
-```typescript
+```go
 // cmd/remote-control/main.go
 
 import (
@@ -440,6 +440,153 @@ Similarly so, the coffee machine server should output the following:
 ```plaintext
 1 remote controls connected
 ```
+
+</details>
+
+#### 4. Calling the Server's RPCs from the Client
+
+<details>
+  <summary>Expand section</summary>
+
+The coffee machine and the client are now connected to each other, but we haven't added the ability to call the `BrewCoffee` RPC from the remote control just yet. To fix this, we'll create a simple TUI interface that will print a list of available coffee variants and sizes to the terminal, waits for the user to make their choice by entering a number, and then calls the `BrewCoffee` RPC with the correct arguments. After the coffee has been brewed, we'll print the new water level to the terminal.
+
+To achieve this, we can call this RPC transparently from the remote control by accessing the connected coffee machine(s) with `registry.ForRemotes`, and we can handle errors by checking with `if err := ..., err != nil { ... }` just like if we were making a local function call:
+
+```go
+// cmd/remote-control/main.go
+
+import (
+	"bufio"
+	"log"
+	"os"
+)
+
+func main() {
+  // ...
+
+  go func() {
+		log.Println(`Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano`)
+
+		stdin := bufio.NewReader(os.Stdin)
+
+		for {
+			line, err := stdin.ReadString('\n')
+			if err != nil {
+				panic(err)
+			}
+
+			if err := registry.ForRemotes(func(remoteID string, remote coffeeMachine) error {
+				switch line {
+				case "1\n":
+					fallthrough
+				case "2\n":
+					res, err := remote.BrewCoffee(
+						ctx,
+						"latte",
+						func() int {
+							if line == "1" {
+								return 100
+							} else {
+								return 200
+							}
+						}(),
+						func(ctx context.Context, percentage int) error {
+							log.Printf(`Brewing Cafè Latte ... %v%% done`, percentage)
+
+							return nil
+						},
+					)
+					if err != nil {
+						log.Println("Couldn't brew Cafè Latte:", err)
+
+						return nil
+					}
+
+					log.Println("Remaining water:", res, "ml")
+
+				case "3\n":
+					fallthrough
+				case "4\n":
+					res, err := remote.BrewCoffee(
+						ctx,
+						"americano",
+						func() int {
+							if line == "1" {
+								return 100
+							} else {
+								return 200
+							}
+						}(),
+						func(ctx context.Context, percentage int) error {
+							log.Printf(`Brewing Americano ... %v%% done`, percentage)
+
+							return nil
+						},
+					)
+					if err != nil {
+						log.Println("Couldn't brew Americano:", err)
+
+						return nil
+					}
+
+					log.Println("Remaining water:", res, "ml")
+
+				default:
+					log.Printf("Unknown letter %v, ignoring input", line)
+
+					return nil
+				}
+
+				return nil
+			}); err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+  // ...
+}
+```
+
+Now we can restart the remote control like so:
+
+```shell
+go run ./cmd/remote-control/main.go
+```
+
+After which you should see the following output:
+
+```plaintext
+Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano
+1 coffee machines connected
+Connected to localhost:1337
+```
+
+It is now possible to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And after the coffee has been brewed, the remote control should return the remaining water level like so:
+
+```plaintext
+Remaining water: 900 ml
+```
+
+**Enjoy your (virtual) coffee!** You've successfully called an RPC provided by a server from the client. Feel free to try out the other supported variants and sizes until there is no more water remaining.
 
 </details>
 
