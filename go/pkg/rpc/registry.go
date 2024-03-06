@@ -54,6 +54,7 @@ type Options struct {
 	OnClientDisconnect func(remoteID string)
 }
 
+// Registry exposes local RPCs and implements remote RPCs
 type Registry[R, T any] struct {
 	local  wrappedChild
 	remote R
@@ -66,12 +67,13 @@ type Registry[R, T any] struct {
 	options *Options
 }
 
-func NewRegistry[R, T any](
-	local any,
+// NewRegistry creates a new registry
+func NewRegistry[R, T any]( // Type of remote RPCs to implement, type of nested values
+	local any, // Struct of local RPCs to expose
 
-	ctx context.Context,
+	ctx context.Context, // Global context
 
-	options *Options,
+	options *Options, // Configuration options
 ) *Registry[R, T] {
 	if options == nil {
 		options = &Options{}
@@ -226,15 +228,16 @@ func (r Registry[R, T]) makeRPC(
 	})
 }
 
+// LinkMessage exposes local RPCs and implements remote RPCs via a message-based transport
 func (r Registry[R, T]) LinkMessage(
-	writeRequest,
-	writeResponse func(b T) error,
+	writeRequest, // Function to write requests with
+	writeResponse func(b T) error, // Function to write responses with
 
-	readRequest,
-	readResponse func() (T, error),
+	readRequest, // Function to read requests with
+	readResponse func() (T, error), // Function to read responses with
 
-	marshal func(v any) (T, error),
-	unmarshal func(data T, v any) error,
+	marshal func(v any) (T, error), // Function to marshal nested values with
+	unmarshal func(data T, v any) error, // Function to unmarshal nested values with
 ) error {
 	responseResolver := utils.NewBroadcaster[callResponse[T]]()
 
@@ -664,12 +667,13 @@ func (r Registry[R, T]) LinkMessage(
 	return fatalErr
 }
 
+// LinkStream exposes local RPCs and implements remote RPCs via a stream-based transport
 func (r Registry[R, T]) LinkStream(
-	encode func(v Message[T]) error,
-	decode func(v *Message[T]) error,
+	encode func(v Message[T]) error, // Function to encode messages with
+	decode func(v *Message[T]) error, // Function to decode messages with
 
-	marshal func(v any) (T, error),
-	unmarshal func(data T, v any) error,
+	marshal func(v any) (T, error), // Function to marshal nested values with
+	unmarshal func(data T, v any) error, // Function to unmarshal nested values with
 ) error {
 	var (
 		decodeDone = make(chan struct{})
@@ -733,8 +737,9 @@ func (r Registry[R, T]) LinkStream(
 	)
 }
 
+// ForRemotes iterates over the list of connected remotes
 func (r Registry[R, T]) ForRemotes(
-	cb func(remoteID string, remote R) error,
+	cb func(remoteID string, remote R) error, // Function to execute for each remote
 ) error {
 	r.remotesLock.Lock()
 	defer r.remotesLock.Unlock()
