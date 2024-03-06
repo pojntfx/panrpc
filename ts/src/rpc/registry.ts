@@ -118,6 +118,9 @@ const makeRPC =
         .catch(rej);
     });
 
+/**
+ * Exposes local RPCs and implements remote RPCs
+ */
 export class Registry<L extends Object, R extends Object> {
   private closureManager: ClosureManager;
 
@@ -125,6 +128,12 @@ export class Registry<L extends Object, R extends Object> {
     [remoteID: string]: R;
   } = {};
 
+  /**
+   * Create a new registry
+   * @param local Class with local RPCs to expose
+   * @param remote Class with remote RPC placeholders to implement
+   * @param options Configuration options
+   */
   constructor(
     private local: L,
     private remote: R,
@@ -134,6 +143,15 @@ export class Registry<L extends Object, R extends Object> {
     this.closureManager = new ClosureManager();
   }
 
+  /**
+   * Expose local RPCs and implement remote RPCs via a message-based transport
+   * @param requestWriter Stream to write requests to
+   * @param responseWriter Stream to write responses to
+   * @param requestReader Stream to read requests from
+   * @param responseReader Stream to read responses from
+   * @param marshal Function to marshal nested values with
+   * @param unmarshal Function to unmarshal nested values with
+   */
   linkMessage = <T>(
     requestWriter: WritableStreamDefaultWriter<T>,
     responseWriter: WritableStreamDefaultWriter<T>,
@@ -311,6 +329,13 @@ export class Registry<L extends Object, R extends Object> {
     this.options?.onClientConnect?.(remoteID);
   };
 
+  /**
+   * Expose local RPCs and implement remote RPCs via a stream-based transport
+   * @param encoder Stream to write messages to
+   * @param decoder Stream to read messages from
+   * @param marshal Function to marshal nested values with
+   * @param unmarshal Function to unmarshal nested values with
+   */
   linkStream = <T>(
     encoder: WritableStream,
     decoder: ReadableStream,
@@ -430,6 +455,10 @@ export class Registry<L extends Object, R extends Object> {
     );
   };
 
+  /**
+   * Iterate over list of connected remotes
+   * @param cb Function to execute for each remote
+   */
   forRemotes = async (cb: (remoteID: string, remote: R) => Promise<void>) => {
     // eslint-disable-next-line no-restricted-syntax
     for (const remoteID of Object.keys(this.remotes)) {
