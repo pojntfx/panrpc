@@ -789,6 +789,170 @@ Coffee machine has stopped brewing
 
 </details>
 
+#### 6. Passing Closures to RPCs
+
+<details>
+  <summary>Expand section</summary>
+
+So far, when the remote control/client calls the `BrewCoffee` RPC, there is no way of knowing the incremental progress of the brew other than waiting for `BrewCoffee` to return the new water level. In order to know of the progress of the coffee machine as it is brewing, we can make use of the closure/callback support in panrpc, which allows us to pass a function to an RPC call, just like you could do locally. First, we'll add a `onProgress` callback to the coffee machine's `BrewCoffee` implementation, which we then call incrementally during the brewing process:
+
+```go
+// cmd/coffee-machine/main.go
+
+func (s *coffeeMachine) BrewCoffee(
+	ctx context.Context,
+	variant string,
+	size int,
+	onProgress func(ctx context.Context, percentage int) error, // This is new
+) (int, error) {
+	// ...
+
+	// Report 0% brewing process
+	if err := onProgress(ctx, 0); err != nil {
+		return 0, err
+	}
+
+	// Report 25% brewing process
+	time.Sleep(500 * time.Millisecond)
+	if err := onProgress(ctx, 25); err != nil {
+		return 0, err
+	}
+
+	// Report 50% brewing process
+	time.Sleep(500 * time.Millisecond)
+	if err := onProgress(ctx, 50); err != nil {
+		return 0, err
+	}
+
+	// Report 75% brewing process
+	time.Sleep(500 * time.Millisecond)
+	if err := onProgress(ctx, 75); err != nil {
+		return 0, err
+	}
+
+	// Report 100% brewing process
+	time.Sleep(500 * time.Millisecond)
+	if err := onProgress(ctx, 100); err != nil {
+		return 0, err
+	}
+
+	// ..
+
+	return s.waterLevel, nil
+}
+```
+
+In the remote control, we'll also extend the struct with the `BrewCoffee` placeholder method with this new RPC argument:
+
+```go
+// cmd/remote-control/main.go
+
+type coffeeMachine struct {
+	BrewCoffee func(
+		ctx context.Context,
+		variant string,
+		size int,
+		onProgress func(ctx context.Context, percentage int) error, // This is new
+	) (int, error)
+}
+```
+
+And finally, where we call the `BrewCoffee` RPC in the remote control/client, we can pass in the implementation of this closure:
+
+```go
+// cmd/remote-control/main.go
+
+go func() {
+	// ...
+	for {
+		// ...
+		if err := registry.ForRemotes(func(remoteID string, remote coffeeMachine) error {
+			switch line {
+			case "1\n":
+				fallthrough
+			case "2\n":
+				res, err := remote.BrewCoffee(
+					ctx,
+					"latte",
+					func() int {
+						if line == "1" {
+							return 100
+						} else {
+							return 200
+						}
+					}(),
+					func(ctx context.Context, percentage int) error {
+						log.Printf(`Brewing Cafè Latte ... %v%% done`, percentage) // This is new
+
+						return nil
+					},
+				)
+
+				// ...
+
+			case "3\n":
+				fallthrough
+			case "4\n":
+				res, err := remote.BrewCoffee(
+					ctx,
+					"americano",
+					func() int {
+						if line == "1" {
+							return 100
+						} else {
+							return 200
+						}
+					}(),
+					func(ctx context.Context, percentage int) error {
+						log.Printf(`Brewing Americano ... %v%% done`, percentage) // This is new
+
+						return nil
+					},
+				)
+
+				// ...
+
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	}
+}()
+```
+
+Now that we can restart the coffee machine/server again like so:
+
+```shell
+go run ./cmd/coffee-machine/main.go
+```
+
+And connect the remote control/client to it again like so:
+
+```shell
+go run ./cmd/remote-control/main.go
+```
+
+You can now request the coffee machine to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
+
+```plaintext
+Brewing coffee variant latte in size 100 ml
+```
+
+And the remote control will print the progress as reported by the coffee machine to the terminal, before once again returning the remaining water level like so:
+
+```plaintext
+Brewing Cafè Latte ... 0% done
+Brewing Cafè Latte ... 25% done
+Brewing Cafè Latte ... 50% done
+Brewing Cafè Latte ... 75% done
+Brewing Cafè Latte ... 100% done
+Remaining water: 900 ml
+```
+
+**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./go/cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./go/cmd/panrpc-example-websocket-coffee-client-cli/main.go) for a recap.
+
+</details>
+
 ### TypeScript
 
 > Just looking for sample code? Check out the sources for the example [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts).
