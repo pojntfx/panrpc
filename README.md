@@ -147,6 +147,13 @@ func (s *coffeeMachine) BrewCoffee(
 }
 ```
 
+> [!IMPORTANT]  
+> The following limitations on which methods can be exposed as RPCs exist:
+>
+> - Methods must have `context.Context` as their first argument
+> - Methods can not have variadic arguments
+> - Methods must return either an error or a single value and an error
+
 To start turning the `BrewCoffee` method into an RPC, create an instance of the struct and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
 
 ```go
@@ -1028,6 +1035,12 @@ class CoffeeMachine {
 }
 ```
 
+> [!IMPORTANT]  
+> The following limitations on which methods can be exposed as RPCs exist:
+>
+> - Methods must have `ILocalContext` as their first argument
+> - Methods can not have variadic arguments
+
 To start turning the `BrewCoffee` method into an RPC, create an instance of the class and pass it to a [panrpc Registry](https://pojntfx.github.io/panrpc/classes/Registry.html) like so:
 
 ```typescript
@@ -1170,6 +1183,9 @@ class CoffeeMachine {
   }
 }
 ```
+
+> [!IMPORTANT]  
+> Placeholder methods must have `IRemoteContext` instead of `ILocalContext` as their first argument.
 
 In order to make the `BrewCoffee` placeholder method do RPC calls, create an instance of the class and pass it to a [panrpc Registry](https://pojntfx.github.io/panrpc/classes/Registry.html) like so:
 
