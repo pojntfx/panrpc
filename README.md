@@ -34,13 +34,13 @@ It enables you to ...
 You can add panrpc to your **Go** project by running the following:
 
 ```shell
-go get github.com/pojntfx/panrpc/...@latest
+$ go get github.com/pojntfx/panrpc/...@latest
 ```
 
 For **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
 
 ```shell
-npm install @pojntfx/panrpc
+$ npm install @pojntfx/panrpc
 ```
 
 ### `purl` Tool
@@ -50,15 +50,15 @@ In addition to the library, the CLI tool `purl` is also available; `purl` is lik
 On Linux, you can install them like so:
 
 ```shell
-curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.linux-$(uname -m)"
-sudo install /tmp/purl /usr/local/bin
+$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.linux-$(uname -m)"
+$ sudo install /tmp/purl /usr/local/bin
 ```
 
 On macOS, you can use the following:
 
 ```shell
-curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.darwin-$(uname -m)"
-sudo install /tmp/purl /usr/local/bin
+$ curl -L -o /tmp/purl "https://github.com/pojntfx/panrpc/releases/latest/download/purl.darwin-$(uname -m)"
+$ sudo install /tmp/purl /usr/local/bin
 ```
 
 On Windows, the following should work (using PowerShell as administrator):
@@ -83,16 +83,16 @@ You can find binaries for more operating systems and architectures on [GitHub re
 Start by creating a new Go module for the tutorial and installing `github.com/pojntfx/panrpc/go`:
 
 ```shell
-mkdir -p panrpc-tutorial-go
-cd panrpc-tutorial-go
-go mod init panrpc-tutorial-go
-go get github.com/pojntfx/panrpc/go@latest
+$ mkdir -p panrpc-tutorial-go
+$ cd panrpc-tutorial-go
+$ go mod init panrpc-tutorial-go
+$ go get github.com/pojntfx/panrpc/go@latest
 ```
 
 The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
 
 ```shell
-go get nhooyr.io/websocket@latest
+$ go get nhooyr.io/websocket@latest
 ```
 
 In addition to supporting many transports, the TypeScript version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a `io.ReadWriter` stream can be used. For this tutorial, we'll be using JSON as the serializer through the `encoding/json` Go standard library.
@@ -303,7 +303,7 @@ func main() {
 **Congratulations!** You've created your first panrpc server. You can start it from your terminal like so:
 
 ```shell
-go run ./cmd/coffee-machine/main.go
+$ go run ./cmd/coffee-machine/main.go
 ```
 
 You should now see the following in your terminal, which means that the server is available on `localhost:1337`:
@@ -432,7 +432,7 @@ func main() {
 **Cheers!** You've created your first panrpc client. You can start it from your terminal like so:
 
 ```shell
-go run ./cmd/remote-control/main.go
+$ go run ./cmd/remote-control/main.go
 ```
 
 You should now see the following in your terminal, which means that the client has connected to the panrpc server at `localhost:1337`:
@@ -554,7 +554,7 @@ func main() {
 Now we can restart the remote control like so:
 
 ```shell
-go run ./cmd/remote-control/main.go
+$ go run ./cmd/remote-control/main.go
 ```
 
 After which you should see the following output:
@@ -762,15 +762,15 @@ func main{
 Now that we've added support for this RPC to the coffee machine/server, we can restart it like so:
 
 ```shell
-go run ./cmd/coffee-machine/main.go
+$ go run ./cmd/coffee-machine/main.go
 ```
 
 To test if it works, connect two remote controls/clients to it like so:
 
 ```shell
-go run ./cmd/remote-control/main.go
+$ go run ./cmd/remote-control/main.go
 # In another terminal
-go run ./cmd/remote-control/main.go
+$ go run ./cmd/remote-control/main.go
 ```
 
 You can now request the coffee machine to brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
@@ -930,13 +930,13 @@ go func() {
 Now that we can restart the coffee machine/server again like so:
 
 ```shell
-go run ./cmd/coffee-machine/main.go
+$ go run ./cmd/coffee-machine/main.go
 ```
 
 And connect the remote control/client to it again like so:
 
 ```shell
-go run ./cmd/remote-control/main.go
+$ go run ./cmd/remote-control/main.go
 ```
 
 You can now request the coffee machine to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
@@ -972,22 +972,22 @@ Remaining water: 900 ml
 Start by creating a new npm module for the tutorial and installing `@pojntfx/panrpc`:
 
 ```shell
-mkdir -p panrpc-tutorial-typescript
-cd panrpc-tutorial-typescript
-npm init -y
-npm install @pojntfx/panrpc
+$ mkdir -p panrpc-tutorial-typescript
+$ cd panrpc-tutorial-typescript
+$ npm init -y
+$ npm install @pojntfx/panrpc
 ```
 
 The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [WHATWG stream](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) can be used with the panrpc [`linkStream` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`linkMessage` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `ws` library, which you can install like so:
 
 ```shell
-npm install ws
+$ npm install ws
 ```
 
 In addition to supporting many transports, the TypeScript version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a WHATWG stream can be used. For this tutorial, we'll be using JSON as the serializer through the `@streamparser/json-whatwg` library, which you can install like so:
 
 ```shell
-npm install @streamparser/json-whatwg
+$ npm install @streamparser/json-whatwg
 ```
 
 </details>
@@ -1150,7 +1150,7 @@ console.log("Listening on localhost:1337");
 **Congratulations!** You've created your first panrpc server. You can start it from your terminal like so:
 
 ```shell
-npx tsx coffee-machine.ts
+$ npx tsx coffee-machine.ts
 ```
 
 You should now see the following in your terminal, which means that the server is available on `localhost:1337`:
@@ -1295,7 +1295,7 @@ console.log("Connected to localhost:1337");
 **Cheers!** You've created your first panrpc client. You can start it from your terminal like so:
 
 ```shell
-npx tsx remote-control.ts
+$ npx tsx remote-control.ts
 ```
 
 You should now see the following in your terminal, which means that the client has connected to the panrpc server at `localhost:1337`:
@@ -1386,7 +1386,7 @@ import { createInterface } from "readline/promises";
 Now we can restart the remote control like so:
 
 ```shell
-npx tsx remote-control.ts
+$ npx tsx remote-control.ts
 ```
 
 After which you should see the following output:
@@ -1578,15 +1578,15 @@ service.forRemotes = registry.forRemotes;
 Now that we've added support for this RPC to the coffee machine/server, we can restart it like so:
 
 ```shell
-npx tsx coffee-machine.ts
+$ npx tsx coffee-machine.ts
 ```
 
 To test if it works, connect two remote controls/clients to it like so:
 
 ```shell
-npx tsx remote-control.ts
+$ npx tsx remote-control.ts
 # In another terminal
-npx tsx remote-control.ts
+$ npx tsx remote-control.ts
 ```
 
 You can now request the coffee machine to brew a coffee on either of the remote controls by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
@@ -1733,13 +1733,13 @@ And finally, where we call the `BrewCoffee` RPC in the remote control/client, we
 Now that we can restart the coffee machine/server again like so:
 
 ```shell
-npx tsx coffee-machine.ts
+$ npx tsx coffee-machine.ts
 ```
 
 And connect the remote control/client to it again like so:
 
 ```shell
-npx tsx remote-control.ts
+$ npx tsx remote-control.ts
 ```
 
 You can now request the coffee machine to brew a coffee by pressing a number and <kbd>ENTER</kbd>. Once the RPC has been called, the coffee machine should print something like the following again:
@@ -1970,20 +1970,20 @@ To contribute, please use the [GitHub flow](https://guides.github.com/introducti
 To build and start a development version of panrpc locally, run the following:
 
 ```shell
-git clone https://github.com/pojntfx/panrpc.git
+$ git clone https://github.com/pojntfx/panrpc.git
 
 # For Go
-cd panrpc/go
-go run ./cmd/panrpc-example-tcp-server-cli/ # Starts the Go TCP example server CLI
+$ cd panrpc/go
+$ go run ./cmd/panrpc-example-tcp-server-cli/ # Starts the Go TCP example server CLI
 # In another terminal
-go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client CLI
+$ go run ./cmd/panrpc-example-tcp-client-cli/ # Starts the Go TCP example client CLI
 
 # For TypeScript
-cd panrpc/ts
-npm install
-npx tsx ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
+$ cd panrpc/ts
+$ npm install
+$ npx tsx ./bin/panrpc-example-tcp-server-cli.ts # Starts the TypeScript TCP example server CLI
 # In another terminal
-npx tsx ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
+$ npx tsx ./bin/panrpc-example-tcp-client-cli.ts # Starts the TypeScript TCP example client CLI
 ```
 
 Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#panrpc:matrix.org?via=matrix.org)!
