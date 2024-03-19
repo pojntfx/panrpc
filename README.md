@@ -1,9 +1,6 @@
-# panrpc
+<img alt="Project icon" style="vertical-align: middle;" src="./docs/icon.svg" width="120" height="120" align="left">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/logo-readme-dark.png">
-  <img alt="Logo" src="./docs/logo-readme-light.png">
-</picture>
+# panrpc
 
 Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.
 
@@ -1990,6 +1987,6 @@ Have any questions or need help? Chat with us [on Matrix](https://matrix.to/#/#p
 
 ## License
 
-panrpc (c) 2023 Felicitas Pojtinger and contributors
+panrpc (c) 2024 Felicitas Pojtinger and contributors
 
 SPDX-License-Identifier: Apache-2.0
