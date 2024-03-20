@@ -8,7 +8,7 @@
    version="1.1"
    id="svg5"
    xml:space="preserve"
-   sodipodi:docname="icon-light.svg"
+   sodipodi:docname="icon.svg"
    inkscape:version="1.3.2 (091e20ef0f, 2023-11-25)"
    inkscape:export-filename="icon-light.png"
    inkscape:export-xdpi="96"
@@ -250,7 +250,7 @@
        r="67.733337"
        sodipodi:insensitive="true" /><path
        id="path22"
-       style="fill:#efbf9f;fill-opacity:1;stroke:none;stroke-width:0;stroke-opacity:1;filter:url(#filter125)"
+       style="fill:#007d9c;fill-opacity:1;stroke:none;stroke-width:0;stroke-opacity:1;filter:url(#filter125)"
        d="m 120.42225,129.52195 -1.66028,2.00863 -20.338375,10.44573 -1.943002,9.02623 4.333517,7.21694 7.21644,4.33351 9.02623,-1.94349 10.44623,-20.33837 2.00813,-1.65979 -0.86246,-8.22643 v -5e-4 z"
        transform="matrix(1.0597149,0.28394975,-0.28394975,1.0597149,36.544731,-45.955307)" /><g
        id="g164"
