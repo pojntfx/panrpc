@@ -551,6 +551,8 @@ func main() {
 }
 ```
 
+> Note that by cancelling the `context.Context` that we pass in as the first argument to every RPC call, you can cancel an RPC call before it has returned, which is useful for [implementing things like timeouts](https://pkg.go.dev/context#WithTimeout). If you don't cancel this `context.Context` like we do in this example, the RPC call will simply block until it returns.
+
 Now we can restart the remote control like so:
 
 ```shell
@@ -1386,6 +1388,8 @@ import { createInterface } from "readline/promises";
   }
 })();
 ```
+
+> Note that by aborting the [AbortSignal](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal) that we can pass in as the first argument to every RPC call, you can abort an RPC call before it has returned, which is useful for [implementing things like timeouts](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal#aborting_a_fetch_operation_with_a_timeout). If you don't abort this `AbortSignal`, or pass in `undefined` like we do in this example, the RPC call will simply block until it returns.
 
 Now we can restart the remote control like so:
 
