@@ -14,15 +14,15 @@ Language-, transport- and serialization-agnostic RPC framework with remote closu
 
 ## Overview
 
-panrpc is a novel RPC framework with a unique feature: It allows exposing functions on **both the client and server**!
+panrpc is a flexible high-performance RPC framework designed to work in almost any environment with advanced features such as remote closures and bidirectional RPC calls.
 
 It enables you to ...
 
-- **Call remote functions transparently**: panrpc makes use of reflection, so you can call functions as though they were local without defining your own protocol or generating code
-- **Call functions on the client from the server**: Unlike most RPC frameworks, panrpc allows for functions to be exposed on both the server and the client, enabling its use in new usecases such as doing bidirectional data transfer without subscriptions or pushing information before the client requests it
-- **Implement RPCs on any transport layer**: By being able to work with any `io.ReadWriteCloser` such as TCP, WebSocket or WebRTC with the [Stream-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream), or any message-based transport such as Redis or NATS with the [Message-Oriented API](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage), you can use panrpc to build services that run in almost any environment, including the browser!
-- **Use an encoding/decoding layer of your choice**: Instead of depending on Protobuf or another fixed format for serialization, panrpc can work with every serialization framework that implements the basic `Marshal`/`Unmarshal` interface, such as JSON or CBOR.
-- **Pass closures and callbacks to RPCs**: Thanks to its bidirectional capabilities, panrpc can handle closures and callbacks transparently, just like with local function calls!
+- **Transparently call and expose RPCs in many languages**: Thanks to it's use of reflection, panrpc doesn't require you to learn a DSL or run a code generator. RPCs are defined and called as local functions, and its [simple protocol](#protocol) means that [multiple languages](#examples) are supported and adding support for new ones is simple.
+- **Work with any transport layer**: Instead of being restricted to one transport layer (like TCP or WebSockets for most RPC frameworks), panrpc depends only on the semantics of a [stream](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream) or a [message](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage), meaning it works over everything from TCP, WebSockets, UNIX sockets, WebRTC, Redis, NATS and more.
+- **Work with any serializer**: Instead of being restricted to one serialization framework (like Protobuf or JSON for most RPC frameworks), panrpc can use any user-defined serializer that supports streaming encode/decode, such as JSON, CBOR and others.
+- **Call RPCs on both clients and servers**: Unlike most RPC frameworks, which only allow you to call a server's RPCs from a client, panrpc can also work with the reverse configuration (where the server calls RPCs exposed by the client) or both at the same time.
+- **Pass closures to RPCs**: You can transparently pass closures and callbacks to RPCs as function parameters, and they will be called by the RPC just like if it were a local function call.
 
 ## Installation
 
