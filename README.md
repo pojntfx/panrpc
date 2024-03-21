@@ -28,13 +28,13 @@ It enables you to ...
 
 ### Library
 
-You can add panrpc to your **Go** project by running the following:
+You can add panrpc to your <img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> **Go** project by running the following:
 
 ```shell
 $ go get github.com/pojntfx/panrpc/...@latest
 ```
 
-For **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
+For <img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
 
 ```shell
 $ npm install @pojntfx/panrpc
@@ -68,7 +68,7 @@ You can find binaries for more operating systems and architectures on [GitHub re
 
 ## Tutorial
 
-### Go
+### <img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Go
 
 > Just looking for sample code? Check out the sources for the example [coffee machine server](./go/cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./go/cmd/panrpc-example-websocket-coffee-client-cli/main.go).
 
@@ -962,7 +962,7 @@ Remaining water: 900 ml
 
 </details>
 
-### TypeScript
+### <img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> TypeScript
 
 > Just looking for sample code? Check out the sources for the example [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts).
 
@@ -1782,53 +1782,53 @@ To make getting started with panrpc easier, take a look at the following example
 
 - **Transports**
   - **TCP (Stream-Oriented API)**
-    - [Go TCP Server CLI Example](./go/cmd/panrpc-example-tcp-server-cli/main.go)
-    - [Go TCP Client CLI Example](./go/cmd/panrpc-example-tcp-client-cli/main.go)
-    - [TypeScript TCP Server CLI Example](./ts/bin/panrpc-example-tcp-server-cli.ts)
-    - [TypeScript TCP Client CLI Example](./ts/bin/panrpc-example-tcp-client-cli.ts)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Server CLI Example](./go/cmd/panrpc-example-tcp-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Client CLI Example](./go/cmd/panrpc-example-tcp-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> TCP Server CLI Example](./ts/bin/panrpc-example-tcp-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> TCP Client CLI Example](./ts/bin/panrpc-example-tcp-client-cli.ts)
   - **UNIX Socket (Stream-Oriented API)**
-    - [Go UNIX Socket Server CLI Example](./go/cmd/panrpc-example-unix-server-cli/main.go)
-    - [Go UNIX Socket Client CLI Example](./go/cmd/panrpc-example-unix-client-cli/main.go)
-    - [TypeScript UNIX Socket Server CLI Example](./ts/bin/panrpc-example-unix-server-cli.ts)
-    - [TypeScript UNIX Socket Client CLI Example](./ts/bin/panrpc-example-unix-client-cli.ts)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> UNIX Socket Server CLI Example](./go/cmd/panrpc-example-unix-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> UNIX Socket Client CLI Example](./go/cmd/panrpc-example-unix-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> UNIX Socket Server CLI Example](./ts/bin/panrpc-example-unix-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> UNIX Socket Client CLI Example](./ts/bin/panrpc-example-unix-client-cli.ts)
   - **`stdin/stdout` Pipe (Stream-Oriented API)**
-    - [Go `stdin/stdout` Pipe Socket Server CLI Example](./go/cmd/panrpc-example-pipe-server-cli/main.go)
-    - [Go `stdin/stdout` Pipe Socket Client CLI Example](./go/cmd/panrpc-example-pipe-client-cli/main.go)
-    - [TypeScript `stdin/stdout` Pipe Server CLI Example](./ts/bin/panrpc-example-pipe-server-cli.ts)
-    - [TypeScript `stdin/stdout` Pipe Client CLI Example](./ts/bin/panrpc-example-pipe-client-cli.ts)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> `stdin/stdout` Pipe Socket Server CLI Example](./go/cmd/panrpc-example-pipe-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> `stdin/stdout` Pipe Socket Client CLI Example](./go/cmd/panrpc-example-pipe-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> `stdin/stdout` Pipe Server CLI Example](./ts/bin/panrpc-example-pipe-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> `stdin/stdout` Pipe Client CLI Example](./ts/bin/panrpc-example-pipe-client-cli.ts)
   - **WebSocket (Stream-Oriented API)**
-    - [Go WebSocket Server CLI Example](./go/cmd/panrpc-example-websocket-server-cli/main.go)
-    - [Go WebSocket Client CLI Example](./go/cmd/panrpc-example-websocket-client-cli/main.go)
-    - [TypeScript WebSocket Server CLI Example](./ts/bin/panrpc-example-websocket-server-cli.ts)
-    - [TypeScript WebSocket Client CLI Example](./ts/bin/panrpc-example-websocket-client-cli.ts)
-    - [TypeScript WebSocket Client Web Example](./ts/bin/panrpc-example-websocket-client-web)
+    - <img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> [WebSocket Server CLI Example](./go/cmd/panrpc-example-websocket-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> WebSocket Client CLI Example](./go/cmd/panrpc-example-websocket-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Server CLI Example](./ts/bin/panrpc-example-websocket-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Client CLI Example](./ts/bin/panrpc-example-websocket-client-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Client Web Example](./ts/bin/panrpc-example-websocket-client-web)
   - **WebRTC (Stream-Oriented API)**
-    - [Go WebRTC Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
-    - [TypeScript WebRTC Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
   - **Redis (Message-Oriented API)**
-    - [Go Redis Server CLI Example](./go/cmd/panrpc-example-redis-server-cli/main.go)
-    - [Go Redis Client CLI Example](./go/cmd/panrpc-example-redis-client-cli/main.go)
-    - [TypeScript Redis Server CLI Example](./ts/bin/panrpc-example-redis-server-cli.ts)
-    - [TypeScript Redis Client CLI Example](./ts/bin/panrpc-example-redis-client-cli.ts)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Redis Server CLI Example](./go/cmd/panrpc-example-redis-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Redis Client CLI Example](./go/cmd/panrpc-example-redis-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Redis Server CLI Example](./ts/bin/panrpc-example-redis-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Redis Client CLI Example](./ts/bin/panrpc-example-redis-client-cli.ts)
 - **Callbacks**
-  - [Go Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-callbacks-callee-cli/main.go)
-  - [Go Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-callbacks-caller-cli/main.go)
-  - [TypeScript Callbacks Demo Server CLI Example](./ts/bin/panrpc-example-callbacks-callee-cli.ts)
-  - [TypeScript Callbacks Demo Client CLI Example](./ts/bin/panrpc-example-callbacks-caller-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-callbacks-callee-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-callbacks-caller-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./ts/bin/panrpc-example-callbacks-callee-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./ts/bin/panrpc-example-callbacks-caller-cli.ts)
 - **Closures**
-  - [Go Closures Demo Server CLI Example](./go/cmd/panrpc-example-closures-callee-cli/main.go)
-  - [Go Closures Demo Client CLI Example](./go/cmd/panrpc-example-closures-caller-cli/main.go)
-  - [TypeScript Closures Demo Server CLI Example](./ts/bin/panrpc-example-closures-callee-cli.ts)
-  - [TypeScript Closures Demo Client CLI Example](./ts/bin/panrpc-example-closures-caller-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./go/cmd/panrpc-example-closures-callee-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./go/cmd/panrpc-example-closures-caller-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./ts/bin/panrpc-example-closures-callee-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./ts/bin/panrpc-example-closures-caller-cli.ts)
 - **Benchmarks**
-  - [Go Requests/Second Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-rps-server-cli/main.go)
-  - [Go Requests/Second Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-rps-client-cli/main.go)
-  - [TypeScript Requests/Second Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-rps-server-cli.ts)
-  - [TypeScript Requests/Second Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-rps-client-cli.ts)
-  - [Go Throughput Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-throughput-server-cli/main.go)
-  - [Go Throughput Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-throughput-client-cli/main.go)
-  - [TypeScript Throughput Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-throughput-server-cli.ts)
-  - [TypeScript Throughput Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-throughput-client-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-rps-server-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-rps-client-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-rps-server-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-rps-client-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Throughput Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-throughput-server-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Throughput Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-throughput-client-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Throughput Benchmark Server CLI Example](./ts/bin/panrpc-example-tcp-throughput-server-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Throughput Benchmark Client CLI Example](./ts/bin/panrpc-example-tcp-throughput-client-cli.ts)
 
 ### Benchmarks
 
