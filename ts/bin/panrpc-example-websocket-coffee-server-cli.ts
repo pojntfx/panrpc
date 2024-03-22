@@ -113,6 +113,7 @@ const registry = new Registry(
 
 service.forRemotes = registry.forRemotes;
 
+// Create WebSocket server
 const server = new WebSocketServer({
   host: "127.0.0.1",
   port: 1337,
@@ -123,12 +124,14 @@ server.on("connection", (socket) => {
     console.error("Remote control disconnected with error:", e);
   });
 
+  // Set up streaming JSON encoder
   const encoder = new WritableStream({
     write(chunk) {
       socket.send(JSON.stringify(chunk));
     },
   });
 
+  // Set up streaming JSON decoder
   const parser = new JSONParser({
     paths: ["$"],
     separator: "",

@@ -119,6 +119,7 @@ const registry = new Registry(
   }
 })();
 
+// Connect to WebSocket server
 const socket = new WebSocket("ws://127.0.0.1:1337");
 
 socket.addEventListener("error", (e) => {
@@ -133,12 +134,14 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
+// Set up streaming JSON encoder
 const encoder = new WritableStream({
   write(chunk) {
     socket.send(JSON.stringify(chunk));
   },
 });
 
+// Set up streaming JSON decoder
 const parser = new JSONParser({
   paths: ["$"],
   separator: "",

@@ -86,13 +86,13 @@ $ go mod init panrpc-tutorial-go
 $ go get github.com/pojntfx/panrpc/go@latest
 ```
 
-The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
+The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
 
 ```shell
 $ go get nhooyr.io/websocket@latest
 ```
 
-In addition to supporting many transports, the TypeScript version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a `io.ReadWriter` stream can be used. For this tutorial, we'll be using JSON as the serializer through the `encoding/json` Go standard library.
+In addition to supporting many transports, the Go version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a `io.ReadWriter` stream can be used. For this tutorial, we'll be using JSON as the serializer through the `encoding/json` Go standard library.
 
 </details>
 
@@ -191,7 +191,7 @@ func main() {
 }
 ```
 
-Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate to upgrade from HTTP to WebSockets, so feel free to copy-and-paste this:
+Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate to upgrade from HTTP to WebSockets, so feel free to copy-and-paste this, or take a look at the [examples](#examples) to check out how you can set up a different transport (TCP, WebSockets, UNIX sockets etc.) and serializer (JSON, CBOR etc.) instead:
 
 <details>
   <summary>Expand boilerplate code snippet</summary>
@@ -211,7 +211,8 @@ import (
 func main() {
   // ...
 
-  lis, err := net.Listen("tcp", "127.0.0.1:1337")
+  // Create TCP listener
+	lis, err := net.Listen("tcp", "127.0.0.1:1337")
 	if err != nil {
 		panic(err)
 	}
@@ -219,6 +220,7 @@ func main() {
 
 	log.Println("Listening on", lis.Addr())
 
+	// Create HTTP server from TCP listener
 	if err := http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -228,6 +230,7 @@ func main() {
 			}
 		}()
 
+		// Upgrade from HTTP to WebSockets
 		switch r.Method {
 		case http.MethodGet:
 			c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -254,6 +257,7 @@ func main() {
 			conn := websocket.NetConn(ctx, c, websocket.MessageText)
 			defer conn.Close()
 
+			// Set up the streaming JSON encoder and decoder
 			encoder := json.NewEncoder(conn)
 			decoder := json.NewDecoder(conn)
 
@@ -371,7 +375,7 @@ func main() {
 }
 ```
 
-Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate to connect to the WebSocket, so feel free to copy-and-paste this:
+Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate to connect to the WebSocket, so feel free to copy-and-paste this, or take a look at the [examples](#examples) to check out how you can set up a different transport (TCP, WebSockets, UNIX sockets etc.) and serializer (JSON, CBOR etc.) instead:
 
 <details>
   <summary>Expand boilerplate code snippet</summary>
@@ -389,7 +393,8 @@ import (
 func main() {
   // ...
 
-  c, _, err := websocket.Dial(ctx, "ws://127.0.0.1:1337", nil)
+ // Connect to WebSocket server
+	c, _, err := websocket.Dial(ctx, "ws://127.0.0.1:1337", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -399,6 +404,7 @@ func main() {
 
 	log.Println("Connected to localhost:1337")
 
+	// Set up the streaming JSON encoder and decoder
 	encoder := json.NewEncoder(conn)
 	decoder := json.NewDecoder(conn)
 
@@ -657,7 +663,7 @@ type remoteControl struct {
 
 In order to make the `SetCoffeeMachineBrewing` placeholder method do RPC calls, create an instance of the struct and pass it to the server's registry like so:
 
-```typescript
+```go
 // cmd/coffee-machine/main.go
 
 func main() {
@@ -1076,7 +1082,7 @@ const registry = new Registry(
 );
 ```
 
-Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this:
+Now that we have a registry that provides our coffee machine's RPCs, we can link it to our transport (WebSockets) and serializer of choice (JSON). This requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this, or take a look at the [examples](#examples) to check out how you can set up a different transport (TCP, WebSockets, UNIX sockets etc.) and serializer (JSON, CBOR etc.) instead:
 
 <details>
   <summary>Expand boilerplate code snippet</summary>
@@ -1087,6 +1093,7 @@ Now that we have a registry that provides our coffee machine's RPCs, we can link
 import { JSONParser } from "@streamparser/json-whatwg";
 import { WebSocketServer } from "ws";
 
+// Create WebSocket server
 const server = new WebSocketServer({
   host: "127.0.0.1",
   port: 1337,
@@ -1097,12 +1104,14 @@ server.on("connection", (socket) => {
     console.error("Remote control disconnected with error:", e);
   });
 
+  // Set up streaming JSON encoder
   const encoder = new WritableStream({
     write(chunk) {
       socket.send(JSON.stringify(chunk));
     },
   });
 
+  // Set up streaming JSON decoder
   const parser = new JSONParser({
     paths: ["$"],
     separator: "",
@@ -1221,7 +1230,7 @@ const registry = new Registry(
 );
 ```
 
-Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this:
+Now that we have a registry that turns the remote control's placeholder methods into RPC calls, we can link it to our transport (WebSockets) and serializer of choice (JSON). Once again, this requires a bit of boilerplate since the `ws` library doesn't provide WHATWG streams directly yet, so feel free to copy-and-paste this, or take a look at the [examples](#examples) to check out how you can set up a different transport (TCP, WebSockets, UNIX sockets etc.) and serializer (JSON, CBOR etc.) instead:
 
 <details>
   <summary>Expand boilerplate code snippet</summary>
@@ -1232,6 +1241,7 @@ Now that we have a registry that turns the remote control's placeholder methods 
 import { JSONParser } from "@streamparser/json-whatwg";
 import { WebSocket } from "ws";
 
+// Connect to WebSocket server
 const socket = new WebSocket("ws://127.0.0.1:1337");
 
 socket.addEventListener("error", (e) => {
@@ -1246,12 +1256,14 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
+// Set up streaming JSON encoder
 const encoder = new WritableStream({
   write(chunk) {
     socket.send(JSON.stringify(chunk));
   },
 });
 
+// Set up streaming JSON decoder
 const parser = new JSONParser({
   paths: ["$"],
   separator: "",

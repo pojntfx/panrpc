@@ -143,6 +143,7 @@ func main() {
 		}
 	}()
 
+	// Connect to WebSocket server
 	c, _, err := websocket.Dial(ctx, "ws://127.0.0.1:1337", nil)
 	if err != nil {
 		panic(err)
@@ -153,6 +154,7 @@ func main() {
 
 	log.Println("Connected to localhost:1337")
 
+	// Set up the streaming JSON encoder and decoder
 	encoder := json.NewEncoder(conn)
 	decoder := json.NewDecoder(conn)
 

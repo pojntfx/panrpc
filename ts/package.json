@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "eslint . && tsc --emitDeclarationOnly && typedoc --excludePrivate --out typedoc index.ts && bun build --minify --splitting --target browser --outdir=dist ./index.ts && cp ../README.md ./dist"
+    "build": "eslint . && tsc --emitDeclarationOnly && typedoc --excludePrivate --out typedoc index.ts && bun build --minify --splitting --target browser --outdir=dist ./index.ts"
   },
   "repository": {
     "type": "git",

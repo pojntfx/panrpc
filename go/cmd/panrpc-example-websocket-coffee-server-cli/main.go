@@ -123,6 +123,7 @@ func main() {
 	)
 	service.ForRemotes = registry.ForRemotes
 
+	// Create TCP listener
 	lis, err := net.Listen("tcp", "127.0.0.1:1337")
 	if err != nil {
 		panic(err)
@@ -131,6 +132,7 @@ func main() {
 
 	log.Println("Listening on", lis.Addr())
 
+	// Create HTTP server from TCP listener
 	if err := http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -140,6 +142,7 @@ func main() {
 			}
 		}()
 
+		// Upgrade from HTTP to WebSockets
 		switch r.Method {
 		case http.MethodGet:
 			c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -166,6 +169,7 @@ func main() {
 			conn := websocket.NetConn(ctx, c, websocket.MessageText)
 			defer conn.Close()
 
+			// Set up the streaming JSON encoder and decoder
 			encoder := json.NewEncoder(conn)
 			decoder := json.NewDecoder(conn)
 
