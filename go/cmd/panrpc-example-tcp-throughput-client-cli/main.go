@@ -106,7 +106,7 @@ func main() {
 
 			ctx,
 
-			&rpc.Options{
+			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)
 				},
@@ -141,6 +141,8 @@ func main() {
 				func(data json.RawMessage, v any) error {
 					return json.Unmarshal([]byte(data), v)
 				},
+
+				nil,
 			)
 		}
 
@@ -151,7 +153,7 @@ func main() {
 
 			ctx,
 
-			&rpc.Options{
+			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)
 				},
@@ -186,6 +188,8 @@ func main() {
 				func(data cbor.RawMessage, v any) error {
 					return cbor.Unmarshal([]byte(data), v)
 				},
+
+				nil,
 			)
 		}
 

@@ -49,10 +49,12 @@ func GetRemoteID(ctx context.Context) string {
 	return ctx.Value(RemoteIDContextKey).(string)
 }
 
-type Options struct {
+type RegistryHooks struct {
 	OnClientConnect    func(remoteID string)
 	OnClientDisconnect func(remoteID string)
 }
+
+type LinkHooks RegistryHooks
 
 // Registry exposes local RPCs and implements remote RPCs
 type Registry[R, T any] struct {
@@ -64,7 +66,7 @@ type Registry[R, T any] struct {
 
 	ctx context.Context
 
-	options *Options
+	hooks *RegistryHooks
 }
 
 // NewRegistry creates a new registry
@@ -73,10 +75,10 @@ func NewRegistry[R, T any]( // Type of remote RPCs to implement, type of nested 
 
 	ctx context.Context, // Global context
 
-	options *Options, // Configuration options
+	hooks *RegistryHooks, // Global hooks
 ) *Registry[R, T] {
-	if options == nil {
-		options = &Options{}
+	if hooks == nil {
+		hooks = &RegistryHooks{}
 	}
 
 	return &Registry[R, T]{wrappedChild{
@@ -85,7 +87,7 @@ func NewRegistry[R, T any]( // Type of remote RPCs to implement, type of nested 
 			closuresLock: sync.Mutex{},
 			closures:     map[string]func(args ...interface{}) (interface{}, error){},
 		},
-	}, *new(R), map[string]R{}, &sync.Mutex{}, ctx, options}
+	}, *new(R), map[string]R{}, &sync.Mutex{}, ctx, hooks}
 }
 
 func (r Registry[R, T]) makeRPC(
@@ -238,7 +240,13 @@ func (r Registry[R, T]) LinkMessage(
 
 	marshal func(v any) (T, error), // Function to marshal nested values with
 	unmarshal func(data T, v any) error, // Function to unmarshal nested values with
+
+	hooks *LinkHooks, // Link hooks
 ) error {
+	if hooks == nil {
+		hooks = &LinkHooks{}
+	}
+
 	responseResolver := utils.NewBroadcaster[callResponse[T]]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
@@ -312,8 +320,12 @@ func (r Registry[R, T]) LinkMessage(
 		r.remotesLock.Lock()
 		r.remotes[remoteID] = remote.Interface().(R)
 
-		if r.options.OnClientConnect != nil {
-			r.options.OnClientConnect(remoteID)
+		if r.hooks.OnClientConnect != nil {
+			r.hooks.OnClientConnect(remoteID)
+		}
+
+		if hooks.OnClientConnect != nil {
+			hooks.OnClientConnect(remoteID)
 		}
 		r.remotesLock.Unlock()
 
@@ -321,8 +333,12 @@ func (r Registry[R, T]) LinkMessage(
 			r.remotesLock.Lock()
 			delete(r.remotes, remoteID)
 
-			if r.options.OnClientDisconnect != nil {
-				r.options.OnClientDisconnect(remoteID)
+			if r.hooks.OnClientDisconnect != nil {
+				r.hooks.OnClientDisconnect(remoteID)
+			}
+
+			if hooks.OnClientDisconnect != nil {
+				hooks.OnClientDisconnect(remoteID)
 			}
 			r.remotesLock.Unlock()
 		}()
@@ -674,6 +690,8 @@ func (r Registry[R, T]) LinkStream(
 
 	marshal func(v any) (T, error), // Function to marshal nested values with
 	unmarshal func(data T, v any) error, // Function to unmarshal nested values with
+
+	hooks *LinkHooks, // Link hooks
 ) error {
 	var (
 		decodeDone = make(chan struct{})
@@ -734,6 +752,8 @@ func (r Registry[R, T]) LinkStream(
 
 		marshal,
 		unmarshal,
+
+		hooks,
 	)
 }
 

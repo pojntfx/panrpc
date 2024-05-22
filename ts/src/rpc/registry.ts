@@ -23,10 +23,12 @@ interface ICallResponse {
   err: string;
 }
 
-export interface IOptions {
+export interface IRegistryHooks {
   onClientConnect?: (remoteID: string) => void;
   onClientDisconnect?: (remoteID: string) => void;
 }
+
+export interface ILinkHooks extends IRegistryHooks {}
 
 const remoteClosureKey = Symbol("required");
 export const remoteClosure = (
@@ -132,13 +134,13 @@ export class Registry<L extends Object, R extends Object> {
    * Create a new registry
    * @param local Class with local RPCs to expose
    * @param remote Class with remote RPC placeholders to implement
-   * @param options Configuration options
+   * @param hooks Global hooks
    */
   constructor(
     private local: L,
     private remote: R,
 
-    private options?: IOptions
+    private hooks?: IRegistryHooks
   ) {
     this.closureManager = new ClosureManager();
   }
@@ -151,6 +153,7 @@ export class Registry<L extends Object, R extends Object> {
    * @param responseReader Stream to read responses from
    * @param marshal Function to marshal nested values with
    * @param unmarshal Function to unmarshal nested values with
+   * @param hooks Link hooks
    */
   linkMessage = <T>(
     requestWriter: WritableStreamDefaultWriter<T>,
@@ -160,7 +163,9 @@ export class Registry<L extends Object, R extends Object> {
     responseReader: ReadableStreamDefaultReader<T>,
 
     marshal: (value: any) => T,
-    unmarshal: (text: T) => any
+    unmarshal: (text: T) => any,
+
+    hooks?: ILinkHooks
   ) => {
     const responseResolver = new EventTarget();
 
@@ -206,7 +211,7 @@ export class Registry<L extends Object, R extends Object> {
             closed = true;
 
             delete that.remotes[remoteID];
-            that.options?.onClientDisconnect?.(remoteID);
+            that.hooks?.onClientDisconnect?.(remoteID);
           }
 
           return;
@@ -296,7 +301,8 @@ export class Registry<L extends Object, R extends Object> {
             closed = true;
 
             delete that.remotes[remoteID];
-            that.options?.onClientDisconnect?.(remoteID);
+            that.hooks?.onClientDisconnect?.(remoteID);
+            hooks?.onClientDisconnect?.(remoteID);
           }
 
           return;
@@ -326,7 +332,8 @@ export class Registry<L extends Object, R extends Object> {
 
     this.remotes[remoteID] = r;
 
-    this.options?.onClientConnect?.(remoteID);
+    this.hooks?.onClientConnect?.(remoteID);
+    hooks?.onClientConnect?.(remoteID);
   };
 
   /**
@@ -335,13 +342,16 @@ export class Registry<L extends Object, R extends Object> {
    * @param decoder Stream to read messages from
    * @param marshal Function to marshal nested values with
    * @param unmarshal Function to unmarshal nested values with
+   * @param hooks Link hooks
    */
   linkStream = <T>(
     encoder: WritableStream,
     decoder: ReadableStream,
 
     marshal: (value: any) => T,
-    unmarshal: (text: T) => any
+    unmarshal: (text: T) => any,
+
+    hooks?: ILinkHooks
   ) => {
     const encoderWriter = encoder.getWriter();
 
@@ -451,7 +461,9 @@ export class Registry<L extends Object, R extends Object> {
       responseReader.getReader(),
 
       marshal,
-      unmarshal
+      unmarshal,
+
+      hooks
     );
   };
 

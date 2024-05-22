@@ -175,7 +175,7 @@ func main() {
 
 		ctx,
 
-		&rpc.Options{
+		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				clients++
 
@@ -359,7 +359,7 @@ func main() {
 
 		ctx,
 
-		&rpc.Options{
+		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				clients++
 
@@ -633,7 +633,7 @@ func main() {
 
 		ctx,
 
-		&rpc.Options{
+		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				clients++
 
@@ -674,7 +674,7 @@ func main() {
 
 		ctx,
 
-		&rpc.Options{
+		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				clients++
 

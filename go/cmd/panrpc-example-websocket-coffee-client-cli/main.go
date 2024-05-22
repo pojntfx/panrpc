@@ -43,7 +43,7 @@ func main() {
 
 		ctx,
 
-		&rpc.Options{
+		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				clients++
 
@@ -177,6 +177,8 @@ func main() {
 		func(data json.RawMessage, v any) error {
 			return json.Unmarshal([]byte(data), v)
 		},
+
+		nil,
 	); err != nil {
 		panic(err)
 	}
