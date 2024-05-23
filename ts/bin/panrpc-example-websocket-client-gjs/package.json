@@ -1,0 +1,11 @@
+{
+  "name": "@pojntfx/panrpc-example-websocket-client-gjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "gjs -m main.js"
+  },
+  "dependencies": {
+    "@streamparser/json-whatwg": "^0.0.20"
+  }
+}
