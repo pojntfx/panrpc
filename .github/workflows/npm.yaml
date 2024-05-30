@@ -12,9 +12,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup node
-        uses: actions/setup-node@v2-beta
+        uses: actions/setup-node@v4
         with:
           node-version: "16"
           registry-url: "https://registry.npmjs.org"
@@ -23,7 +23,7 @@ jobs:
         with:
           bun-version: latest
       - name: Cache the dependency directories
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             node_modules
