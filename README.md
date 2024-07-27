@@ -6,7 +6,7 @@ Language-, transport- and serialization-agnostic RPC framework with remote closu
 
 [![hydrun CI](https://github.com/pojntfx/panrpc/actions/workflows/hydrun.yaml/badge.svg)](https://github.com/pojntfx/panrpc/actions/workflows/hydrun.yaml)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg)
-[![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc/go.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc/go)
 [![npm CI](https://github.com/pojntfx/panrpc/actions/workflows/npm.yaml/badge.svg)](https://github.com/pojntfx/panrpc/actions/workflows/npm.yaml)
 [![npm: @pojntfx/panrpc](https://img.shields.io/npm/v/@pojntfx/panrpc)](https://www.npmjs.com/package/@pojntfx/panrpc)
 [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc)
@@ -16,10 +16,10 @@ Language-, transport- and serialization-agnostic RPC framework with remote closu
 
 panrpc is a flexible high-performance RPC framework designed to work in almost any environment with advanced features such as remote closures and bidirectional RPC calls.
 
-It enables you to ...
+It enables you to:
 
 - **Transparently call and expose RPCs in many languages**: Thanks to it's use of reflection, panrpc doesn't require you to learn a DSL or run a code generator. RPCs are defined and called as local functions, and its [simple protocol](#protocol) means that [multiple languages](#examples) are supported and adding support for new ones is simple.
-- **Work with any transport layer**: Instead of being restricted to one transport layer (like TCP or WebSockets for most RPC frameworks), panrpc depends only on the semantics of a [stream](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkStream) or a [message](https://pkg.go.dev/github.com/pojntfx/panrpc/pkg/rpc#LinkMessage), meaning it works over everything from TCP, WebSockets, UNIX sockets, WebRTC, Redis, NATS and more.
+- **Work with any transport layer**: Instead of being restricted to one transport layer (like TCP or WebSockets for most RPC frameworks), panrpc depends only on the semantics of a [stream](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkStream) or a [message](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkMessage), meaning it works over everything from TCP, WebSockets, UNIX sockets, WebRTC, Redis, NATS and more.
 - **Work with any serializer**: Instead of being restricted to one serialization framework (like Protobuf or JSON for most RPC frameworks), panrpc can use any user-defined serializer that supports streaming encode/decode, such as JSON, CBOR and others.
 - **Call RPCs on both clients and servers**: Unlike most RPC frameworks, which only allow you to call a server's RPCs from a client, panrpc can also work with the reverse configuration (where the server calls RPCs exposed by the client) or both at the same time.
 - **Pass closures to RPCs**: You can transparently pass closures and callbacks to RPCs as function parameters, and they will be called by the RPC just like if it were a local function call.
@@ -31,7 +31,7 @@ It enables you to ...
 You can add panrpc to your <img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> **Go** project by running the following:
 
 ```shell
-$ go get github.com/pojntfx/panrpc/...@latest
+$ go get github.com/pojntfx/panrpc/go/...@latest
 ```
 
 For <img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> **TypeScript**, you can add panrpc to your project (both server-side TypeScript/Node.js and all major browser engines are supported) by running the following:
@@ -83,7 +83,7 @@ Start by creating a new Go module for the tutorial and installing `github.com/po
 $ mkdir -p panrpc-tutorial-go
 $ cd panrpc-tutorial-go
 $ go mod init panrpc-tutorial-go
-$ go get github.com/pojntfx/panrpc/go@latest
+$ go get github.com/pojntfx/panrpc/go/...@latest
 ```
 
 The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
@@ -1789,7 +1789,7 @@ Remaining water: 900 ml
 
 ### Library API
 
-- [![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc)
+- [![Go Reference](https://pkg.go.dev/badge/github.com/pojntfx/panrpc/go.svg)](https://pkg.go.dev/github.com/pojntfx/panrpc/go)
 - [![TypeScript docs](https://img.shields.io/badge/TypeScript%20-docs-blue.svg)](https://pojntfx.github.io/panrpc)
 
 ### Examples
