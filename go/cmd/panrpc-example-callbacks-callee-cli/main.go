@@ -53,7 +53,7 @@ func main() {
 
 	service := &local{}
 
-	clients := 0
+	var clients atomic.Int64
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		service,
 
@@ -61,14 +61,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v clients connected", clients)
+				log.Printf("%v clients connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v clients connected", clients)
+				log.Printf("%v clients connected", clients.Add(-1))
 			},
 		},
 	)

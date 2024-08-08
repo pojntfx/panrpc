@@ -7,6 +7,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"sync/atomic"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
@@ -119,7 +120,7 @@ func main() {
 	defer cancel()
 
 	var (
-		clients = 0
+		clients atomic.Int64
 
 		handleConn func(conn net.Conn) error
 	)
@@ -132,14 +133,10 @@ func main() {
 
 			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
-					clients++
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(1))
 				},
 				OnClientDisconnect: func(remoteID string) {
-					clients--
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(-1))
 				},
 			},
 		)
@@ -180,14 +177,10 @@ func main() {
 
 			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
-					clients++
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(1))
 				},
 				OnClientDisconnect: func(remoteID string) {
-					clients--
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(-1))
 				},
 			},
 		)

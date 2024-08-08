@@ -62,11 +62,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	clients := 0
+	var clients atomic.Int64
 	onClientConnect := func(forRemotes func(func(remoteID string, r remote) error) error, remoteID string) {
-		clients++
-
-		log.Printf("%v clients connected", clients)
+		log.Printf("%v clients connected", clients.Add(1))
 
 		go func() {
 			rps := new(atomic.Int64)
@@ -243,9 +241,7 @@ func main() {
 					onClientConnect(registry.ForRemotes, remoteID)
 				},
 				OnClientDisconnect: func(remoteID string) {
-					clients--
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(-1))
 				},
 			},
 		)
@@ -290,9 +286,7 @@ func main() {
 					onClientConnect(registry.ForRemotes, remoteID)
 				},
 				OnClientDisconnect: func(remoteID string) {
-					clients--
-
-					log.Printf("%v clients connected", clients)
+					log.Printf("%v clients connected", clients.Add(-1))
 				},
 			},
 		)

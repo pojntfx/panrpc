@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
@@ -101,8 +102,7 @@ func main() {
 		waterLevel:        1000,
 	}
 
-	clients := 0
-
+	var clients atomic.Int64
 	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
 		service,
 
@@ -110,14 +110,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(-1))
 			},
 		},
 	)

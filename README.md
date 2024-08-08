@@ -168,8 +168,7 @@ func main() {
 		waterLevel:        1000,
 	}
 
-	clients := 0
-
+	var clients atomic.Int64
 	registry := rpc.NewRegistry[struct{}, json.RawMessage](
 		service,
 
@@ -177,14 +176,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(-1))
 			},
 		},
 	)
@@ -352,8 +347,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	clients := 0
-
+	var clients atomic.Int64
 	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
 		&struct{}{},
 
@@ -361,14 +355,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v coffee machines connected", clients)
+				log.Printf("%v coffee machines connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v coffee machines connected", clients)
+				log.Printf("%v coffee machines connected", clients.Add(-1))
 			},
 		},
 	)
@@ -635,14 +625,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v coffee machines connected", clients)
+				log.Printf("%v coffee machines connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v coffee machines connected", clients)
+				log.Printf("%v coffee machines connected", clients.Add(-1))
 			},
 		},
 	)
@@ -676,14 +662,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v remote controls connected", clients)
+				log.Printf("%v remote controls connected", clients.Add(-1))
 			},
 		},
 	)

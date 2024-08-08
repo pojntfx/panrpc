@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
 )
@@ -37,8 +38,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	clients := 0
-
+	var clients atomic.Int64
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
 
@@ -46,14 +46,10 @@ func main() {
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
-				clients++
-
-				log.Printf("%v clients connected", clients)
+				log.Printf("%v clients connected", clients.Add(1))
 			},
 			OnClientDisconnect: func(remoteID string) {
-				clients--
-
-				log.Printf("%v clients connected", clients)
+				log.Printf("%v clients connected", clients.Add(-1))
 			},
 		},
 	)
