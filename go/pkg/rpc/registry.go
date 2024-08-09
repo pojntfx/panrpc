@@ -73,7 +73,7 @@ type Registry[R, T any] struct {
 func NewRegistry[R, T any]( // Type of remote RPCs to implement, type of nested values
 	local any, // Struct of local RPCs to expose
 
-	ctx context.Context, // Global context
+	ctx context.Context, // Global context, used for resolving RPC requests and responses not tied to any specific read or write operation
 
 	hooks *RegistryHooks, // Global hooks
 ) *Registry[R, T] {
@@ -232,6 +232,8 @@ func (r Registry[R, T]) makeRPC(
 
 // LinkMessage exposes local RPCs and implements remote RPCs via a message-based transport
 func (r Registry[R, T]) LinkMessage(
+	ctx context.Context, // Context for read and write operations
+
 	writeRequest, // Function to write requests with
 	writeResponse func(b T) error, // Function to write responses with
 
@@ -247,6 +249,46 @@ func (r Registry[R, T]) LinkMessage(
 		hooks = &LinkHooks{}
 	}
 
+	writeRequestCtx := func(b T) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		return writeRequest(b)
+	}
+
+	writeResponseCtx := func(b T) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		return writeResponse(b)
+	}
+
+	readRequestCtx := func() (T, error) {
+		select {
+		case <-ctx.Done():
+			return *new(T), ctx.Err()
+		default:
+		}
+
+		return readRequest()
+	}
+
+	readResponseCtx := func() (T, error) {
+		select {
+		case <-ctx.Done():
+			return *new(T), ctx.Err()
+		default:
+		}
+
+		return readResponse()
+	}
+
 	responseResolver := utils.NewBroadcaster[callResponse[T]]()
 
 	remote := reflect.New(reflect.ValueOf(r.remote).Type()).Elem()
@@ -254,6 +296,10 @@ func (r Registry[R, T]) LinkMessage(
 	var fatalErr error
 	fatalErrLock := sync.NewCond(&sync.Mutex{})
 
+	// Right now, we only report the first fatal error, fail fast and
+	// don't wait for all goroutines to have exited. It is the job
+	// of the caller to clean those up by making sure that the read/write
+	// functions return errors - e.g. by closing the connection
 	setErr := func(err error) {
 		if err == nil {
 			responseResolver.Close(context.Canceled)
@@ -266,6 +312,14 @@ func (r Registry[R, T]) LinkMessage(
 		fatalErrLock.Broadcast()
 		fatalErrLock.L.Unlock()
 	}
+
+	// The user is responsible for cancelling the context after LinkMessage has returned,
+	// so this is not a context leak
+	go func() {
+		<-ctx.Done()
+
+		setErr(ctx.Err())
+	}()
 
 	go func() {
 		for i := 0; i < remote.NumField(); i++ {
@@ -308,7 +362,7 @@ func (r Registry[R, T]) LinkMessage(
 					setErr,
 					responseResolver,
 
-					writeRequest,
+					writeRequestCtx,
 
 					marshal,
 					unmarshal,
@@ -350,7 +404,7 @@ func (r Registry[R, T]) LinkMessage(
 			defer wg.Done()
 
 			for {
-				b, err := readRequest()
+				b, err := readRequestCtx()
 				if err != nil {
 					setErr(err)
 
@@ -391,7 +445,7 @@ func (r Registry[R, T]) LinkMessage(
 					for i := 0; i < function.Type().NumIn(); i++ {
 						if i == 0 {
 							// Add the context to the function arguments
-							args = append(args, reflect.ValueOf(context.WithValue(r.ctx, RemoteIDContextKey, remoteID)))
+							args = append(args, reflect.ValueOf(context.WithValue(ctx, RemoteIDContextKey, remoteID)))
 
 							continue
 						}
@@ -436,7 +490,7 @@ func (r Registry[R, T]) LinkMessage(
 									setErr,
 									responseResolver,
 
-									writeRequest,
+									writeRequestCtx,
 
 									marshal,
 									unmarshal,
@@ -532,7 +586,7 @@ func (r Registry[R, T]) LinkMessage(
 								return
 							}
 
-							if err := writeResponse(b); err != nil {
+							if err := writeResponseCtx(b); err != nil {
 								setErr(err)
 
 								return
@@ -559,7 +613,7 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								if err := writeResponse(b); err != nil {
+								if err := writeResponseCtx(b); err != nil {
 									setErr(err)
 
 									return
@@ -585,7 +639,7 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								if err := writeResponse(b); err != nil {
+								if err := writeResponseCtx(b); err != nil {
 									setErr(err)
 
 									return
@@ -613,7 +667,7 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								if err := writeResponse(b); err != nil {
+								if err := writeResponseCtx(b); err != nil {
 									setErr(err)
 
 									return
@@ -632,7 +686,7 @@ func (r Registry[R, T]) LinkMessage(
 									return
 								}
 
-								if err := writeResponse(b); err != nil {
+								if err := writeResponseCtx(b); err != nil {
 									setErr(err)
 
 									return
@@ -649,7 +703,7 @@ func (r Registry[R, T]) LinkMessage(
 			defer wg.Done()
 
 			for {
-				b, err := readResponse()
+				b, err := readResponseCtx()
 				if err != nil {
 					setErr(err)
 
@@ -685,6 +739,8 @@ func (r Registry[R, T]) LinkMessage(
 
 // LinkStream exposes local RPCs and implements remote RPCs via a stream-based transport
 func (r Registry[R, T]) LinkStream(
+	ctx context.Context, // Context for read and write operations
+
 	encode func(v Message[T]) error, // Function to encode messages with
 	decode func(v *Message[T]) error, // Function to decode messages with
 
@@ -722,6 +778,8 @@ func (r Registry[R, T]) LinkStream(
 	}()
 
 	return r.LinkMessage(
+		ctx,
+
 		func(b T) error {
 			return encode(Message[T]{
 				Request: &b,
