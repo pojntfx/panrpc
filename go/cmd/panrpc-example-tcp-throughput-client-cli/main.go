@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -102,8 +103,6 @@ func main() {
 		registry = rpc.NewRegistry[remote, json.RawMessage](
 			&local{},
 
-			ctx,
-
 			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)
@@ -115,10 +114,15 @@ func main() {
 		)
 
 		handleConn = func(conn net.Conn) error {
+			linkCtx, cancelLinkCtx := context.WithCancel(ctx)
+			defer cancelLinkCtx()
+
 			encoder := json.NewEncoder(conn)
 			decoder := json.NewDecoder(conn)
 
 			return registry.LinkStream(
+				linkCtx,
+
 				func(v rpc.Message[json.RawMessage]) error {
 					return encoder.Encode(v)
 				},
@@ -147,8 +151,6 @@ func main() {
 		registry = rpc.NewRegistry[remote, cbor.RawMessage](
 			&local{},
 
-			ctx,
-
 			&rpc.RegistryHooks{
 				OnClientConnect: func(remoteID string) {
 					onClientConnect(registry.ForRemotes, remoteID)
@@ -160,10 +162,15 @@ func main() {
 		)
 
 		handleConn = func(conn net.Conn) error {
+			linkCtx, cancelLinkCtx := context.WithCancel(ctx)
+			defer cancelLinkCtx()
+
 			encoder := cbor.NewEncoder(conn)
 			decoder := cbor.NewDecoder(conn)
 
 			return registry.LinkStream(
+				linkCtx,
+
 				func(v rpc.Message[cbor.RawMessage]) error {
 					return encoder.Encode(v)
 				},
@@ -201,27 +208,23 @@ func main() {
 		log.Println("Listening on", lis.Addr())
 
 		for {
-			func() {
-				conn, err := lis.Accept()
-				if err != nil {
-					log.Println("could not accept connection, continuing:", err)
-
-					return
+			conn, err := lis.Accept()
+			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					break
 				}
 
-				go func() {
-					defer func() {
-						_ = conn.Close()
+				log.Println("could not accept connection, continuing:", err)
 
-						if err := recover(); err != nil {
-							log.Printf("Client disconnected with error: %v", err)
-						}
-					}()
+				continue
+			}
 
-					if err := handleConn(conn); err != nil {
-						panic(err)
-					}
-				}()
+			go func() {
+				defer conn.Close()
+
+				if err := handleConn(conn); err != nil && !errors.Is(err, io.EOF) {
+					log.Println("Client disconnected with error:", err)
+				}
 			}()
 		}
 	} else {

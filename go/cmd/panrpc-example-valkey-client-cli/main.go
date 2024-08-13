@@ -52,10 +52,8 @@ func main() {
 	defer cancel()
 
 	var clients atomic.Int64
-	registry := rpc.NewRegistry[remote, json.RawMessage](
+	registry := rpc.NewRegistry[remote, []byte](
 		&local{},
-
-		ctx,
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
@@ -211,7 +209,9 @@ func main() {
 	}()
 
 	if err := registry.LinkMessage(
-		func(b json.RawMessage) error {
+		ctx,
+
+		func(b []byte) error {
 			if _, err := broker.XAdd(ctx, &redis.XAddArgs{
 				Stream: *clientRequestsStream,
 				Values: map[string]interface{}{
@@ -223,7 +223,7 @@ func main() {
 
 			return nil
 		},
-		func(b json.RawMessage) error {
+		func(b []byte) error {
 			if _, err := broker.XAdd(ctx, &redis.XAddArgs{
 				Stream: *clientResponsesStream,
 				Values: map[string]interface{}{
@@ -236,7 +236,7 @@ func main() {
 			return nil
 		},
 
-		func() (json.RawMessage, error) {
+		func() ([]byte, error) {
 			packet, ok := <-requestPackets
 			if !ok {
 				return []byte{}, net.ErrClosed
@@ -244,7 +244,7 @@ func main() {
 
 			return packet, nil
 		},
-		func() (json.RawMessage, error) {
+		func() ([]byte, error) {
 			packet, ok := <-responsePackets
 			if !ok {
 				return []byte{}, net.ErrClosed
@@ -253,15 +253,15 @@ func main() {
 			return packet, nil
 		},
 
-		func(v any) (json.RawMessage, error) {
+		func(v any) ([]byte, error) {
 			b, err := json.Marshal(v)
 			if err != nil {
 				return nil, err
 			}
 
-			return json.RawMessage(b), nil
+			return []byte(b), nil
 		},
-		func(data json.RawMessage, v any) error {
+		func(data []byte, v any) error {
 			return json.Unmarshal([]byte(data), v)
 		},
 

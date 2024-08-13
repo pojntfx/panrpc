@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -106,8 +107,6 @@ func main() {
 	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
 		service,
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v remote controls connected", clients.Add(1))
@@ -171,6 +170,8 @@ func main() {
 
 			go func() {
 				if err := registry.LinkStream(
+					r.Context(),
+
 					func(v rpc.Message[json.RawMessage]) error {
 						return encoder.Encode(v)
 					},
@@ -191,7 +192,7 @@ func main() {
 					},
 
 					nil,
-				); err != nil {
+				); err != nil && !errors.Is(err, io.EOF) {
 					errs <- err
 
 					return

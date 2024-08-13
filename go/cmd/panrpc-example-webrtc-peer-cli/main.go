@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -59,8 +61,6 @@ func main() {
 	var clients atomic.Int64
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
-
-		ctx,
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
@@ -204,18 +204,17 @@ func main() {
 			log.Println("Connected to remote with ID", remote.PeerID)
 
 			go func() {
-				defer func() {
-					_ = remote.Conn.Close()
+				defer remote.Conn.Close()
 
-					if err := recover(); err != nil {
-						log.Printf("Client disconnected with error: %v", err)
-					}
-				}()
+				linkCtx, cancelLinkCtx := context.WithCancel(ctx)
+				defer cancelLinkCtx()
 
 				encoder := json.NewEncoder(remote.Conn)
 				decoder := json.NewDecoder(remote.Conn)
 
 				if err := registry.LinkStream(
+					linkCtx,
+
 					func(v rpc.Message[json.RawMessage]) error {
 						return encoder.Encode(v)
 					},
@@ -236,8 +235,8 @@ func main() {
 					},
 
 					nil,
-				); err != nil {
-					panic(err)
+				); err != nil && !errors.Is(err, io.EOF) {
+					log.Println("Client disconnected with error:", err)
 				}
 			}()
 		}

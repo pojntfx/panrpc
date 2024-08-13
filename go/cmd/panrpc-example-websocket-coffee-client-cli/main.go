@@ -41,8 +41,6 @@ func main() {
 	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
 		&remoteControl{},
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v coffee machines connected", clients.Add(1))
@@ -155,6 +153,8 @@ func main() {
 	decoder := json.NewDecoder(conn)
 
 	if err := registry.LinkStream(
+		ctx,
+
 		func(v rpc.Message[json.RawMessage]) error {
 			return encoder.Encode(v)
 		},

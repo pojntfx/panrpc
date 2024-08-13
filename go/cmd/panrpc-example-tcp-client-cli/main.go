@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -40,8 +42,6 @@ func main() {
 	var clients atomic.Int64
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
-
-		ctx,
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
@@ -112,51 +112,52 @@ func main() {
 		log.Println("Listening on", lis.Addr())
 
 		for {
-			func() {
-				conn, err := lis.Accept()
-				if err != nil {
-					log.Println("could not accept connection, continuing:", err)
-
-					return
+			conn, err := lis.Accept()
+			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					break
 				}
 
-				go func() {
-					defer func() {
-						_ = conn.Close()
+				log.Println("could not accept connection, continuing:", err)
 
-						if err := recover(); err != nil {
-							log.Printf("Client disconnected with error: %v", err)
+				continue
+			}
+
+			go func() {
+				defer conn.Close()
+
+				linkCtx, cancelLinkCtx := context.WithCancel(ctx)
+				defer cancelLinkCtx()
+
+				encoder := json.NewEncoder(conn)
+				decoder := json.NewDecoder(conn)
+
+				if err := registry.LinkStream(
+					linkCtx,
+
+					func(v rpc.Message[json.RawMessage]) error {
+						return encoder.Encode(v)
+					},
+					func(v *rpc.Message[json.RawMessage]) error {
+						return decoder.Decode(v)
+					},
+
+					func(v any) (json.RawMessage, error) {
+						b, err := json.Marshal(v)
+						if err != nil {
+							return nil, err
 						}
-					}()
 
-					encoder := json.NewEncoder(conn)
-					decoder := json.NewDecoder(conn)
+						return json.RawMessage(b), nil
+					},
+					func(data json.RawMessage, v any) error {
+						return json.Unmarshal([]byte(data), v)
+					},
 
-					if err := registry.LinkStream(
-						func(v rpc.Message[json.RawMessage]) error {
-							return encoder.Encode(v)
-						},
-						func(v *rpc.Message[json.RawMessage]) error {
-							return decoder.Decode(v)
-						},
-
-						func(v any) (json.RawMessage, error) {
-							b, err := json.Marshal(v)
-							if err != nil {
-								return nil, err
-							}
-
-							return json.RawMessage(b), nil
-						},
-						func(data json.RawMessage, v any) error {
-							return json.Unmarshal([]byte(data), v)
-						},
-
-						nil,
-					); err != nil {
-						panic(err)
-					}
-				}()
+					nil,
+				); err != nil && !errors.Is(err, io.EOF) {
+					log.Println("Client disconnected with error:", err)
+				}
 			}()
 		}
 	} else {
@@ -172,6 +173,8 @@ func main() {
 		decoder := json.NewDecoder(conn)
 
 		if err := registry.LinkStream(
+			ctx,
+
 			func(v rpc.Message[json.RawMessage]) error {
 				return encoder.Encode(v)
 			},

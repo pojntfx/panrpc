@@ -35,8 +35,6 @@ func main() {
 	registry := rpc.NewRegistry[remote, json.RawMessage](
 		&local{},
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v clients connected", clients.Add(1))
@@ -106,6 +104,8 @@ func main() {
 	decoder := json.NewDecoder(os.Stdin)
 
 	if err := registry.LinkStream(
+		ctx,
+
 		func(v rpc.Message[json.RawMessage]) error {
 			return encoder.Encode(v)
 		},
