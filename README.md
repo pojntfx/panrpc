@@ -19,7 +19,7 @@ panrpc is a flexible high-performance RPC framework designed to work in almost a
 It enables you to:
 
 - **Transparently call and expose RPCs in many languages**: Thanks to it's use of reflection, panrpc doesn't require you to learn a DSL or run a code generator. RPCs are defined and called as local functions, and its [simple protocol](#protocol) means that [multiple languages](#examples) are supported and adding support for new ones is simple.
-- **Work with any transport layer**: Instead of being restricted to one transport layer (like TCP or WebSockets for most RPC frameworks), panrpc depends only on the semantics of a [stream](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkStream) or a [message](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkMessage), meaning it works over everything from TCP, WebSockets, UNIX sockets, WebRTC, Redis, NATS and more.
+- **Work with any transport layer**: Instead of being restricted to one transport layer (like TCP or WebSockets for most RPC frameworks), panrpc depends only on the semantics of a [stream](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkStream) or a [message](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#LinkMessage), meaning it works over everything from TCP, WebSockets, UNIX sockets, WebRTC, Valkey/Redis, NATS and more.
 - **Work with any serializer**: Instead of being restricted to one serialization framework (like Protobuf or JSON for most RPC frameworks), panrpc can use any user-defined serializer that supports streaming encode/decode, such as JSON, CBOR and others.
 - **Call RPCs on both clients and servers**: Unlike most RPC frameworks, which only allow you to call a server's RPCs from a client, panrpc can also work with the reverse configuration (where the server calls RPCs exposed by the client) or both at the same time.
 - **Pass closures to RPCs**: You can transparently pass closures and callbacks to RPCs as function parameters, and they will be called by the RPC just like if it were a local function call.
@@ -86,7 +86,7 @@ $ go mod init panrpc-tutorial-go
 $ go get github.com/pojntfx/panrpc/go/...@latest
 ```
 
-The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
+The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Valkey/Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
 
 ```shell
 $ go get nhooyr.io/websocket@latest
@@ -172,8 +172,6 @@ func main() {
 	registry := rpc.NewRegistry[struct{}, json.RawMessage](
 		service,
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v remote controls connected", clients.Add(1))
@@ -258,6 +256,8 @@ func main() {
 
 			go func() {
 				if err := registry.LinkStream(
+          r.Context(),
+
 					func(v rpc.Message[json.RawMessage]) error {
 						return encoder.Encode(v)
 					},
@@ -351,8 +351,6 @@ func main() {
 	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
 		&struct{}{},
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v coffee machines connected", clients.Add(1))
@@ -399,6 +397,8 @@ func main() {
 	decoder := json.NewDecoder(conn)
 
 	if err := registry.LinkStream(
+    ctx,
+
 		func(v rpc.Message[json.RawMessage]) error {
 			return encoder.Encode(v)
 		},
@@ -621,8 +621,6 @@ func main() {
   registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
 		&remoteControl{},
 
-		ctx,
-
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				log.Printf("%v coffee machines connected", clients.Add(1))
@@ -657,8 +655,6 @@ func main() {
 
 	registry := rpc.NewRegistry[remoteControl, json.RawMessage](
 		service,
-
-		ctx,
 
 		&rpc.RegistryHooks{
 			OnClientConnect: func(remoteID string) {
@@ -970,7 +966,7 @@ $ npm init -y
 $ npm install @pojntfx/panrpc
 ```
 
-The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [WHATWG stream](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) can be used with the panrpc [`linkStream` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkStream). If you want to use a message broker like Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`linkMessage` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `ws` library, which you can install like so:
+The TypeScript version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [WHATWG stream](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) can be used with the panrpc [`linkStream` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkStream). If you want to use a message broker like Valkey/Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`linkMessage` API](https://pojntfx.github.io/panrpc/classes/Registry.html#linkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `ws` library, which you can install like so:
 
 ```shell
 $ npm install ws
@@ -1803,11 +1799,11 @@ To make getting started with panrpc easier, take a look at the following example
   - **WebRTC (Stream-Oriented API)**
     - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
-  - **Redis (Message-Oriented API)**
-    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Redis Server CLI Example](./go/cmd/panrpc-example-redis-server-cli/main.go)
-    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Redis Client CLI Example](./go/cmd/panrpc-example-redis-client-cli/main.go)
-    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Redis Server CLI Example](./ts/bin/panrpc-example-redis-server-cli.ts)
-    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Redis Client CLI Example](./ts/bin/panrpc-example-redis-client-cli.ts)
+  - **Valkey/Redis (Message-Oriented API)**
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Server CLI Example](./go/cmd/panrpc-example-valkey-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Client CLI Example](./go/cmd/panrpc-example-valkey-client-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Server CLI Example](./ts/bin/panrpc-example-valkey-server-cli.ts)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Client CLI Example](./ts/bin/panrpc-example-valkey-client-cli.ts)
 - **Callbacks**
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-callbacks-callee-cli/main.go)
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-callbacks-caller-cli/main.go)
