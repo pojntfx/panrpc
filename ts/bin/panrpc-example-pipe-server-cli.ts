@@ -66,6 +66,8 @@ process.on("SIGHUP", async () => {
   });
 });
 
+const linkSignal = new AbortController();
+
 const encoder = new WritableStream({
   write(chunk) {
     return new Promise<void>((res) => {
@@ -119,9 +121,12 @@ stdin.on("data", (m) => parserWriter.write(m));
 stdin.on("close", () => {
   parserReader.cancel();
   parserWriter.abort();
+  linkSignal.abort();
 });
 
 registry.linkStream(
+  linkSignal.signal,
+
   encoder,
   decoder,
 

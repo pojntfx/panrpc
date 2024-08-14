@@ -328,6 +328,8 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
+    const linkSignal = new AbortController();
+
     let encoder: WritableStream;
     let decoder: ReadableStream;
 
@@ -388,6 +390,7 @@ if (listen) {
         socket.on("close", () => {
           parserReader.cancel();
           parserWriter.abort();
+          linkSignal.abort();
         });
 
         break;
@@ -446,7 +449,10 @@ if (listen) {
           },
         });
         socket.on("data", (m) => parser.write(m));
-        socket.on("close", () => parser.destroy());
+        socket.on("close", () => {
+          parser.destroy();
+          linkSignal.abort();
+        });
 
         break;
       }
@@ -456,6 +462,8 @@ if (listen) {
     }
 
     registry.linkStream(
+      linkSignal.signal,
+
       encoder,
       decoder,
 
@@ -469,7 +477,7 @@ if (listen) {
       host: u.hostname as string,
       port: parseInt(u.port as string, 10),
     },
-    () => console.error("Listening on", addr)
+    () => console.log("Listening on", addr)
   );
 } else {
   const u = parse(`tcp://${addr}`);
@@ -493,6 +501,8 @@ if (listen) {
     );
     socket.on("error", rej);
   });
+
+  const linkSignal = new AbortController();
 
   let encoder: WritableStream;
   let decoder: ReadableStream;
@@ -552,6 +562,7 @@ if (listen) {
       socket.on("close", () => {
         parserReader.cancel();
         parserWriter.abort();
+        linkSignal.abort();
       });
 
       break;
@@ -610,7 +621,10 @@ if (listen) {
         },
       });
       socket.on("data", (m) => parser.write(m));
-      socket.on("close", () => parser.destroy());
+      socket.on("close", () => {
+        parser.destroy();
+        linkSignal.abort();
+      });
 
       break;
     }
@@ -620,6 +634,8 @@ if (listen) {
   }
 
   registry.linkStream(
+    linkSignal.signal,
+
     encoder,
     decoder,
 
@@ -627,5 +643,5 @@ if (listen) {
     (v) => v
   );
 
-  console.error("Connected to", addr);
+  console.log("Connected to", addr);
 }
