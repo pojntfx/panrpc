@@ -1082,6 +1082,8 @@ server.on("connection", (socket) => {
     console.error("Remote control disconnected with error:", e);
   });
 
+  const linkSignal = new AbortController();
+
   // Set up streaming JSON encoder
   const encoder = new WritableStream({
     write(chunk) {
@@ -1123,9 +1125,12 @@ server.on("connection", (socket) => {
   socket.addEventListener("close", () => {
     parserReader.cancel();
     parserWriter.abort();
+    linkSignal.abort();
   });
 
   registry.linkStream(
+    linkSignal.signal,
+
     encoder,
     decoder,
 
@@ -1234,6 +1239,8 @@ await new Promise<void>((res, rej) => {
   socket.addEventListener("error", rej);
 });
 
+const linkSignal = new AbortController();
+
 // Set up streaming JSON encoder
 const encoder = new WritableStream({
   write(chunk) {
@@ -1273,9 +1280,12 @@ socket.addEventListener("message", (m) => parserWriter.write(m.data as string));
 socket.addEventListener("close", () => {
   parserReader.cancel();
   parserWriter.abort();
+  linkSignal.abort();
 });
 
 registry.linkStream(
+  linkSignal.signal,
+
   encoder,
   decoder,
 
