@@ -1,6 +1,6 @@
 {
   "name": "@pojntfx/panrpc",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Language-, transport- and serialization-agnostic RPC framework with remote closure support that allows exposing and calling functions on both clients and servers.",
   "source": "index.ts",
   "module": "dist/index.js",
