@@ -124,6 +124,8 @@ server.on("connection", (socket) => {
     console.error("Remote control disconnected with error:", e);
   });
 
+  const linkSignal = new AbortController();
+
   // Set up streaming JSON encoder
   const encoder = new WritableStream({
     write(chunk) {
@@ -165,9 +167,12 @@ server.on("connection", (socket) => {
   socket.addEventListener("close", () => {
     parserReader.cancel();
     parserWriter.abort();
+    linkSignal.abort();
   });
 
   registry.linkStream(
+    linkSignal.signal,
+
     encoder,
     decoder,
 

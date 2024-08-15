@@ -110,6 +110,8 @@ if (listen) {
       console.error("Client disconnected with error:", e);
     });
 
+    const linkSignal = new AbortController();
+
     const encoder = new WritableStream({
       write(chunk) {
         socket.send(JSON.stringify(chunk));
@@ -149,9 +151,12 @@ if (listen) {
     socket.addEventListener("close", () => {
       parserReader.cancel();
       parserWriter.abort();
+      linkSignal.abort();
     });
 
     registry.linkStream(
+      linkSignal.signal,
+
       encoder,
       decoder,
 
@@ -175,6 +180,8 @@ if (listen) {
     socket.addEventListener("open", () => res());
     socket.addEventListener("error", rej);
   });
+
+  const linkSignal = new AbortController();
 
   const encoder = new WritableStream({
     write(chunk) {
@@ -215,9 +222,12 @@ if (listen) {
   socket.addEventListener("close", () => {
     parserReader.cancel();
     parserWriter.abort();
+    linkSignal.abort();
   });
 
   registry.linkStream(
+    linkSignal.signal,
+
     encoder,
     decoder,
 
