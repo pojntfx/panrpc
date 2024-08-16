@@ -1787,7 +1787,9 @@ To make getting started with panrpc easier, take a look at the following example
 - **Transports**
   - **TCP (Stream-Oriented API)**
     - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Server CLI Example](./go/cmd/panrpc-example-tcp-server-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Server CLI Example (with graceful shutdown)](./go/cmd/panrpc-example-tcp-server-graceful-cli/main.go)
     - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Client CLI Example](./go/cmd/panrpc-example-tcp-client-cli/main.go)
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> TCP Client CLI Example (with graceful shutdown)](./go/cmd/panrpc-example-tcp-client-graceful-cli/main.go)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> TCP Server CLI Example](./ts/bin/panrpc-example-tcp-server-cli.ts)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> TCP Client CLI Example](./ts/bin/panrpc-example-tcp-client-cli.ts)
   - **UNIX Socket (Stream-Oriented API)**
@@ -1806,9 +1808,9 @@ To make getting started with panrpc easier, take a look at the following example
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Server CLI Example](./ts/bin/panrpc-example-websocket-server-cli.ts)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Client CLI Example](./ts/bin/panrpc-example-websocket-client-cli.ts)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebSocket Client Web Example](./ts/bin/panrpc-example-websocket-client-web)
-  - **WebRTC (Stream-Oriented API)**
-    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
-    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebRTC Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
+  - **WebRTC/weron (Stream-Oriented API)**
+    - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> WebRTC/weron Peer CLI Example](./go/cmd/panrpc-example-webrtc-peer-cli/main.go)
+    - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> WebRTC/weron Peer CLI Example](./ts/bin/panrpc-example-webrtc-peer-cli.ts)
   - **Valkey/Redis (Message-Oriented API)**
     - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Server CLI Example](./go/cmd/panrpc-example-valkey-server-cli/main.go)
     - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Client CLI Example](./go/cmd/panrpc-example-valkey-client-cli/main.go)
