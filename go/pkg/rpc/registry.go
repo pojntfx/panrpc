@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -230,6 +231,87 @@ func (r Registry[R, T]) makeRPC(
 	})
 }
 
+func (r Registry[R, T]) implementRemoteStructRecursively(
+	ctx context.Context,
+
+	nameSuffix string,
+
+	remote reflect.Value,
+
+	setErr func(err error),
+	responseResolver *utils.Broadcaster[callResponse[T]],
+
+	writeRequest func(b T) error,
+
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
+) error {
+	for i := 0; i < remote.NumField(); i++ {
+		functionField := remote.Type().Field(i)
+		functionType := functionField.Type
+
+		if functionType.Kind() == reflect.Struct {
+			if err := r.implementRemoteStructRecursively(
+				ctx,
+
+				path.Join(functionField.Name, nameSuffix),
+
+				remote.FieldByName(functionField.Name),
+
+				setErr,
+				responseResolver,
+
+				writeRequest,
+
+				marshal,
+				unmarshal,
+			); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if functionType.Kind() != reflect.Func {
+			continue
+		}
+
+		if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
+			return ErrInvalidReturn
+		}
+
+		if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
+			return ErrInvalidReturn
+		}
+
+		if functionType.NumIn() < 1 {
+			return ErrInvalidArgs
+		}
+
+		if !functionType.In(0).Implements(contextType) {
+			return ErrInvalidArgs
+		}
+
+		remote.
+			FieldByName(functionField.Name).
+			Set(r.makeRPC(
+				ctx,
+
+				path.Join(functionField.Name, nameSuffix),
+				functionType,
+				setErr,
+				responseResolver,
+
+				writeRequest,
+
+				marshal,
+				unmarshal,
+			))
+	}
+
+	return nil
+}
+
 // LinkMessage exposes local RPCs and implements remote RPCs via a message-based transport
 func (r Registry[R, T]) LinkMessage(
 	ctx context.Context, // Context for read, write and in-flight RPC operations
@@ -322,53 +404,22 @@ func (r Registry[R, T]) LinkMessage(
 	}()
 
 	go func() {
-		for i := 0; i < remote.NumField(); i++ {
-			functionField := remote.Type().Field(i)
-			functionType := functionField.Type
+		if err := r.implementRemoteStructRecursively(
+			ctx,
 
-			if functionType.Kind() != reflect.Func {
-				continue
-			}
+			"",
 
-			if functionType.NumOut() <= 0 || functionType.NumOut() > 2 {
-				setErr(ErrInvalidReturn)
+			remote,
 
-				break
-			}
+			setErr,
+			responseResolver,
 
-			if !functionType.Out(functionType.NumOut() - 1).Implements(errorType) {
-				setErr(ErrInvalidReturn)
+			writeRequestCtx,
 
-				break
-			}
-
-			if functionType.NumIn() < 1 {
-				setErr(ErrInvalidArgs)
-
-				break
-			}
-
-			if !functionType.In(0).Implements(contextType) {
-				setErr(ErrInvalidArgs)
-
-				break
-			}
-
-			remote.
-				FieldByName(functionField.Name).
-				Set(r.makeRPC(
-					ctx,
-
-					functionField.Name,
-					functionType,
-					setErr,
-					responseResolver,
-
-					writeRequestCtx,
-
-					marshal,
-					unmarshal,
-				))
+			marshal,
+			unmarshal,
+		); err != nil {
+			setErr(err)
 		}
 
 		remoteID := uuid.NewString()
