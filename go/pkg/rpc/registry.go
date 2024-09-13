@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"errors"
-	"log"
 	"path"
 	"reflect"
 	"strings"
@@ -334,8 +333,6 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 
 	err error,
 ) {
-	log.Println(req.Function)
-
 	function, err = findMethodByFunctionCallPathRecursively(r.local.wrappee, req.Function)
 	if err != nil {
 		function, err = reflect.
