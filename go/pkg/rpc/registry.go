@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"log"
 	"path"
 	"reflect"
 	"strings"
@@ -16,8 +17,9 @@ var (
 	errorType   = reflect.TypeOf((*error)(nil)).Elem()
 	contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 
-	ErrInvalidReturn = errors.New("invalid return, can only return an error or a value and an error")
-	ErrInvalidArgs   = errors.New("invalid arguments, first argument needs to be a context.Context")
+	ErrInvalidFunctionCallPath = errors.New("invalid or empty function call path")
+	ErrInvalidReturn           = errors.New("invalid return, can only return an error or a value and an error")
+	ErrInvalidArgs             = errors.New("invalid arguments, first argument needs to be a context.Context")
 
 	ErrCannotCallNonFunction = errors.New("can not call non function")
 )
@@ -234,7 +236,7 @@ func (r Registry[R, T]) makeRPC(
 func (r Registry[R, T]) implementRemoteStructRecursively(
 	ctx context.Context,
 
-	nameSuffix string,
+	namePrefix string,
 
 	remote reflect.Value,
 
@@ -254,7 +256,7 @@ func (r Registry[R, T]) implementRemoteStructRecursively(
 			if err := r.implementRemoteStructRecursively(
 				ctx,
 
-				path.Join(functionField.Name, nameSuffix),
+				path.Join(namePrefix, functionField.Name),
 
 				remote.FieldByName(functionField.Name),
 
@@ -297,7 +299,7 @@ func (r Registry[R, T]) implementRemoteStructRecursively(
 			Set(r.makeRPC(
 				ctx,
 
-				path.Join(functionField.Name, nameSuffix),
+				path.Join(namePrefix, functionField.Name),
 				functionType,
 				setErr,
 				responseResolver,
@@ -310,6 +312,191 @@ func (r Registry[R, T]) implementRemoteStructRecursively(
 	}
 
 	return nil
+}
+
+func (r Registry[R, T]) findLocalFunctionToCallRecursively(
+	ctx context.Context,
+
+	req utils.Request[T],
+
+	setErr func(err error),
+	responseResolver *utils.Broadcaster[callResponse[T]],
+
+	writeRequest func(b T) error,
+
+	marshal func(v any) (T, error),
+	unmarshal func(data T, v any) error,
+
+	remoteID string,
+) (
+	function reflect.Value,
+	args []reflect.Value,
+
+	err error,
+) {
+	log.Println(req.Function)
+
+	function, err = findMethodByFunctionCallPathRecursively(r.local.wrappee, req.Function)
+	if err != nil {
+		function, err = reflect.
+			ValueOf(r.local.wrapper).
+			MethodByName(req.Function), nil
+
+		if function.Kind() != reflect.Func {
+			return function, args, errors.Join(ErrCannotCallNonFunction, err)
+		}
+	}
+
+	if function.Type().NumIn() != len(req.Args)+1 {
+		return function, args, ErrInvalidArgsCount
+	}
+
+	for i := 0; i < function.Type().NumIn(); i++ {
+		if i == 0 {
+			// Add the context to the function arguments
+			args = append(args, reflect.ValueOf(context.WithValue(ctx, RemoteIDContextKey, remoteID)))
+
+			continue
+		}
+
+		functionType := function.Type().In(i)
+		if functionType.Kind() == reflect.Func {
+			arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
+				defer func() {
+					var err error
+					if e := recover(); e != nil {
+						var ok bool
+						err, ok = e.(error)
+						if !ok {
+							err = utils.ErrPanickedWithNonErrorValue
+						}
+
+						setErr(err)
+					}
+
+					// If we tried to return with an invalid results count, set them so that the call doesn't panic
+					if len(results) != functionType.NumOut() {
+						errReturnValue := reflect.ValueOf(err)
+
+						if functionType.NumOut() == 1 {
+							results = []reflect.Value{errReturnValue}
+						} else if functionType.NumOut() == 2 {
+							valueReturnValue := reflect.Zero(functionType.Out(0))
+
+							results = []reflect.Value{valueReturnValue, errReturnValue}
+						}
+					}
+				}()
+
+				closureID := ""
+				if err := unmarshal(req.Args[i-2], &closureID); err != nil {
+					panic(err)
+				}
+
+				rpc := r.makeRPC(
+					ctx,
+
+					"CallClosure",
+					reflect.TypeOf(callClosureType(nil)),
+					setErr,
+					responseResolver,
+
+					writeRequest,
+
+					marshal,
+					unmarshal,
+				)
+
+				var (
+					ctx     context.Context
+					rpcArgs = []interface{}{}
+				)
+				for i, arg := range args {
+					if i == 0 {
+						v, ok := arg.Interface().(context.Context)
+						if !ok {
+							panic(ErrInvalidArgs)
+						}
+						ctx = v
+
+						// Don't sent the context over the wire
+						continue
+					}
+
+					rpcArgs = append(rpcArgs, arg.Interface())
+				}
+
+				rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
+				if err != nil {
+					panic(err)
+				}
+
+				rv := []reflect.Value{}
+				if functionType.NumOut() == 1 {
+					returnValue := reflect.New(functionType.Out(0))
+
+					returnValue.Elem().Set(rcpRv[1]) // Error return value is at index 1
+
+					rv = append(rv, returnValue.Elem())
+				} else if functionType.NumOut() == 2 {
+					valueReturnValue := reflect.New(functionType.Out(0))
+					errReturnValue := reflect.New(functionType.Out(1))
+
+					if el := rcpRv[0].Elem(); el.IsValid() {
+						valueReturnValue.Elem().Set(el.Convert(valueReturnValue.Type().Elem()))
+					}
+					errReturnValue.Elem().Set(rcpRv[1])
+
+					rv = append(rv, valueReturnValue.Elem(), errReturnValue.Elem())
+				}
+
+				return rv
+			})
+
+			args = append(args, arg)
+		} else {
+			arg := reflect.New(functionType)
+
+			if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
+				return function, args, err
+			}
+
+			args = append(args, arg.Elem())
+		}
+	}
+
+	return
+}
+
+func findMethodByFunctionCallPathRecursively(root interface{}, functionCallPath string) (reflect.Value, error) {
+	functionCallPathParts := strings.Split(functionCallPath, "/")
+	if len(functionCallPathParts) == 0 {
+		return reflect.Value{}, ErrInvalidFunctionCallPath
+	}
+
+	// Try to follow the function call path to the last struct
+	field := reflect.ValueOf(root)
+	for _, name := range functionCallPathParts[:len(functionCallPathParts)-1] {
+		if field.Kind() == reflect.Ptr {
+			field = field.Elem()
+		}
+
+		if field.Kind() != reflect.Struct {
+			return reflect.Value{}, ErrCannotCallNonFunction
+		}
+
+		field = field.FieldByName(name)
+		if !field.IsValid() {
+			return reflect.Value{}, ErrCannotCallNonFunction
+		}
+	}
+
+	function := field.MethodByName(functionCallPathParts[len(functionCallPathParts)-1])
+	if function.Kind() != reflect.Func {
+		return reflect.Value{}, ErrCannotCallNonFunction
+	}
+
+	return function, nil
 }
 
 // LinkMessage exposes local RPCs and implements remote RPCs via a message-based transport
@@ -472,143 +659,25 @@ func (r Registry[R, T]) LinkMessage(
 				}
 
 				go func() {
-					function := reflect.
-						ValueOf(r.local.wrappee).
-						MethodByName(req.Function)
+					function, args, err := r.findLocalFunctionToCallRecursively(
+						ctx,
 
-					if function.Kind() != reflect.Func {
-						function = reflect.
-							ValueOf(r.local.wrapper).
-							MethodByName(req.Function)
+						req,
 
-						if function.Kind() != reflect.Func {
-							setErr(ErrCannotCallNonFunction)
+						setErr,
+						responseResolver,
 
-							return
-						}
-					}
+						writeRequestCtx,
 
-					if function.Type().NumIn() != len(req.Args)+1 {
-						setErr(ErrInvalidArgsCount)
+						marshal,
+						unmarshal,
+
+						remoteID,
+					)
+					if err != nil {
+						setErr(err)
 
 						return
-					}
-
-					args := []reflect.Value{}
-					for i := 0; i < function.Type().NumIn(); i++ {
-						if i == 0 {
-							// Add the context to the function arguments
-							args = append(args, reflect.ValueOf(context.WithValue(ctx, RemoteIDContextKey, remoteID)))
-
-							continue
-						}
-
-						functionType := function.Type().In(i)
-						if functionType.Kind() == reflect.Func {
-							arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
-								defer func() {
-									var err error
-									if e := recover(); e != nil {
-										var ok bool
-										err, ok = e.(error)
-										if !ok {
-											err = utils.ErrPanickedWithNonErrorValue
-										}
-
-										setErr(err)
-									}
-
-									// If we tried to return with an invalid results count, set them so that the call doesn't panic
-									if len(results) != functionType.NumOut() {
-										errReturnValue := reflect.ValueOf(err)
-
-										if functionType.NumOut() == 1 {
-											results = []reflect.Value{errReturnValue}
-										} else if functionType.NumOut() == 2 {
-											valueReturnValue := reflect.Zero(functionType.Out(0))
-
-											results = []reflect.Value{valueReturnValue, errReturnValue}
-										}
-									}
-								}()
-
-								closureID := ""
-								if err := unmarshal(req.Args[i-2], &closureID); err != nil {
-									panic(err)
-								}
-
-								rpc := r.makeRPC(
-									ctx,
-
-									"CallClosure",
-									reflect.TypeOf(callClosureType(nil)),
-									setErr,
-									responseResolver,
-
-									writeRequestCtx,
-
-									marshal,
-									unmarshal,
-								)
-
-								var (
-									ctx     context.Context
-									rpcArgs = []interface{}{}
-								)
-								for i, arg := range args {
-									if i == 0 {
-										v, ok := arg.Interface().(context.Context)
-										if !ok {
-											panic(ErrInvalidArgs)
-										}
-										ctx = v
-
-										// Don't sent the context over the wire
-										continue
-									}
-
-									rpcArgs = append(rpcArgs, arg.Interface())
-								}
-
-								rcpRv, err := utils.Call(rpc, []reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(closureID), reflect.ValueOf(rpcArgs)})
-								if err != nil {
-									panic(err)
-								}
-
-								rv := []reflect.Value{}
-								if functionType.NumOut() == 1 {
-									returnValue := reflect.New(functionType.Out(0))
-
-									returnValue.Elem().Set(rcpRv[1]) // Error return value is at index 1
-
-									rv = append(rv, returnValue.Elem())
-								} else if functionType.NumOut() == 2 {
-									valueReturnValue := reflect.New(functionType.Out(0))
-									errReturnValue := reflect.New(functionType.Out(1))
-
-									if el := rcpRv[0].Elem(); el.IsValid() {
-										valueReturnValue.Elem().Set(el.Convert(valueReturnValue.Type().Elem()))
-									}
-									errReturnValue.Elem().Set(rcpRv[1])
-
-									rv = append(rv, valueReturnValue.Elem(), errReturnValue.Elem())
-								}
-
-								return rv
-							})
-
-							args = append(args, arg)
-						} else {
-							arg := reflect.New(functionType)
-
-							if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
-								setErr(err)
-
-								return
-							}
-
-							args = append(args, arg.Elem())
-						}
 					}
 
 					go func() {
