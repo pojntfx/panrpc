@@ -179,9 +179,12 @@ export class Registry<L extends Object, R extends Object> {
 
     const r: R = {} as R;
     // eslint-disable-next-line no-restricted-syntax
-    for (const functionName of Object.getOwnPropertyNames(
-      Object.getPrototypeOf(this.remote)
-    )) {
+    for (const functionName of [
+      ...Object.getOwnPropertyNames(this.remote),
+      ...Object.getOwnPropertyNames(Object.getPrototypeOf(this.remote)),
+    ]) {
+      console.log(functionName);
+
       if (functionName === constructorFunctionName) {
         // eslint-disable-next-line no-continue
         continue;
