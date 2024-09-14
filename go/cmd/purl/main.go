@@ -55,6 +55,7 @@ Usage of %v:
 
 Examples:
 	%v tcp://localhost:1337/Increment '[1]'
+	%v tcp://localhost:1337/Time.GetSystemTime '[1]'
 	%v tls://localhost:443/Increment '[1]'
 	%v unix:///tmp/panrpc.sock/Increment '[1]'
 	%v unixs:///tmp/panrpc.sock/Increment '[1]'
@@ -63,7 +64,7 @@ Examples:
 	%v weron://examplepass:examplekey@examplecommunity/panrpc.example.webrtc/Increment '[1]'
 
 Flags:
-`, bin, bin, bin, bin, bin, bin, bin, bin, bin)
+`, bin, bin, bin, bin, bin, bin, bin, bin, bin, bin)
 
 		flag.PrintDefaults()
 	}

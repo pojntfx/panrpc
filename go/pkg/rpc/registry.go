@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"errors"
-	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -251,11 +250,16 @@ func (r Registry[R, T]) implementRemoteStructRecursively(
 		functionField := remote.Type().Field(i)
 		functionType := functionField.Type
 
+		prefix := ""
+		if namePrefix != "" {
+			prefix = "."
+		}
+
 		if functionType.Kind() == reflect.Struct {
 			if err := r.implementRemoteStructRecursively(
 				ctx,
 
-				path.Join(namePrefix, functionField.Name),
+				namePrefix+prefix+functionField.Name,
 
 				remote.FieldByName(functionField.Name),
 
@@ -298,7 +302,7 @@ func (r Registry[R, T]) implementRemoteStructRecursively(
 			Set(r.makeRPC(
 				ctx,
 
-				path.Join(namePrefix, functionField.Name),
+				namePrefix+prefix+functionField.Name,
 				functionType,
 				setErr,
 				responseResolver,
@@ -466,7 +470,7 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 }
 
 func findMethodByFunctionCallPathRecursively(root interface{}, functionCallPath string) (reflect.Value, error) {
-	functionCallPathParts := strings.Split(functionCallPath, "/")
+	functionCallPathParts := strings.Split(functionCallPath, ".")
 	if len(functionCallPathParts) == 0 {
 		return reflect.Value{}, ErrInvalidFunctionCallPath
 	}
