@@ -125,6 +125,68 @@ const makeRPC =
         .catch(rej);
     });
 
+const implementRemoteObjectRecursively = <R, T>(
+  linkSignal: AbortSignal | undefined,
+
+  namePrefix: string,
+
+  remoteInterface: R,
+  remoteImplementation: R | undefined,
+
+  responseResolver: EventTarget,
+
+  requestWriter: WritableStreamDefaultWriter<T>,
+
+  marshal: (value: any) => T,
+
+  closureManager: ClosureManager
+): R => {
+  const r = remoteImplementation || ({} as R);
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const functionName of [
+    ...Object.getOwnPropertyNames(remoteInterface),
+    ...Object.getOwnPropertyNames(Object.getPrototypeOf(remoteInterface)),
+  ]) {
+    if (functionName === constructorFunctionName) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    let prefix = "";
+    if (namePrefix !== "") {
+      prefix = ".";
+    }
+
+    if (typeof (remoteInterface as any)[functionName] === "object") {
+      (r as any)[functionName] = implementRemoteObjectRecursively(
+        linkSignal,
+        namePrefix + prefix + functionName,
+        (remoteInterface as any)[functionName],
+        (r as any)[functionName],
+        responseResolver,
+        requestWriter,
+        marshal,
+        closureManager
+      );
+
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    (r as any)[functionName] = makeRPC(
+      linkSignal,
+      namePrefix + prefix + functionName,
+      responseResolver,
+      requestWriter,
+      marshal,
+      closureManager
+    );
+  }
+
+  return r;
+};
+
 /**
  * Exposes local RPCs and implements remote RPCs
  */
@@ -177,32 +239,22 @@ export class Registry<L extends Object, R extends Object> {
   ) => {
     const responseResolver = new EventTarget();
 
-    const r: R = {} as R;
-    // eslint-disable-next-line no-restricted-syntax
-    for (const functionName of [
-      ...Object.getOwnPropertyNames(this.remote),
-      ...Object.getOwnPropertyNames(Object.getPrototypeOf(this.remote)),
-    ]) {
-      console.log(functionName);
+    const r = implementRemoteObjectRecursively(
+      signal,
 
-      if (functionName === constructorFunctionName) {
-        // eslint-disable-next-line no-continue
-        continue;
-      }
+      "",
 
-      (r as any)[functionName] = makeRPC(
-        signal,
+      this.remote,
+      undefined,
 
-        functionName,
-        responseResolver,
+      responseResolver,
 
-        requestWriter,
+      requestWriter,
 
-        marshal,
+      marshal,
 
-        this.closureManager
-      );
-    }
+      this.closureManager
+    );
 
     let closed = false;
 
