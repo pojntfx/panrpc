@@ -8,6 +8,8 @@ import {
 import { ILocalContext, IRemoteContext } from "./context";
 import { ClosureManager, registerClosure } from "./manager";
 
+export const ErrorInvalidFunctionCallPath =
+  "invalid or empty function call path";
 export const ErrorCallAborted = "call aborted";
 export const ErrorCannotCallNonFunction = "can not call non function";
 
@@ -187,6 +189,34 @@ const implementRemoteObjectRecursively = <R, T>(
   return r;
 };
 
+const findMethodByFunctionCallPathRecursively = (
+  root: any,
+  functionCallPath: string
+): { field: any; functionName: string; fn: Function } => {
+  const functionCallPathParts = functionCallPath.split(".");
+  if (functionCallPathParts.length === 0) {
+    throw new Error(ErrorInvalidFunctionCallPath);
+  }
+
+  // Traverse the path to get to the object containing the function
+  let field = root;
+  // eslint-disable-next-line no-restricted-syntax
+  for (const name of functionCallPathParts.slice(0, -1)) {
+    if (typeof field[name] !== "object") {
+      throw new Error(ErrorCannotCallNonFunction);
+    }
+
+    field = field[name];
+    if (!field) {
+      throw new Error(ErrorCannotCallNonFunction);
+    }
+  }
+
+  const functionName = functionCallPathParts[functionCallPathParts.length - 1];
+
+  return { field, functionName, fn: field[functionName] };
+};
+
 /**
  * Exposes local RPCs and implements remote RPCs
  */
@@ -300,9 +330,19 @@ export class Registry<L extends Object, R extends Object> {
               throw new Error(ErrorCannotCallNonFunction);
             }
 
-            let fn = (that.local as any)[functionName];
+            let {
+              // eslint-disable-next-line prefer-const
+              field,
+              functionName: resolvedFunctionName,
+              fn,
+            } = findMethodByFunctionCallPathRecursively(
+              that.local,
+              functionName
+            );
             if (typeof fn !== "function") {
-              fn = (that.closureManager as any)[functionName];
+              field = that.local;
+              resolvedFunctionName = functionName;
+              fn = (that.closureManager as any)[resolvedFunctionName];
 
               if (typeof fn !== "function") {
                 throw new Error(ErrorCannotCallNonFunction);
@@ -310,7 +350,11 @@ export class Registry<L extends Object, R extends Object> {
             }
 
             const remoteClosureParameterIndexes: number[] | undefined =
-              Reflect.getMetadata(remoteClosureKey, that.local, functionName);
+              Reflect.getMetadata(
+                remoteClosureKey,
+                field,
+                resolvedFunctionName
+              );
 
             const ctx: ILocalContext = { remoteID };
 

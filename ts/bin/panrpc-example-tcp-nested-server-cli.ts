@@ -16,7 +16,7 @@ class TimeLocal {
   async GetSystemTime(ctx: ILocalContext): Promise<number> {
     console.log("Getting system time");
 
-    return Date.now() / 1000;
+    return Math.floor(Date.now() / 1000);
   }
 }
 
@@ -49,7 +49,7 @@ class Remote {
 let clients = 0;
 
 const registry = new Registry(
-  new Local(),
+  new Local(new TimeLocal()),
   new Remote(),
 
   {

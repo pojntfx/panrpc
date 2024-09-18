@@ -475,7 +475,7 @@ func findMethodByFunctionCallPathRecursively(root interface{}, functionCallPath 
 		return reflect.Value{}, ErrInvalidFunctionCallPath
 	}
 
-	// Try to follow the function call path to the last struct
+	// Traverse the path to get to the struct containing the function
 	field := reflect.ValueOf(root)
 	for _, name := range functionCallPathParts[:len(functionCallPathParts)-1] {
 		if field.Kind() == reflect.Ptr {
