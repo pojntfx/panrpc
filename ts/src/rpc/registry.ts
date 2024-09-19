@@ -213,6 +213,9 @@ const findMethodByFunctionCallPathRecursively = (
   }
 
   const functionName = functionCallPathParts[functionCallPathParts.length - 1];
+  if (functionName === constructorFunctionName) {
+    throw new Error(ErrorCannotCallNonFunction);
+  }
 
   return { field, functionName, fn: field[functionName] };
 };
@@ -326,10 +329,6 @@ export class Registry<L extends Object, R extends Object> {
 
           let resp: T;
           try {
-            if (functionName === constructorFunctionName) {
-              throw new Error(ErrorCannotCallNonFunction);
-            }
-
             let {
               // eslint-disable-next-line prefer-const
               field,
