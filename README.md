@@ -151,6 +151,7 @@ func (s *coffeeMachine) BrewCoffee(
 > - Methods must have `context.Context` as their first argument
 > - Methods can not have variadic arguments
 > - Methods must return either an error or a single value and an error
+> - Methods must be public (private methods won't be callable as RPCs, but stay callable as regular methods)
 
 To start turning the `BrewCoffee` method into an RPC, create an instance of the struct and pass it to a [panrpc Registry](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry) like so:
 
@@ -995,7 +996,11 @@ To start with implementing the coffee machine server, create a new file `coffee-
 import { ILocalContext } from "@pojntfx/panrpc";
 
 class CoffeeMachine {
-  constructor(private supportedVariants: string[], private waterLevel: number) {
+  #waterLevel: number;
+
+  constructor(private supportedVariants: string[], waterLevel: number) {
+    this.#waterLevel = waterLevel;
+
     this.BrewCoffee = this.BrewCoffee.bind(this);
   }
 
@@ -1008,7 +1013,7 @@ class CoffeeMachine {
       throw new Error("unsupported variant");
     }
 
-    if (this.waterLevel - size < 0) {
+    if (this.#waterLevel - size < 0) {
       throw new Error("not enough water");
     }
 
@@ -1018,9 +1023,9 @@ class CoffeeMachine {
       setTimeout(r, 5000);
     });
 
-    this.waterLevel -= size;
+    this.#waterLevel -= size;
 
-    return this.waterLevel;
+    return this.#waterLevel;
   }
 }
 ```
@@ -1029,6 +1034,7 @@ class CoffeeMachine {
 >
 > - Methods must have `ILocalContext` as their first argument
 > - Methods can not have variadic arguments
+> - Methods must be public (private methods - those that start with `#`, see [private properties](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_properties) - won't be callable as RPCs, but stay callable as regular methods)
 
 To start turning the `BrewCoffee` method into an RPC, create an instance of the class and pass it to a [panrpc Registry](https://pojntfx.github.io/panrpc/classes/Registry.html) like so:
 
@@ -1543,7 +1549,7 @@ class CoffeeMachine {
         throw new Error("unsupported variant");
       }
 
-      if (this.waterLevel - size < 0) {
+      if (this.#waterLevel - size < 0) {
         throw new Error("not enough water");
       }
 
@@ -1564,9 +1570,9 @@ class CoffeeMachine {
       });
     }
 
-    this.waterLevel -= size;
+    this.#waterLevel -= size;
 
-    return this.waterLevel;
+    return this.#waterLevel;
   }
 }
 ```
@@ -1679,7 +1685,7 @@ class CoffeeMachine {
 
     // ..
 
-    return this.waterLevel;
+    return this.#waterLevel;
   }
 }
 ```
@@ -1817,15 +1823,15 @@ To make getting started with panrpc easier, take a look at the following example
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Server CLI Example](./ts/bin/panrpc-example-valkey-server-cli.ts)
     - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Valkey/Redis Client CLI Example](./ts/bin/panrpc-example-valkey-client-cli.ts)
 - **Callbacks**
-  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-callbacks-callee-cli/main.go)
-  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-callbacks-caller-cli/main.go)
-  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./ts/bin/panrpc-example-callbacks-callee-cli.ts)
-  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./ts/bin/panrpc-example-callbacks-caller-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./go/cmd/panrpc-example-tcp-callbacks-callee-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./go/cmd/panrpc-example-tcp-callbacks-caller-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Server CLI Example](./ts/bin/panrpc-example-tcp-callbacks-callee-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Callbacks Demo Client CLI Example](./ts/bin/panrpc-example-tcp-callbacks-caller-cli.ts)
 - **Closures**
-  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./go/cmd/panrpc-example-closures-callee-cli/main.go)
-  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./go/cmd/panrpc-example-closures-caller-cli/main.go)
-  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./ts/bin/panrpc-example-closures-callee-cli.ts)
-  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./ts/bin/panrpc-example-closures-caller-cli.ts)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./go/cmd/panrpc-example-tcp-closures-callee-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./go/cmd/panrpc-example-tcp-closures-caller-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./ts/bin/panrpc-example-tcp-closures-callee-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./ts/bin/panrpc-example-tcp-closures-caller-cli.ts)
 - **Benchmarks**
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-rps-server-cli/main.go)
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-rps-client-cli/main.go)

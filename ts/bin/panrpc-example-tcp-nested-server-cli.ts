@@ -21,7 +21,7 @@ class TimeLocal {
 }
 
 class Local {
-  private counter = 0;
+  #counter = 0;
 
   constructor(public Time: TimeLocal) {
     this.Increment = this.Increment.bind(this);
@@ -35,9 +35,9 @@ class Local {
       ctx.remoteID
     );
 
-    this.counter += delta;
+    this.#counter += delta;
 
-    return this.counter;
+    return this.#counter;
   }
 }
 

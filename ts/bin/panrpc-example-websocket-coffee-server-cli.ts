@@ -15,7 +15,11 @@ class CoffeeMachine {
     cb: (remoteID: string, remote: RemoteControl) => Promise<void>
   ) => Promise<void>;
 
-  constructor(private supportedVariants: string[], private waterLevel: number) {
+  #waterLevel: number;
+
+  constructor(private supportedVariants: string[], waterLevel: number) {
+    this.#waterLevel = waterLevel;
+
     this.BrewCoffee = this.BrewCoffee.bind(this);
   }
 
@@ -41,7 +45,7 @@ class CoffeeMachine {
         throw new Error("unsupported variant");
       }
 
-      if (this.waterLevel - size < 0) {
+      if (this.#waterLevel - size < 0) {
         throw new Error("not enough water");
       }
 
@@ -78,9 +82,9 @@ class CoffeeMachine {
       });
     }
 
-    this.waterLevel -= size;
+    this.#waterLevel -= size;
 
-    return this.waterLevel;
+    return this.#waterLevel;
   }
 }
 

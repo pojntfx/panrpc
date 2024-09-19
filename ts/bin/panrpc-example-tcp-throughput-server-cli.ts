@@ -9,13 +9,17 @@ import { Socket, createServer } from "net";
 import { ILocalContext, Registry } from "../index";
 
 class Local {
-  constructor(private buf: number[]) {
+  #buf: number[];
+
+  constructor(buf: number[]) {
+    this.#buf = buf;
+
     this.GetBytes = this.GetBytes.bind(this);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async GetBytes(ctx: ILocalContext): Promise<number[]> {
-    return this.buf;
+    return this.#buf;
   }
 }
 

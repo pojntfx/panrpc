@@ -8,7 +8,7 @@ import { Socket, createServer } from "net";
 import { ILocalContext, IRemoteContext, Registry } from "../index";
 
 class Local {
-  private counter = 0;
+  #counter = 0;
 
   constructor() {
     this.Increment = this.Increment.bind(this);
@@ -22,9 +22,9 @@ class Local {
       ctx.remoteID
     );
 
-    this.counter += delta;
+    this.#counter += delta;
 
-    return this.counter;
+    return this.#counter;
   }
 }
 
