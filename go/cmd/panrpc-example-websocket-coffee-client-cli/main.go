@@ -24,7 +24,13 @@ func (s *remoteControl) SetCoffeeMachineBrewing(ctx context.Context, brewing boo
 	return nil
 }
 
-type coffeeMachine struct {
+type teaBrewer struct {
+	GetVariants func(ctx context.Context) ([]string, error)
+}
+
+type coffeeMachine[E any] struct {
+	Extension E
+
 	BrewCoffee func(
 		ctx context.Context,
 		variant string,
@@ -38,7 +44,7 @@ func main() {
 	defer cancel()
 
 	var clients atomic.Int64
-	registry := rpc.NewRegistry[coffeeMachine, json.RawMessage](
+	registry := rpc.NewRegistry[coffeeMachine[teaBrewer], json.RawMessage](
 		&remoteControl{},
 
 		&rpc.RegistryHooks{
@@ -58,7 +64,9 @@ func main() {
 - 2: Brew large Cafè Latte
 
 - 3: Brew small Americano
-- 4: Brew large Americano`)
+- 4: Brew large Americano
+
+Or enter 5 to list available tea variants.`)
 
 		stdin := bufio.NewReader(os.Stdin)
 
@@ -68,7 +76,7 @@ func main() {
 				panic(err)
 			}
 
-			if err := registry.ForRemotes(func(remoteID string, remote coffeeMachine) error {
+			if err := registry.ForRemotes(func(remoteID string, remote coffeeMachine[teaBrewer]) error {
 				switch line {
 				case "1\n":
 					fallthrough
@@ -123,6 +131,16 @@ func main() {
 					}
 
 					log.Println("Remaining water:", res, "ml")
+
+				case "5\n":
+					res, err := remote.Extension.GetVariants(ctx)
+					if err != nil {
+						log.Println("Couldn't list available tea variants:", err)
+
+						return nil
+					}
+
+					log.Println("Available tea variants:", res)
 
 				default:
 					log.Printf("Unknown letter %v, ignoring input", line)
