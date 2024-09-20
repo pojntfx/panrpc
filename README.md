@@ -1832,6 +1832,11 @@ To make getting started with panrpc easier, take a look at the following example
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./go/cmd/panrpc-example-tcp-closures-caller-cli/main.go)
   - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./ts/bin/panrpc-example-tcp-closures-callee-cli.ts)
   - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./ts/bin/panrpc-example-tcp-closures-caller-cli.ts)
+- **Nesting**
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Nested Server CLI Example](./go/cmd/panrpc-example-tcp-nested-server-cli/main.go)
+  - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Nested Client CLI Example](./go/cmd/panrpc-example-tcp-nested-client-cli/main.go)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Nested Server CLI Example](./ts/bin/panrpc-example-tcp-nested-server-cli.ts)
+  - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Nested Client CLI Example](./ts/bin/panrpc-example-tcp-nested-client-cli.ts)
 - **Benchmarks**
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Server CLI Example](./go/cmd/panrpc-example-tcp-rps-server-cli/main.go)
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Requests/Second Benchmark Client CLI Example](./go/cmd/panrpc-example-tcp-rps-client-cli/main.go)
