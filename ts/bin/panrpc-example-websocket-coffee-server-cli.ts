@@ -10,14 +10,36 @@ import {
   remoteClosure,
 } from "../index";
 
-class CoffeeMachine {
+class TeaBrewer {
+  #supportedVariants: string[];
+
+  constructor(supportedVariants: string[]) {
+    this.#supportedVariants = supportedVariants;
+
+    this.GetVariants = this.GetVariants.bind(this);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async GetVariants(ctx: ILocalContext): Promise<string[]> {
+    return this.#supportedVariants;
+  }
+}
+
+class CoffeeMachine<E> {
   public forRemotes?: (
     cb: (remoteID: string, remote: RemoteControl) => Promise<void>
   ) => Promise<void>;
 
+  #supportedVariants: string[];
+
   #waterLevel: number;
 
-  constructor(private supportedVariants: string[], waterLevel: number) {
+  constructor(
+    public Extension: E,
+    supportedVariants: string[],
+    waterLevel: number
+  ) {
+    this.#supportedVariants = supportedVariants;
     this.#waterLevel = waterLevel;
 
     this.BrewCoffee = this.BrewCoffee.bind(this);
@@ -41,7 +63,7 @@ class CoffeeMachine {
         await remote.SetCoffeeMachineBrewing(undefined, true);
       });
 
-      if (!this.supportedVariants.includes(variant)) {
+      if (!this.#supportedVariants.includes(variant)) {
         throw new Error("unsupported variant");
       }
 
@@ -93,7 +115,11 @@ class RemoteControl {
   async SetCoffeeMachineBrewing(ctx: IRemoteContext, brewing: boolean) {}
 }
 
-const service = new CoffeeMachine(["latte", "americano"], 1000);
+const service = new CoffeeMachine(
+  new TeaBrewer(["darjeeling", "chai", "earlgrey"]),
+  ["latte", "americano"],
+  1000
+);
 
 let clients = 0;
 
