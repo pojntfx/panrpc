@@ -18,7 +18,16 @@ class RemoteControl {
   }
 }
 
-class CoffeeMachine {
+class TeaBrewer {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, class-methods-use-this
+  async GetVariants(ctx: IRemoteContext): Promise<string[]> {
+    return [];
+  }
+}
+
+class CoffeeMachine<E> {
+  constructor(public Extension: E) {}
+
   // eslint-disable-next-line class-methods-use-this
   async BrewCoffee(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -38,7 +47,7 @@ let clients = 0;
 
 const registry = new Registry(
   new RemoteControl(),
-  new CoffeeMachine(),
+  new CoffeeMachine(new TeaBrewer()),
 
   {
     onClientConnect: () => {
@@ -61,7 +70,9 @@ const registry = new Registry(
 - 2: Brew large Cafè Latte
 
 - 3: Brew small Americano
-- 4: Brew large Americano`);
+- 4: Brew large Americano
+
+Or enter 5 to list available tea variants.`);
 
   const rl = createInterface({ input: stdin, output: stdout });
 
@@ -108,6 +119,18 @@ const registry = new Registry(
             console.log("Remaining water:", res, "ml");
           } catch (e) {
             console.error(`Couldn't brew Americano: ${e}`);
+          }
+
+          break;
+
+        case "5":
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await remote.Extension.GetVariants(undefined);
+
+            console.log("Available tea variants:", res);
+          } catch (e) {
+            console.error(`Couldn't list available tea variants: ${e}`);
           }
 
           break;
