@@ -16,7 +16,17 @@ import (
 	"nhooyr.io/websocket"
 )
 
-type coffeeMachine struct {
+type teaBrewer struct {
+	supportedVariants []string
+}
+
+func (s *teaBrewer) GetVariants(ctx context.Context) ([]string, error) {
+	return s.supportedVariants, nil
+}
+
+type coffeeMachine[E any] struct {
+	Extension E
+
 	supportedVariants []string
 	waterLevel        int
 
@@ -25,7 +35,7 @@ type coffeeMachine struct {
 	) error
 }
 
-func (s *coffeeMachine) BrewCoffee(
+func (s *coffeeMachine[E]) BrewCoffee(
 	ctx context.Context,
 	variant string,
 	size int,
@@ -98,7 +108,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	service := &coffeeMachine{
+	service := &coffeeMachine[*teaBrewer]{
+		Extension: &teaBrewer{
+			supportedVariants: []string{"darjeeling", "chai", "earlgrey"},
+		},
+
 		supportedVariants: []string{"latte", "americano"},
 		waterLevel:        1000,
 	}
