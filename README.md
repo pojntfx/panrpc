@@ -916,7 +916,7 @@ go func() {
 }()
 ```
 
-Now that we can restart the coffee machine/server again like so:
+Now we can restart the coffee machine/server again like so:
 
 ```shell
 $ go run ./cmd/coffee-machine/main.go
@@ -1746,7 +1746,7 @@ And finally, where we call the `BrewCoffee` RPC in the remote control/client, we
 })();
 ```
 
-Now that we can restart the coffee machine/server again like so:
+Now we can restart the coffee machine/server again like so:
 
 ```shell
 $ npx tsx coffee-machine.ts
@@ -1775,7 +1775,166 @@ Brewing Cafè Latte ... 100% done
 Remaining water: 900 ml
 ```
 
-**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts) for a recap.
+**Enjoy your live coffee brewing progress!** You've successfully implemented incremental coffee brewing progress reports by using panrpc's closure support, something that is usually quite tricky to do with RPC frameworks.
+
+#### 7. Nesting RPCs
+
+So far, we've added RPCs directly to our coffee machine/server and remote control/client. While this approach is simple, it makes future extensions difficult. If we want to add more features, we would need to modify the coffee machine/server and remote control/client directly by adding new RPC methods, which can be hard to do in a type-safe way. Additionally, having only one level of RPCs makes large APIs hard to understand and organize as the number of RPCs increases.
+
+In order to work around this, panrpc supports nesting RPCs in both clients and servers. This allows you to simplify top-level RPC calls; for example, instead of a single RPC like `GetConnectedChatUsers()`, you can use categorized, nested calls such as `Chat.Users.GetConnected()`.
+
+To define a nested RPC, simply add another class as a public instance property to your existing coffee machine/server or remote control/client. In this new class, you can define RPCs as methods, just like with top-level RPCs. To call them, follow the same concept: Define placeholder methods in the new class and add it as a public instance property to your coffee machine/server or remote control/client.
+
+In this example, we'll add a tea brewer extension to our coffee machine/server and remote control/client. This extension will allow us to list available tea variants by calling the `Extension.GetVariants` RPC. For brevity, we won't implement all the tea brewing functions. To add the tea brewer extension to the coffee machine/server, first create a new `TeaBrewer` class, similar to the `CoffeeMachine` class. Then, add the `GetVariants` method to this class and instantiate it with the supported variants:
+
+```typescript
+// coffee-machine.ts
+
+class TeaBrewer {
+  #supportedVariants: string[];
+
+  constructor(supportedVariants: string[]) {
+    this.#supportedVariants = supportedVariants;
+
+    this.GetVariants = this.GetVariants.bind(this);
+  }
+
+  async GetVariants(ctx: ILocalContext): Promise<string[]> {
+    return this.#supportedVariants;
+  }
+}
+```
+
+To add these nested RPCs to the main `CoffeeMachine` class, we'll include them as a public property in the class’s constructor. To keep the coffee machine flexible and avoid depending on the `TeaBrewer` extension, we'll name the property `Extension` and make it generic in `CoffeeMachine`. This way, we can easily replace the tea brewer with another extension in the future, such as a full-featured tea brewer:
+
+```typescript
+// coffee-machine.ts
+
+class CoffeeMachine<E> {
+  // ...
+  constructor(
+    public Extension: E,
+    supportedVariants: string[],
+    waterLevel: number
+  ) {
+    this.#supportedVariants = supportedVariants;
+    this.#waterLevel = waterLevel;
+
+    this.BrewCoffee = this.BrewCoffee.bind(this);
+  }
+  // ...
+}
+```
+
+Finally, for the coffee machine/server, create an instance of our extension and pass it to the `CoffeeMachine` when initializing it. This is also where you provide the list of supported tea variants:
+
+```typescript
+// coffee-machine.ts
+
+// ...
+const service = new CoffeeMachine(
+  new TeaBrewer(["darjeeling", "chai", "earlgrey"]),
+  ["latte", "americano"],
+  1000
+);
+// ...
+```
+
+For the remote control/client, it's a very similar process. First, we define the new `TeaBrewer` class with the `GetVariants` placeholder method:
+
+```typescript
+// remote-control.ts
+
+class TeaBrewer {
+  async GetVariants(ctx: IRemoteContext): Promise<string[]> {
+    return [];
+  }
+}
+```
+
+Then we'll add the nested RPCs to the main `CoffeeMachine` class as a public instance property, and we'll use generics again to keep everything extensible:
+
+```typescript
+// remote-control.ts
+
+class CoffeeMachine<E> {
+  constructor(public Extension: E) {}
+
+  // ...
+}
+```
+
+After this, we need to create an instance of our extension and pass it to `CoffeeMachine` when we create it:
+
+```typescript
+// remote-control.ts
+
+const registry = new Registry(
+  new RemoteControl(),
+  new CoffeeMachine(new TeaBrewer())
+
+  // ...
+);
+```
+
+And finally, we add another switch case to the remote control/client so that we can call `Extension.GetVariants`:
+
+```typescript
+// remote-control.ts
+
+(async () => {
+  console.log(`Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano
+
+Or enter 5 to list available tea variants.`);
+
+  // ...
+
+  await registry.forRemotes(async (remoteID, remote) => {
+    switch (line) {
+      // ..
+      case "5":
+        try {
+          const res = await remote.Extension.GetVariants(undefined);
+
+          console.log("Available tea variants:", res);
+        } catch (e) {
+          console.error(`Couldn't list available tea variants: ${e}`);
+        }
+
+        break;
+
+      default:
+      // ..
+    }
+  });
+})();
+```
+
+Now we can restart the coffee machine/server again like so:
+
+```shell
+$ npx tsx coffee-machine.ts
+```
+
+And connect the remote control/client to it again like so:
+
+```shell
+$ npx tsx remote-control.ts
+```
+
+You can now request the coffee machine to list the available tea variants by pressing `5` and <kbd>ENTER</kbd>. Once the RPC has been called, the remote control should print something like the following:
+
+```plaintext
+Available tea variants: [ "darjeeling", "chai", "earlgrey" ]
+```
+
+**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. You've also made it easily extensible by using nested RPCs. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./ts/bin/panrpc-example-websocket-coffee-server-cli.ts) and [coffee machine client/remote control](./ts/bin/panrpc-example-websocket-coffee-client-cli.ts) for a recap.
 
 </details>
 
@@ -1832,7 +1991,7 @@ To make getting started with panrpc easier, take a look at the following example
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./go/cmd/panrpc-example-tcp-closures-caller-cli/main.go)
   - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Server CLI Example](./ts/bin/panrpc-example-tcp-closures-callee-cli.ts)
   - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Closures Demo Client CLI Example](./ts/bin/panrpc-example-tcp-closures-caller-cli.ts)
-- **Nesting**
+- **Nested RPCs**
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Nested Server CLI Example](./go/cmd/panrpc-example-tcp-nested-server-cli/main.go)
   - [<img alt="Go" src="https://cdn.simpleicons.org/go" style="vertical-align: middle;" height="20" width="20" /> Nested Client CLI Example](./go/cmd/panrpc-example-tcp-nested-client-cli/main.go)
   - [<img alt="typescript" src="https://cdn.simpleicons.org/typescript" style="vertical-align: middle;" height="20" width="20" /> Nested Server CLI Example](./ts/bin/panrpc-example-tcp-nested-server-cli.ts)
