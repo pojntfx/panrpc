@@ -1777,11 +1777,16 @@ Remaining water: 900 ml
 
 **Enjoy your live coffee brewing progress!** You've successfully implemented incremental coffee brewing progress reports by using panrpc's closure support, something that is usually quite tricky to do with RPC frameworks.
 
+</details>
+
 #### 7. Nesting RPCs
 
 So far, we've added RPCs directly to our coffee machine/server and remote control/client. While this approach is simple, it makes future extensions difficult. If we want to add more features, we would need to modify the coffee machine/server and remote control/client directly by adding new RPC methods, which can be hard to do in a type-safe way. Additionally, having only one level of RPCs makes large APIs hard to understand and organize as the number of RPCs increases.
 
 In order to work around this, panrpc supports nesting RPCs in both clients and servers. This allows you to simplify top-level RPC calls; for example, instead of a single RPC like `GetConnectedChatUsers()`, you can use categorized, nested calls such as `Chat.Users.GetConnected()`.
+
+<details>
+  <summary>Expand section</summary>
 
 To define a nested RPC, simply add another class as a public instance property to your existing coffee machine/server or remote control/client. In this new class, you can define RPCs as methods, just like with top-level RPCs. To call them, follow the same concept: Define placeholder methods in the new class and add it as a public instance property to your coffee machine/server or remote control/client.
 
