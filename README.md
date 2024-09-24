@@ -945,7 +945,155 @@ Brewing Cafè Latte ... 100% done
 Remaining water: 900 ml
 ```
 
-**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./go/cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./go/cmd/panrpc-example-websocket-coffee-client-cli/main.go) for a recap.
+**Enjoy your live coffee brewing progress!** You've successfully implemented incremental coffee brewing progress reports by using panrpc's closure support, something that is usually quite tricky to do with RPC frameworks.
+
+</details>
+
+#### 7. Nesting RPCs
+
+So far, we've added RPCs directly to our coffee machine/server and remote control/client. While this approach is simple, it makes future extensions difficult. If we want to add more features, we would need to modify the coffee machine/server and remote control/client directly by adding new RPC methods, which can be hard to do in a type-safe way. Additionally, having only one level of RPCs makes large APIs hard to understand and organize as the number of RPCs increases.
+
+In order to work around this, panrpc supports nesting RPCs in both clients and servers. This allows you to simplify top-level RPC calls; for example, instead of a single RPC like `GetConnectedChatUsers()`, you can use categorized, nested calls such as `Chat.Users.GetConnected()`.
+
+<details>
+  <summary>Expand section</summary>
+
+To define a nested RPC, simply add another struct as a public property to your existing coffee machine/server or remote control/client. In this new stuct, you can define RPCs as methods, just like with top-level RPCs. To call them, follow the same concept: Define placeholder methods in the new struct and add it as a public property to your coffee machine/server or remote control/client.
+
+In this example, we'll add a tea brewer extension to our coffee machine/server and remote control/client. This extension will allow us to list available tea variants by calling the `Extension.GetVariants` RPC. For brevity, we won't implement all the tea brewing functions. To add the tea brewer extension to the coffee machine/server, first create a new `TeaBrewer` struct, similar to the `CoffeeMachine` struct. Then, add the `GetVariants` method to this class and instantiate it with the supported variants:
+
+```go
+// cmd/coffee-machine/main.go
+
+type teaBrewer struct {
+	supportedVariants []string
+}
+
+func (s *teaBrewer) GetVariants(ctx context.Context) ([]string, error) {
+	return s.supportedVariants, nil
+}
+```
+
+To add these nested RPCs to the main `CoffeeMachine` struct, we'll include them as a public property in the struct. To keep the coffee machine flexible and avoid depending on the `TeaBrewer` extension, we'll name the property `Extension` and make it generic in `CoffeeMachine`. This way, we can easily replace the tea brewer with another extension in the future, such as a full-featured tea brewer:
+
+```go
+// cmd/coffee-machine/main.go
+
+type coffeeMachine[E any] struct {
+	Extension E
+
+  // ...
+}
+```
+
+Finally, for the coffee machine/server, create an instance of our extension and pass it to the `CoffeeMachine` when initializing it. This is also where you provide the list of supported tea variants:
+
+```go
+// cmd/coffee-machine/main.go
+
+// ...
+service := &coffeeMachine[*teaBrewer]{
+		Extension: &teaBrewer{
+			supportedVariants: []string{"darjeeling", "chai", "earlgrey"},
+		},
+
+		supportedVariants: []string{"latte", "americano"},
+		waterLevel:        1000,
+	}
+// ...
+```
+
+For the remote control/client, it's a very similar process. First, we define the new `TeaBrewer` struct with the `GetVariants` placeholder method:
+
+```go
+// cmd/remote-control/main.go
+
+type teaBrewer struct {
+	GetVariants func(ctx context.Context) ([]string, error)
+}
+```
+
+Then we'll add the nested RPCs to the main `CoffeeMachine` struct as a public instance property, and we'll use generics again to keep everything extensible:
+
+```go
+// cmd/remote-control/main.go
+
+type coffeeMachine[E any] struct {
+	Extension E
+
+	// ...
+}
+```
+
+After this, we need to create an instance of our extension and pass it to `CoffeeMachine` when we create it:
+
+```go
+// cmd/remote-control/main.go
+
+registry := rpc.NewRegistry[coffeeMachine[teaBrewer], json.RawMessage](
+		&remoteControl{},
+
+		// ...
+	)
+```
+
+And finally, we add another switch case to the remote control/client so that we can call `Extension.GetVariants`:
+
+```go
+// cmd/remote-control/main.go
+
+	go func() {
+		log.Println(`Enter one of the following numbers followed by <ENTER> to brew a coffee:
+
+- 1: Brew small Cafè Latte
+- 2: Brew large Cafè Latte
+
+- 3: Brew small Americano
+- 4: Brew large Americano
+
+Or enter 5 to list available tea variants.`)
+
+  // ...
+
+  if err := registry.ForRemotes(func(remoteID string, remote coffeeMachine[teaBrewer]) error {
+		switch line {
+      // ..
+      case "5\n":
+				res, err := remote.Extension.GetVariants(ctx)
+				if err != nil {
+					log.Println("Couldn't list available tea variants:", err)
+
+					return nil
+				}
+
+				log.Println("Available tea variants:", res)
+
+      default:
+      // ..
+		}
+	}
+}()
+```
+
+Now we can restart the coffee machine/server again like so:
+
+```shell
+$ go run ./cmd/coffee-machine/main.go
+```
+
+And connect the remote control/client to it again like so:
+
+```shell
+$ go run ./cmd/remote-control/main.go
+```
+
+You can now request the coffee machine to list the available tea variants by pressing `5` and <kbd>ENTER</kbd>. Once the RPC has been called, the remote control should print something like the following:
+
+```plaintext
+Available tea variants: [ "darjeeling", "chai", "earlgrey" ]
+```
+
+**🚀 That's it!** You've successfully built a virtual coffee machine with support for brewing coffee, notifications when coffee is being brewed, and incremental coffee brewing progress reports. You've also made it easily extensible by using nested RPCs. We can't wait to see what you're going to build next with panrpc! Be sure to take a look at the [reference](#reference) and [examples](#examples) for more information, or check out the complete sources for the [coffee machine server](./go/cmd/panrpc-example-websocket-coffee-server-cli/main.go) and [coffee machine client/remote control](./go/cmd/panrpc-example-websocket-coffee-client-cli/main.go) for a recap.
 
 </details>
 
