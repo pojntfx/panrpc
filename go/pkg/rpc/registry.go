@@ -17,6 +17,7 @@ var (
 
 	ErrInvalidFunctionCallPath = errors.New("invalid or empty function call path")
 	ErrInvalidReturn           = errors.New("invalid return, can only return an error or a value and an error")
+	ErrReturnValueTooComplex   = errors.New("invalid return, either the type doesn't match or is too complex and can't be inspected")
 	ErrInvalidArgs             = errors.New("invalid arguments, first argument needs to be a context.Context")
 
 	ErrCannotCallNonFunction = errors.New("can not call non function")
@@ -444,7 +445,12 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 					errReturnValue := reflect.New(functionType.Out(1))
 
 					if el := rcpRv[0].Elem(); el.IsValid() {
-						valueReturnValue.Elem().Set(el.Convert(valueReturnValue.Type().Elem()))
+						convertedValueReturnType, err := convertValue(el, valueReturnValue.Type().Elem())
+						if err != nil {
+							panic(err)
+						}
+
+						valueReturnValue.Elem().Set(convertedValueReturnType)
 					}
 					errReturnValue.Elem().Set(rcpRv[1])
 
@@ -498,6 +504,34 @@ func findMethodByFunctionCallPathRecursively(root interface{}, functionCallPath 
 	}
 
 	return function, nil
+}
+
+func convertValue(srcVal reflect.Value, dstType reflect.Type) (reflect.Value, error) {
+	for srcVal.Kind() == reflect.Interface {
+		srcVal = srcVal.Elem()
+	}
+
+	if srcVal.Type().ConvertibleTo(dstType) {
+		return srcVal.Convert(dstType), nil
+	}
+
+	// We can't convert slices directly, we have to convert each element individually
+	if srcVal.Kind() == reflect.Slice && dstType.Kind() == reflect.Slice {
+		srcLen := srcVal.Len()
+		dstSlice := reflect.MakeSlice(dstType, srcLen, srcLen)
+		for i := 0; i < srcLen; i++ {
+			elem, err := convertValue(srcVal.Index(i), dstType.Elem())
+			if err != nil {
+				return reflect.Value{}, err
+			}
+
+			dstSlice.Index(i).Set(elem)
+		}
+
+		return dstSlice, nil
+	}
+
+	return reflect.Value{}, ErrReturnValueTooComplex
 }
 
 // LinkMessage exposes local RPCs and implements remote RPCs via a message-based transport

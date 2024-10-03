@@ -14,7 +14,7 @@ var (
 	ErrNotAFunction = errors.New("not a function")
 
 	ErrInvalidArgsCount = errors.New("invalid argument count")
-	ErrInvalidArg       = errors.New("invalid argument")
+	ErrInvalidArg       = errors.New("invalid argument, either the type doesn't match or is too complex and can't be inspected")
 
 	ErrClosureDoesNotExist = errors.New("closure does not exist")
 )
@@ -45,15 +45,12 @@ func createClosure(fn interface{}) (func(args ...interface{}) (interface{}, erro
 
 		in := make([]reflect.Value, len(args))
 		for i, arg := range args {
-			if argType := reflect.TypeOf(arg); argType != functionType.In(i) {
-				if argType.ConvertibleTo(functionType.In(i)) {
-					in[i] = reflect.ValueOf(arg).Convert(functionType.In(i))
-				} else {
-					return nil, ErrInvalidArg
-				}
-			} else {
-				in[i] = reflect.ValueOf(arg)
+			convertedArgVal, err := convertValue(reflect.ValueOf(arg), functionType.In(i))
+			if err != nil {
+				return nil, ErrInvalidArg
 			}
+
+			in[i] = convertedArgVal
 		}
 
 		out, err := utils.Call(reflect.ValueOf(fn), in)
