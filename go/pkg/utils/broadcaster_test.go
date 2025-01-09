@@ -18,8 +18,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "basic publish and receive",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[string]()
-				ctx := context.Background()
 
 				receive, err := b.Receive("test", ctx)
 				assert.NoError(t, err)
@@ -36,8 +38,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "receive after channel freed",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[string]()
-				ctx := context.Background()
 
 				receive, err := b.Receive("test", ctx)
 				assert.NoError(t, err)
@@ -51,8 +55,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "receive after broadcaster closed",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[string]()
-				ctx := context.Background()
 
 				receive, err := b.Receive("test", ctx)
 				assert.NoError(t, err)
@@ -66,8 +72,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "receive with cancelled context",
 			run: func(t *testing.T) {
-				b := NewBroadcaster[string]()
 				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
 				assert.NoError(t, err)
@@ -83,8 +91,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "publish and receive with multiple channels",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[string]()
-				ctx := context.Background()
 
 				// Setup two channels
 				receive1, err := b.Receive("ch1", ctx)
@@ -133,8 +143,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "concurrent publish and receive operations",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[int]()
-				ctx := context.Background()
 
 				const numChannels = 3
 				const messagesPerChannel = 5
@@ -182,8 +194,10 @@ func TestBroadcaster(t *testing.T) {
 		{
 			name: "close while receiving",
 			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				b := NewBroadcaster[string]()
-				ctx := context.Background()
 
 				receive, err := b.Receive("test", ctx)
 				assert.NoError(t, err)
