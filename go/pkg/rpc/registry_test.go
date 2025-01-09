@@ -13,8 +13,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type nestedServiceLocal struct {
+	value string
+}
+
+func (s *nestedServiceLocal) GetValue(ctx context.Context) (string, error) {
+	return s.value, nil
+}
+
+func (s *nestedServiceLocal) SetValue(ctx context.Context, newValue string) error {
+	s.value = newValue
+
+	return nil
+}
+
+type nestedServiceRemote struct {
+	GetValue func(ctx context.Context) (string, error)
+	SetValue func(ctx context.Context, newValue string) error
+}
+
 type serverLocal struct {
 	counter int64
+
+	Nested *nestedServiceLocal
 }
 
 func (s *serverLocal) Increment(ctx context.Context, delta int64) (int64, error) {
@@ -69,12 +90,16 @@ type serverRemote struct {
 		items []string,
 		onProcess func(ctx context.Context, item string, i int) (bool, error),
 	) (int, error)
+
+	Nested nestedServiceRemote
 }
 
 type clientLocal struct {
 	messages        []string
 	messagesLock    sync.Mutex
 	messageReceived sync.WaitGroup
+
+	Nested *nestedServiceLocal
 }
 
 func (c *clientLocal) Println(ctx context.Context, msg string) error {
@@ -135,6 +160,8 @@ type clientRemote struct {
 		items []string,
 		onProcess func(ctx context.Context, item string, i int) (bool, error),
 	) (int, error)
+
+	Nested nestedServiceRemote
 }
 
 func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGroup) {
@@ -150,7 +177,9 @@ func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGro
 
 func startServer(t *testing.T, ctx context.Context, lis net.Listener, serverConnected *sync.WaitGroup) (*Registry[serverRemote, json.RawMessage], *sync.WaitGroup) {
 	serverRegistry := NewRegistry[serverRemote, json.RawMessage](
-		&serverLocal{},
+		&serverLocal{
+			Nested: &nestedServiceLocal{},
+		},
 
 		&RegistryHooks{
 			OnClientConnect: func(remoteID string) {
@@ -720,6 +749,153 @@ func TestRegistry(t *testing.T) {
 				// Verify callbacks received correct items
 				require.Equal(t, []string{"server1", "server2"}, serverCallbackItems)
 				require.Equal(t, []string{"client1", "client2", "client3"}, clientCallbackItems)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "nested RPCs",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				_, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), &clientLocal{}, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test nested service operations
+				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					err := remote.Nested.SetValue(ctx, "test value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test value", value)
+
+					err = remote.Nested.SetValue(ctx, "updated value")
+					require.NoError(t, err)
+
+					value, err = remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "updated value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "bidirectional nested RPCs",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				// Initialize client with nested service
+				clientLocal := &clientLocal{
+					Nested: &nestedServiceLocal{
+						value: "initial client value",
+					},
+				}
+
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test client calling server's nested service
+				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					// Set and verify server value
+					err := remote.Nested.SetValue(ctx, "test server value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test server value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test server calling client's nested service
+				err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					// Set and verify client value
+					err := remote.Nested.SetValue(ctx, "test client value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test client value", value)
+
+					// Test concurrent access to both nested services
+					var wg sync.WaitGroup
+					wg.Add(2)
+
+					go func() {
+						defer wg.Done()
+
+						value, err := remote.Nested.GetValue(ctx)
+						require.NoError(t, err)
+
+						require.Equal(t, "test client value", value)
+					}()
+
+					go func() {
+						defer wg.Done()
+
+						err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+							value, err := remote.Nested.GetValue(ctx)
+							require.NoError(t, err)
+
+							require.Equal(t, "test server value", value)
+
+							return nil
+						})
+						require.NoError(t, err)
+					}()
+
+					wg.Wait()
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test nested service state persistence
+				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+
+					require.Equal(t, "test server value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+
+					require.Equal(t, "test client value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
 
 				cancel()
 				clientDone.Wait()
