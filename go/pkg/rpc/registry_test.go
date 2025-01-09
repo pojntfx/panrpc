@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type nestedServiceLocal struct {
@@ -166,7 +166,7 @@ type clientRemote struct {
 
 func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGroup) {
 	lis, err := net.Listen("tcp", "localhost:0")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var serverConnected, clientConnected sync.WaitGroup
 	serverConnected.Add(1)
@@ -195,7 +195,7 @@ func startServer(t *testing.T, ctx context.Context, lis net.Listener, serverConn
 		defer serverDone.Done()
 
 		conn, err := lis.Accept()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		defer conn.Close()
 
@@ -234,7 +234,7 @@ func startServer(t *testing.T, ctx context.Context, lis net.Listener, serverConn
 			default:
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}()
 
@@ -253,7 +253,7 @@ func startClient(t *testing.T, ctx context.Context, addr string, clientLocal *cl
 	)
 
 	conn, err := net.Dial("tcp", addr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var clientDone sync.WaitGroup
 	clientDone.Add(1)
@@ -298,7 +298,7 @@ func startClient(t *testing.T, ctx context.Context, addr string, clientLocal *cl
 			default:
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}()
 
@@ -329,16 +329,16 @@ func TestRegistry(t *testing.T) {
 				// Test client calling server
 				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 					count, err := remote.Increment(ctx, 1)
-					assert.NoError(t, err)
-					assert.Equal(t, int64(1), count)
+					require.NoError(t, err)
+					require.Equal(t, int64(1), count)
 
 					count, err = remote.Increment(ctx, 2)
-					assert.NoError(t, err)
-					assert.Equal(t, int64(3), count)
+					require.NoError(t, err)
+					require.Equal(t, int64(3), count)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				cancel()
 				clientDone.Wait()
@@ -367,10 +367,10 @@ func TestRegistry(t *testing.T) {
 				// Test server calling client
 				err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
 					err := remote.Println(ctx, "test message")
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Wait for message to be received
 				clientLocal.messageReceived.Wait()
@@ -380,8 +380,8 @@ func TestRegistry(t *testing.T) {
 				serverDone.Wait()
 
 				// Verify results
-				assert.Len(t, clientLocal.messages, 1)
-				assert.Equal(t, "test message", clientLocal.messages[0])
+				require.Len(t, clientLocal.messages, 1)
+				require.Equal(t, "test message", clientLocal.messages[0])
 			},
 		},
 		{
@@ -410,20 +410,20 @@ func TestRegistry(t *testing.T) {
 					length, err := remote.Iterate(ctx, expectedLength, func(ctx context.Context, i int, b string) (string, error) {
 						callbackCount++
 
-						assert.Equal(t, "This is from the client", b)
+						require.Equal(t, "This is from the client", b)
 
 						return "response from server", nil
 					})
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, expectedLength, length)
+					require.Equal(t, expectedLength, length)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callback was called expected number of times
-				assert.Equal(t, expectedLength, callbackCount)
+				require.Equal(t, expectedLength, callbackCount)
 
 				cancel()
 				clientDone.Wait()
@@ -456,20 +456,20 @@ func TestRegistry(t *testing.T) {
 					length, err := remote.Iterate(ctx, expectedLength, func(ctx context.Context, i int, b string) (string, error) {
 						callbackCount++
 
-						assert.Equal(t, "This is from the server", b)
+						require.Equal(t, "This is from the server", b)
 
 						return "response from client", nil
 					})
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, expectedLength, length)
+					require.Equal(t, expectedLength, length)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callback was called expected number of times
-				assert.Equal(t, expectedLength, callbackCount)
+				require.Equal(t, expectedLength, callbackCount)
 
 				cancel()
 				clientDone.Wait()
@@ -503,7 +503,7 @@ func TestRegistry(t *testing.T) {
 				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 					length, err := remote.Iterate(ctx, expectedOuterLength, func(ctx context.Context, i int, b string) (string, error) {
 						outerCount++
-						assert.Equal(t, "This is from the server", b)
+						require.Equal(t, "This is from the server", b)
 
 						// Make nested callback from server back to client
 						var nestedErr error
@@ -511,7 +511,7 @@ func TestRegistry(t *testing.T) {
 							nestedLength, err := remote.Iterate(ctx, expectedInnerLength, func(ctx context.Context, i int, b string) (string, error) {
 								innerCount++
 
-								assert.Equal(t, "This is from the client", b)
+								require.Equal(t, "This is from the client", b)
 
 								return "response from nested callback", nil
 							})
@@ -521,7 +521,7 @@ func TestRegistry(t *testing.T) {
 								return err
 							}
 
-							assert.Equal(t, expectedInnerLength, nestedLength)
+							require.Equal(t, expectedInnerLength, nestedLength)
 
 							return nil
 						})
@@ -531,17 +531,17 @@ func TestRegistry(t *testing.T) {
 
 						return "response from outer callback", err
 					})
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, expectedOuterLength, length)
+					require.Equal(t, expectedOuterLength, length)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callback counts
-				assert.Equal(t, expectedOuterLength, outerCount)
-				assert.Equal(t, expectedOuterLength*expectedInnerLength, innerCount)
+				require.Equal(t, expectedOuterLength, outerCount)
+				require.Equal(t, expectedOuterLength*expectedInnerLength, innerCount)
 
 				cancel()
 				clientDone.Wait()
@@ -583,13 +583,13 @@ func TestRegistry(t *testing.T) {
 
 						return true, nil
 					})
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, len(serverItems), processed)
+					require.Equal(t, len(serverItems), processed)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Test client calling server's batch processor
 				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
@@ -600,17 +600,17 @@ func TestRegistry(t *testing.T) {
 
 						return true, nil
 					})
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, len(clientItems), processed)
+					require.Equal(t, len(clientItems), processed)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callbacks received all items
-				assert.Equal(t, serverItems, serverCallbackItems)
-				assert.Equal(t, clientItems, clientCallbackItems)
+				require.Equal(t, serverItems, serverCallbackItems)
+				require.Equal(t, clientItems, clientCallbackItems)
 
 				cancel()
 				clientDone.Wait()
@@ -652,11 +652,11 @@ func TestRegistry(t *testing.T) {
 
 						return index < 2, nil
 					})
-					assert.NoError(t, err)
-					assert.Equal(t, 3, processed) // Should process first 3 items
+					require.NoError(t, err)
+					require.Equal(t, 3, processed) // Should process first 3 items
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Test client calling server's batch processor with early termination
 				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
@@ -667,15 +667,15 @@ func TestRegistry(t *testing.T) {
 
 						return index < 3, nil
 					})
-					assert.NoError(t, err)
-					assert.Equal(t, 4, processed) // Should process first 4 items
+					require.NoError(t, err)
+					require.Equal(t, 4, processed) // Should process first 4 items
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callbacks received correct items
-				assert.Equal(t, []string{"server1", "server2", "server3"}, serverCallbackItems)
-				assert.Equal(t, []string{"client1", "client2", "client3", "client4"}, clientCallbackItems)
+				require.Equal(t, []string{"server1", "server2", "server3"}, serverCallbackItems)
+				require.Equal(t, []string{"client1", "client2", "client3", "client4"}, clientCallbackItems)
 
 				cancel()
 				clientDone.Wait()
@@ -721,11 +721,11 @@ func TestRegistry(t *testing.T) {
 
 						return true, nil
 					})
-					assert.Error(t, err)
-					assert.Equal(t, 2, processed) // Should process items until error
+					require.Error(t, err)
+					require.Equal(t, 2, processed) // Should process items until error
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Test client calling server's batch processor with error
 				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
@@ -740,15 +740,15 @@ func TestRegistry(t *testing.T) {
 
 						return true, nil
 					})
-					assert.Error(t, err)
-					assert.Equal(t, 3, processed) // Should process items until error
+					require.Error(t, err)
+					require.Equal(t, 3, processed) // Should process items until error
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify callbacks received correct items
-				assert.Equal(t, []string{"server1", "server2"}, serverCallbackItems)
-				assert.Equal(t, []string{"client1", "client2", "client3"}, clientCallbackItems)
+				require.Equal(t, []string{"server1", "server2"}, serverCallbackItems)
+				require.Equal(t, []string{"client1", "client2", "client3"}, clientCallbackItems)
 
 				cancel()
 				clientDone.Wait()
@@ -774,22 +774,22 @@ func TestRegistry(t *testing.T) {
 				// Test nested service operations
 				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 					err := remote.Nested.SetValue(ctx, "test value")
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					value, err := remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, "test value", value)
+					require.NoError(t, err)
+					require.Equal(t, "test value", value)
 
 					err = remote.Nested.SetValue(ctx, "updated value")
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					value, err = remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, "updated value", value)
+					require.NoError(t, err)
+					require.Equal(t, "updated value", value)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				cancel()
 				clientDone.Wait()
@@ -823,25 +823,25 @@ func TestRegistry(t *testing.T) {
 				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 					// Set and verify server value
 					err := remote.Nested.SetValue(ctx, "test server value")
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					value, err := remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, "test server value", value)
+					require.NoError(t, err)
+					require.Equal(t, "test server value", value)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Test server calling client's nested service
 				err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
 					// Set and verify client value
 					err := remote.Nested.SetValue(ctx, "test client value")
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					value, err := remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, "test client value", value)
+					require.NoError(t, err)
+					require.Equal(t, "test client value", value)
 
 					// Test concurrent access to both nested services
 					var wg sync.WaitGroup
@@ -851,9 +851,9 @@ func TestRegistry(t *testing.T) {
 						defer wg.Done()
 
 						value, err := remote.Nested.GetValue(ctx)
-						assert.NoError(t, err)
+						require.NoError(t, err)
 
-						assert.Equal(t, "test client value", value)
+						require.Equal(t, "test client value", value)
 					}()
 
 					go func() {
@@ -861,41 +861,41 @@ func TestRegistry(t *testing.T) {
 
 						err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 							value, err := remote.Nested.GetValue(ctx)
-							assert.NoError(t, err)
+							require.NoError(t, err)
 
-							assert.Equal(t, "test server value", value)
+							require.Equal(t, "test server value", value)
 
 							return nil
 						})
-						assert.NoError(t, err)
+						require.NoError(t, err)
 					}()
 
 					wg.Wait()
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Test nested service state persistence
 				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
 					value, err := remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, "test server value", value)
+					require.Equal(t, "test server value", value)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
 					value, err := remote.Nested.GetValue(ctx)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.Equal(t, "test client value", value)
+					require.Equal(t, "test client value", value)
 
 					return nil
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				cancel()
 				clientDone.Wait()

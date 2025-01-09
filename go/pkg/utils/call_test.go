@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCall(t *testing.T) {
@@ -73,21 +73,21 @@ func TestCall(t *testing.T) {
 			results, err := Call(reflect.ValueOf(tt.fn), args)
 
 			if tt.expectedErr != nil {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+				require.Error(t, err)
+				require.Equal(t, tt.expectedErr.Error(), err.Error())
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var actual []interface{}
 			for _, result := range results {
 				actual = append(actual, result.Interface())
 			}
 
-			assert.Equal(t, len(tt.expected), len(actual), "number of results should match")
+			require.Equal(t, len(tt.expected), len(actual), "number of results should match")
 			for i := range actual {
-				assert.Equal(t, tt.expected[i], actual[i], "result at index %d should match", i)
+				require.Equal(t, tt.expected[i], actual[i], "result at index %d should match", i)
 			}
 		})
 	}

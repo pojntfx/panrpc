@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequestMarshalUnmarshalNested(t *testing.T) {
@@ -36,13 +36,13 @@ func TestRequestMarshalUnmarshalNested(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			marshaled, err := tt.request.Marshal(json.Marshal)
-			assert.NoError(t, err)
-			assert.JSONEq(t, tt.expectedJSON, string(marshaled))
+			require.NoError(t, err)
+			require.JSONEq(t, tt.expectedJSON, string(marshaled))
 
 			var unmarshaledRequest Request[[]byte]
 			err = unmarshaledRequest.Unmarshal(marshaled, json.Unmarshal)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.request, unmarshaledRequest)
+			require.NoError(t, err)
+			require.Equal(t, tt.request, unmarshaledRequest)
 		})
 	}
 }
@@ -85,8 +85,8 @@ func TestRequestMarshalUnmarshalFlat(t *testing.T) {
 					return json.RawMessage(b), nil
 				},
 			)
-			assert.NoError(t, err)
-			assert.JSONEq(t, tt.expectedJSON, string(marshaled))
+			require.NoError(t, err)
+			require.JSONEq(t, tt.expectedJSON, string(marshaled))
 
 			var unmarshaledRequest Request[json.RawMessage]
 			err = unmarshaledRequest.Unmarshal(
@@ -95,8 +95,8 @@ func TestRequestMarshalUnmarshalFlat(t *testing.T) {
 					return json.Unmarshal([]byte(data), v)
 				},
 			)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.request, unmarshaledRequest)
+			require.NoError(t, err)
+			require.Equal(t, tt.request, unmarshaledRequest)
 		})
 	}
 }
@@ -130,13 +130,13 @@ func TestResponseMarshalUnmarshalNested(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			marshaled, err := tt.response.Marshal(json.Marshal)
-			assert.NoError(t, err)
-			assert.JSONEq(t, tt.expectedJSON, string(marshaled))
+			require.NoError(t, err)
+			require.JSONEq(t, tt.expectedJSON, string(marshaled))
 
 			var unmarshaledResponse Response[[]byte]
 			err = unmarshaledResponse.Unmarshal(marshaled, json.Unmarshal)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.response, unmarshaledResponse)
+			require.NoError(t, err)
+			require.Equal(t, tt.response, unmarshaledResponse)
 		})
 	}
 }
@@ -179,8 +179,8 @@ func TestResponseMarshalUnmarshalFlat(t *testing.T) {
 					return json.RawMessage(b), nil
 				},
 			)
-			assert.NoError(t, err)
-			assert.JSONEq(t, tt.expectedJSON, string(marshaled))
+			require.NoError(t, err)
+			require.JSONEq(t, tt.expectedJSON, string(marshaled))
 
 			var unmarshaledResponse Response[json.RawMessage]
 			err = unmarshaledResponse.Unmarshal(
@@ -189,8 +189,8 @@ func TestResponseMarshalUnmarshalFlat(t *testing.T) {
 					return json.Unmarshal([]byte(data), v)
 				},
 			)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.response, unmarshaledResponse)
+			require.NoError(t, err)
+			require.Equal(t, tt.response, unmarshaledResponse)
 		})
 	}
 }

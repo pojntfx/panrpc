@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBroadcaster(t *testing.T) {
@@ -24,13 +24,13 @@ func TestBroadcaster(t *testing.T) {
 				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				go b.Publish("test", "hello")
 
 				result, err := receive()
-				assert.NoError(t, err)
-				assert.Equal(t, "hello", *result)
+				require.NoError(t, err)
+				require.Equal(t, "hello", *result)
 
 				b.Free("test", nil)
 			},
@@ -44,12 +44,12 @@ func TestBroadcaster(t *testing.T) {
 				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				b.Free("test", nil)
 
 				_, err = receive()
-				assert.Equal(t, ErrClosed, err)
+				require.Equal(t, ErrClosed, err)
 			},
 		},
 		{
@@ -61,12 +61,12 @@ func TestBroadcaster(t *testing.T) {
 				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				b.Close(nil)
 
 				_, err = receive()
-				assert.Equal(t, ErrClosed, err)
+				require.Equal(t, ErrClosed, err)
 			},
 		},
 		{
@@ -78,12 +78,12 @@ func TestBroadcaster(t *testing.T) {
 				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				cancel()
 
 				_, err = receive()
-				assert.ErrorIs(t, err, context.Canceled)
+				require.ErrorIs(t, err, context.Canceled)
 
 				b.Free("test", nil)
 			},
@@ -98,9 +98,9 @@ func TestBroadcaster(t *testing.T) {
 
 				// Setup two channels
 				receive1, err := b.Receive("ch1", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				receive2, err := b.Receive("ch2", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Publish to both channels
 				var wg sync.WaitGroup
@@ -118,12 +118,12 @@ func TestBroadcaster(t *testing.T) {
 
 				// Receive from both channels
 				result1, err := receive1()
-				assert.NoError(t, err)
-				assert.Equal(t, "hello", *result1)
+				require.NoError(t, err)
+				require.Equal(t, "hello", *result1)
 
 				result2, err := receive2()
-				assert.NoError(t, err)
-				assert.Equal(t, "world", *result2)
+				require.NoError(t, err)
+				require.Equal(t, "world", *result2)
 
 				wg.Wait()
 
@@ -158,7 +158,7 @@ func TestBroadcaster(t *testing.T) {
 					channel := strconv.Itoa(i)
 
 					receive, err := b.Receive(channel, ctx)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					// Start publisher
 					go func() {
@@ -177,9 +177,9 @@ func TestBroadcaster(t *testing.T) {
 								t.Errorf("receive error on channel %s: %v", channel, err)
 								return
 							}
-							assert.NotNil(t, result)
-							assert.GreaterOrEqual(t, *result, 0)
-							assert.Less(t, *result, messagesPerChannel)
+							require.NotNil(t, result)
+							require.GreaterOrEqual(t, *result, 0)
+							require.Less(t, *result, messagesPerChannel)
 						}
 					}()
 				}
@@ -200,12 +200,12 @@ func TestBroadcaster(t *testing.T) {
 				b := NewBroadcaster[string]()
 
 				receive, err := b.Receive("test", ctx)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				done := make(chan struct{})
 				go func() {
 					_, err := receive()
-					assert.Equal(t, ErrClosed, err)
+					require.Equal(t, ErrClosed, err)
 					close(done)
 				}()
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClosureManager(t *testing.T) {
@@ -24,12 +25,12 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				result, err := m.CallClosure(context.Background(), closureID, []interface{}{42})
-				assert.NoError(t, err)
-				assert.Equal(t, 84, result)
+				require.NoError(t, err)
+				require.Equal(t, 84, result)
 			},
 		},
 		{
@@ -45,12 +46,12 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				result, err := m.CallClosure(context.Background(), closureID, []interface{}{})
-				assert.ErrorIs(t, err, expectedErr)
-				assert.Nil(t, result)
+				require.ErrorIs(t, err, expectedErr)
+				require.Nil(t, result)
 			},
 		},
 		{
@@ -64,7 +65,7 @@ func TestClosureManager(t *testing.T) {
 				fn := func() {}
 
 				_, _, err := registerClosure(m, fn)
-				assert.ErrorIs(t, err, ErrInvalidReturn)
+				require.ErrorIs(t, err, ErrInvalidReturn)
 			},
 		},
 		{
@@ -80,7 +81,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				_, _, err := registerClosure(m, fn)
-				assert.ErrorIs(t, err, ErrInvalidReturn)
+				require.ErrorIs(t, err, ErrInvalidReturn)
 			},
 		},
 		{
@@ -96,7 +97,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				_, _, err := registerClosure(m, fn)
-				assert.ErrorIs(t, err, ErrInvalidReturn)
+				require.ErrorIs(t, err, ErrInvalidReturn)
 			},
 		},
 		{
@@ -112,7 +113,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				_, _, err := registerClosure(m, fn)
-				assert.ErrorIs(t, err, ErrInvalidReturn)
+				require.ErrorIs(t, err, ErrInvalidReturn)
 			},
 		},
 		{
@@ -127,14 +128,14 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Call cleanup to remove the closure
 				cleanup()
 
 				// Try to call the removed closure
 				_, err = m.CallClosure(context.Background(), closureID, []interface{}{})
-				assert.ErrorIs(t, err, ErrClosureDoesNotExist)
+				require.ErrorIs(t, err, ErrClosureDoesNotExist)
 			},
 		},
 		{
@@ -149,12 +150,12 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				// Call with wrong number of arguments
 				_, err = m.CallClosure(context.Background(), closureID, []interface{}{42, 43})
-				assert.ErrorIs(t, err, ErrInvalidArgsCount)
+				require.ErrorIs(t, err, ErrInvalidArgsCount)
 			},
 		},
 		{
@@ -169,12 +170,12 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				// Call with wrong argument type (string instead of int)
 				_, err = m.CallClosure(context.Background(), closureID, []interface{}{"not an int"})
-				assert.ErrorIs(t, err, ErrInvalidArg)
+				require.ErrorIs(t, err, ErrInvalidArg)
 			},
 		},
 		{
@@ -185,7 +186,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				_, err := m.CallClosure(context.Background(), "non-existent-id", []interface{}{})
-				assert.ErrorIs(t, err, ErrClosureDoesNotExist)
+				require.ErrorIs(t, err, ErrClosureDoesNotExist)
 			},
 		},
 		{
@@ -200,7 +201,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				// Run multiple goroutines calling the same closure
@@ -210,8 +211,8 @@ func TestClosureManager(t *testing.T) {
 				for i := 0; i < numGoroutines; i++ {
 					go func(val int) {
 						result, err := m.CallClosure(context.Background(), closureID, []interface{}{val})
-						assert.NoError(t, err)
-						assert.Equal(t, val*2, result)
+						require.NoError(t, err)
+						require.Equal(t, val*2, result)
 						done <- struct{}{}
 					}(i)
 				}
@@ -235,7 +236,7 @@ func TestClosureManager(t *testing.T) {
 				}
 
 				closureID, cleanup, err := registerClosure(m, fn)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				defer cleanup()
 
 				ctx, cancel := context.WithCancel(context.Background())
@@ -252,7 +253,7 @@ func TestClosureManager(t *testing.T) {
 
 				// Check if the closure returned with context cancellation error
 				err = <-done
-				assert.ErrorIs(t, err, context.Canceled)
+				require.ErrorIs(t, err, context.Canceled)
 			},
 		},
 	}
