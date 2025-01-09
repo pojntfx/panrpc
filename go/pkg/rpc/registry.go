@@ -181,7 +181,14 @@ func (r Registry[R, T]) makeRPC(
 		go func() {
 			defer responseResolver.Free(callID, context.Canceled)
 
-			r, err := responseResolver.Receive(callID, ctx)
+			rr, err := responseResolver.Receive(callID, ctx)
+			if err != nil {
+				res <- callResponse[T]{*new(T), err, true}
+
+				return
+			}
+
+			r, err := rr()
 			if err != nil {
 				r = &callResponse[T]{*new(T), err, true}
 			}

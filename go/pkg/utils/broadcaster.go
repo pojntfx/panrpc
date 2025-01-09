@@ -55,7 +55,7 @@ func (b *Broadcaster[T]) Publish(channel string, v T) {
 	}
 }
 
-func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error) {
+func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (func() (*T, error), error) {
 	b.lock.Lock()
 	if b.closed {
 		b.lock.Unlock()
@@ -76,16 +76,18 @@ func (b *Broadcaster[T]) Receive(channel string, ctx context.Context) (*T, error
 	}
 	b.lock.Unlock()
 
-	select {
-	case v, ok := <-c.channel:
-		if !ok {
-			return nil, ErrClosed
-		}
-		return &v, nil
+	return func() (*T, error) {
+		select {
+		case v, ok := <-c.channel:
+			if !ok {
+				return nil, ErrClosed
+			}
+			return &v, nil
 
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}, nil
 }
 
 func (b *Broadcaster[T]) Free(channel string, err error) {

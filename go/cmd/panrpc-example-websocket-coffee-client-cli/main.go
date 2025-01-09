@@ -8,8 +8,8 @@ import (
 	"os"
 	"sync/atomic"
 
+	"github.com/coder/websocket"
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
-	"nhooyr.io/websocket"
 )
 
 type remoteControl struct{}

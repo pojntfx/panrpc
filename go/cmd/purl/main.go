@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
 	"github.com/pojntfx/panrpc/go/pkg/utils"
 	"github.com/pojntfx/weron/pkg/wrtcconn"
 	"github.com/rs/zerolog"
-	"nhooyr.io/websocket"
 )
 
 var (

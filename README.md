@@ -86,10 +86,10 @@ $ go mod init panrpc-tutorial-go
 $ go get github.com/pojntfx/panrpc/go/...@latest
 ```
 
-The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Valkey/Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `nhooyr.io/websocket` library, which you can install like so:
+The Go version of panrpc supports many transports. While common ones are TCP, WebSockets, UNIX sockets or WebRTC, anything that directly implements or can be adapted to a [`io.ReadWriter`](https://pkg.go.dev/io#ReadWriter) can be used with the panrpc [`LinkStream` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkStream). If you want to use a message broker like Valkey/Redis or NATS as the transport, or need more control over the wire protocol, you can use the [`LinkMessage` API](https://pkg.go.dev/github.com/pojntfx/panrpc/go/pkg/rpc#Registry.LinkMessage) instead. For this tutorial, we'll be using WebSockets as the transport through the `github.com/coder/websocket` library, which you can install like so:
 
 ```shell
-$ go get nhooyr.io/websocket@latest
+$ go get github.com/coder/websocket@latest
 ```
 
 In addition to supporting many transports, the Go version of panrpc also supports different serializers. Common ones are JSON and CBOR, but similarly to transports anything that implements or can be adapted to a `io.ReadWriter` stream can be used. For this tutorial, we'll be using JSON as the serializer through the `encoding/json` Go standard library.
@@ -199,7 +199,7 @@ import (
 	"net/http"
 
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 func main() {
@@ -376,7 +376,7 @@ import (
 	"encoding/json"
 
 	"github.com/pojntfx/panrpc/go/pkg/rpc"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 func main() {
