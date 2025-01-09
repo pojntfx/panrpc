@@ -35,12 +35,39 @@ func (s *serverLocal) Iterate(
 	return length, nil
 }
 
+func (s *serverLocal) ProcessBatch(
+	ctx context.Context,
+	items []string,
+	onProcess func(ctx context.Context, item string, i int) (bool, error),
+) (int, error) {
+	processed := 0
+	for i, item := range items {
+		shouldContinue, err := onProcess(ctx, item, i)
+		if err != nil {
+			return processed, err
+		}
+
+		processed++
+
+		if !shouldContinue {
+			return processed, nil
+		}
+	}
+
+	return processed, nil
+}
+
 type serverRemote struct {
 	Println func(ctx context.Context, msg string) error
 	Iterate func(
 		ctx context.Context,
 		length int,
 		onIteration func(ctx context.Context, i int, b string) (string, error),
+	) (int, error)
+	ProcessBatch func(
+		ctx context.Context,
+		items []string,
+		onProcess func(ctx context.Context, item string, i int) (bool, error),
 	) (int, error)
 }
 
@@ -74,12 +101,39 @@ func (c *clientLocal) Iterate(
 	return length, nil
 }
 
+func (c *clientLocal) ProcessBatch(
+	ctx context.Context,
+	items []string,
+	onProcess func(ctx context.Context, item string, i int) (bool, error),
+) (int, error) {
+	processed := 0
+	for i, item := range items {
+		shouldContinue, err := onProcess(ctx, item, i)
+		if err != nil {
+			return processed, err
+		}
+
+		processed++
+
+		if !shouldContinue {
+			return processed, nil
+		}
+	}
+
+	return processed, nil
+}
+
 type clientRemote struct {
 	Increment func(ctx context.Context, delta int64) (int64, error)
 	Iterate   func(
 		ctx context.Context,
 		length int,
 		onIteration func(ctx context.Context, i int, b string) (string, error),
+	) (int, error)
+	ProcessBatch func(
+		ctx context.Context,
+		items []string,
+		onProcess func(ctx context.Context, item string, i int) (bool, error),
 	) (int, error)
 }
 
@@ -459,6 +513,213 @@ func TestRegistry(t *testing.T) {
 				// Verify callback counts
 				require.Equal(t, expectedOuterLength, outerCount)
 				require.Equal(t, expectedOuterLength*expectedInnerLength, innerCount)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "bidirectional batch processing",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				clientLocal := &clientLocal{}
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test data
+				serverItems := []string{"server1", "server2", "server3"}
+				clientItems := []string{"client1", "client2", "client3"}
+
+				// Track callback invocations
+				serverCallbackItems := make([]string, 0)
+				clientCallbackItems := make([]string, 0)
+				var serverCallbackLock, clientCallbackLock sync.Mutex
+
+				// Test server calling client's batch processor
+				err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, i int) (bool, error) {
+						serverCallbackLock.Lock()
+						serverCallbackItems = append(serverCallbackItems, item)
+						serverCallbackLock.Unlock()
+
+						return true, nil
+					})
+					require.NoError(t, err)
+
+					require.Equal(t, len(serverItems), processed)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test client calling server's batch processor
+				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, i int) (bool, error) {
+						clientCallbackLock.Lock()
+						clientCallbackItems = append(clientCallbackItems, item)
+						clientCallbackLock.Unlock()
+
+						return true, nil
+					})
+					require.NoError(t, err)
+
+					require.Equal(t, len(clientItems), processed)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Verify callbacks received all items
+				require.Equal(t, serverItems, serverCallbackItems)
+				require.Equal(t, clientItems, clientCallbackItems)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "batch processing with early termination",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				clientLocal := &clientLocal{}
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test data
+				serverItems := []string{"server1", "server2", "server3", "server4", "server5"}
+				clientItems := []string{"client1", "client2", "client3", "client4", "client5"}
+
+				// Track callback invocations
+				serverCallbackItems := make([]string, 0)
+				clientCallbackItems := make([]string, 0)
+				var serverCallbackLock, clientCallbackLock sync.Mutex
+
+				// Test server calling client's batch processor with early termination
+				err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, index int) (bool, error) {
+						serverCallbackLock.Lock()
+						serverCallbackItems = append(serverCallbackItems, item)
+						serverCallbackLock.Unlock()
+
+						return index < 2, nil
+					})
+					require.NoError(t, err)
+					require.Equal(t, 3, processed) // Should process first 3 items
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test client calling server's batch processor with early termination
+				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, index int) (bool, error) {
+						clientCallbackLock.Lock()
+						clientCallbackItems = append(clientCallbackItems, item)
+						clientCallbackLock.Unlock()
+
+						return index < 3, nil
+					})
+					require.NoError(t, err)
+					require.Equal(t, 4, processed) // Should process first 4 items
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Verify callbacks received correct items
+				require.Equal(t, []string{"server1", "server2", "server3"}, serverCallbackItems)
+				require.Equal(t, []string{"client1", "client2", "client3", "client4"}, clientCallbackItems)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "batch processing with errors",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				clientLocal := &clientLocal{}
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test data
+				serverItems := []string{"server1", "server2", "server3", "server4", "server5"}
+				clientItems := []string{"client1", "client2", "client3", "client4", "client5"}
+
+				// Track callback invocations
+				serverCallbackItems := make([]string, 0)
+				clientCallbackItems := make([]string, 0)
+				var serverCallbackLock, clientCallbackLock sync.Mutex
+
+				// Test server calling client's batch processor with error
+				err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, index int) (bool, error) {
+						if index == 2 {
+							return false, errors.New("server-side error")
+						}
+
+						serverCallbackLock.Lock()
+						serverCallbackItems = append(serverCallbackItems, item)
+						serverCallbackLock.Unlock()
+
+						return true, nil
+					})
+					require.Error(t, err)
+					require.Equal(t, 2, processed) // Should process items until error
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test client calling server's batch processor with error
+				err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, index int) (bool, error) {
+						if index == 3 {
+							return false, errors.New("client-side error")
+						}
+
+						clientCallbackLock.Lock()
+						clientCallbackItems = append(clientCallbackItems, item)
+						clientCallbackLock.Unlock()
+
+						return true, nil
+					})
+					require.Error(t, err)
+					require.Equal(t, 3, processed) // Should process items until error
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Verify callbacks received correct items
+				require.Equal(t, []string{"server1", "server2"}, serverCallbackItems)
+				require.Equal(t, []string{"client1", "client2", "client3"}, clientCallbackItems)
 
 				cancel()
 				clientDone.Wait()
