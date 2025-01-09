@@ -895,12 +895,15 @@ func (r Registry[R, T]) LinkMessage(
 	}()
 
 	fatalErrLock.L.Lock()
-	if fatalErr == nil {
+	err := fatalErr
+	if err == nil {
 		fatalErrLock.Wait()
+
+		err = fatalErr
 	}
 	fatalErrLock.L.Unlock()
 
-	return fatalErr
+	return err
 }
 
 // LinkStream exposes local RPCs and implements remote RPCs via a stream-based transport
