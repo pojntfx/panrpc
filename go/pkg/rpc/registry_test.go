@@ -476,78 +476,57 @@ func TestRegistry(t *testing.T) {
 				require.Equal(t, int64(1), serverLocal.counter)
 			},
 		},
-		// {
-		// 	name: "nested callbacks between client and server",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
+		{
+			name: "nested callbacks",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
 
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
 
-		// 		clientLocal := &clientLocal{}
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+				clientLocal := &clientLocal{}
 
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
+				serverLocal := &serverLocal{}
 
-		// 		// Track nested callback invocations
-		// 		outerCount := 0
-		// 		innerCount := 0
-		// 		expectedOuterLength := 3
-		// 		expectedInnerLength := 2
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverLocal, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
 
-		// 		// Test nested callbacks
-		// 		err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			length, err := remote.Iterate(ctx, expectedOuterLength, func(ctx context.Context, i int, b string) (string, error) {
-		// 				outerCount++
-		// 				require.Equal(t, "This is from the server", b)
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
 
-		// 				// Make nested callback from server back to client
-		// 				var nestedErr error
-		// 				err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 					nestedLength, err := remote.Iterate(ctx, expectedInnerLength, func(ctx context.Context, i int, b string) (string, error) {
-		// 						innerCount++
+				// Track callback invocations
+				iterations := 5
 
-		// 						require.Equal(t, "This is from the client", b)
+				// Test server calling server with callback
+				err := serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					length, err := remote.Iterate(ctx, int64(iterations))
+					require.NoError(t, err)
 
-		// 						return "response from nested callback", nil
-		// 					})
-		// 					if err != nil {
-		// 						nestedErr = err
+					require.Equal(t, length, int64(iterations))
 
-		// 						return err
-		// 					}
+					// Test client calling server with callback
+					clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+						if _, err := remote.Increment(ctx, 3); err != nil {
+							return err
+						}
 
-		// 					require.Equal(t, expectedInnerLength, nestedLength)
+						return nil
+					})
 
-		// 					return nil
-		// 				})
-		// 				if nestedErr != nil {
-		// 					return "", nestedErr
-		// 				}
+					return nil
+				})
+				require.NoError(t, err)
 
-		// 				return "response from outer callback", err
-		// 			})
-		// 			require.NoError(t, err)
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
 
-		// 			require.Equal(t, expectedOuterLength, length)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Verify callback counts
-		// 		require.Equal(t, expectedOuterLength, outerCount)
-		// 		require.Equal(t, expectedOuterLength*expectedInnerLength, innerCount)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
+				// Verify results
+				require.Equal(t, int64(4), serverLocal.counter)
+			},
+		},
 		// {
 		// 	name: "bidirectional batch processing",
 		// 	run: func(t *testing.T) {
