@@ -181,10 +181,7 @@ func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGro
 	return lis, &serverConnected, &clientConnected
 }
 
-func startServer(t *testing.T, ctx context.Context, lis net.Listener, serverConnected *sync.WaitGroup) (*Registry[clientRemote, json.RawMessage], *sync.WaitGroup) {
-	serverLocal := &serverLocal{
-		Nested: &nestedServiceLocal{},
-	}
+func startServer(t *testing.T, ctx context.Context, lis net.Listener, serverLocal *serverLocal, serverConnected *sync.WaitGroup) (*Registry[clientRemote, json.RawMessage], *sync.WaitGroup) {
 	serverRegistry := NewRegistry[clientRemote, json.RawMessage](
 		serverLocal,
 		&RegistryHooks{
@@ -327,7 +324,7 @@ func TestRegistry(t *testing.T) {
 				lis, serverConnected, clientConnected := setupConnection(t)
 				defer lis.Close()
 
-				_, serverDone := startServer(t, ctx, lis, serverConnected)
+				_, serverDone := startServer(t, ctx, lis, &serverLocal{}, serverConnected)
 				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), &clientLocal{}, clientConnected)
 
 				// Wait for client to connect to server
@@ -365,7 +362,7 @@ func TestRegistry(t *testing.T) {
 				clientLocal := &clientLocal{}
 				clientLocal.messageReceived.Add(1) // Expect one message
 
-				serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
+				serverRegistry, serverDone := startServer(t, ctx, lis, &serverLocal{}, serverConnected)
 				_, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
 
 				// Wait for client to connect to server
@@ -392,52 +389,6 @@ func TestRegistry(t *testing.T) {
 				require.Equal(t, "test message", clientLocal.messages[0])
 			},
 		},
-		// {
-		// 	name: "callback from server to client",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		clientLocal := &clientLocal{}
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		_, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Track callback invocations
-		// 		callbackCount := 0
-		// 		expectedLength := 5
-
-		// 		// Test server calling client with callback
-		// 		err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			length, err := remote.Iterate(ctx, expectedLength, func(ctx context.Context, i int, b string) (string, error) {
-		// 				callbackCount++
-
-		// 				require.Equal(t, "This is from the client", b)
-
-		// 				return "response from server", nil
-		// 			})
-		// 			require.NoError(t, err)
-
-		// 			require.Equal(t, expectedLength, length)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Verify callback was called expected number of times
-		// 		require.Equal(t, expectedLength, callbackCount)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
 		{
 			name: "callback from client to server",
 			run: func(t *testing.T) {
@@ -450,7 +401,7 @@ func TestRegistry(t *testing.T) {
 				clientLocal := &clientLocal{}
 				clientLocal.messageReceived.Add(1) // Expect one message
 
-				_, serverDone := startServer(t, ctx, lis, serverConnected)
+				_, serverDone := startServer(t, ctx, lis, &serverLocal{}, serverConnected)
 				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
 
 				// Wait for client to connect to server
@@ -458,14 +409,14 @@ func TestRegistry(t *testing.T) {
 				clientConnected.Wait()
 
 				// Track callback invocations
-				expectedLength := 5
+				iterations := 5
 
 				// Test client calling server with callback
 				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-					length, err := remote.Iterate(ctx, int64(expectedLength))
+					length, err := remote.Iterate(ctx, int64(iterations))
 					require.NoError(t, err)
 
-					require.Equal(t, length, int64(expectedLength))
+					require.Equal(t, length, int64(iterations))
 
 					return nil
 				})
@@ -480,7 +431,49 @@ func TestRegistry(t *testing.T) {
 
 				// Verify results
 				require.Len(t, clientLocal.messages, 1)
-				require.Equal(t, fmt.Sprintf("Incrementing counter by %v", expectedLength), clientLocal.messages[0])
+				require.Equal(t, fmt.Sprintf("Incrementing counter by %v", iterations), clientLocal.messages[0])
+			},
+		},
+		{
+			name: "callback from server to client",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				clientLocal := &clientLocal{}
+
+				serverLocal := &serverLocal{}
+
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverLocal, serverConnected)
+				_, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Track callback invocations
+				iterations := 5
+
+				// Test client calling server with callback
+				err := serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					length, err := remote.Iterate(ctx, int64(iterations))
+					require.NoError(t, err)
+
+					require.Equal(t, length, int64(iterations))
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+
+				// Verify results
+				require.Equal(t, int64(1), serverLocal.counter)
 			},
 		},
 		// {
