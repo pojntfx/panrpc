@@ -438,52 +438,51 @@ func TestRegistry(t *testing.T) {
 		// 		serverDone.Wait()
 		// 	},
 		// },
-		// {
-		// 	name: "callback from client to server",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
+		{
+			name: "callback from client to server",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
 
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
 
-		// 		clientLocal := &clientLocal{}
-		// 		_, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+				clientLocal := &clientLocal{}
+				clientLocal.messageReceived.Add(1) // Expect one message
 
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
+				_, serverDone := startServer(t, ctx, lis, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
 
-		// 		// Track callback invocations
-		// 		callbackCount := 0
-		// 		expectedLength := 5
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
 
-		// 		// Test client calling server with callback
-		// 		err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			length, err := remote.Iterate(ctx, expectedLength, func(ctx context.Context, i int, b string) (string, error) {
-		// 				callbackCount++
+				// Track callback invocations
+				expectedLength := 5
 
-		// 				require.Equal(t, "This is from the server", b)
+				// Test client calling server with callback
+				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					length, err := remote.Iterate(ctx, int64(expectedLength))
+					require.NoError(t, err)
 
-		// 				return "response from client", nil
-		// 			})
-		// 			require.NoError(t, err)
+					require.Equal(t, length, int64(expectedLength))
 
-		// 			require.Equal(t, expectedLength, length)
+					return nil
+				})
+				require.NoError(t, err)
 
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
+				// Wait for message to be received
+				clientLocal.messageReceived.Wait()
 
-		// 		// Verify callback was called expected number of times
-		// 		require.Equal(t, expectedLength, callbackCount)
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
 
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
+				// Verify results
+				require.Len(t, clientLocal.messages, 1)
+				require.Equal(t, fmt.Sprintf("Incrementing counter by %v", expectedLength), clientLocal.messages[0])
+			},
+		},
 		// {
 		// 	name: "nested callbacks between client and server",
 		// 	run: func(t *testing.T) {
