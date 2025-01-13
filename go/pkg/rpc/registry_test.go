@@ -527,360 +527,165 @@ func TestRegistry(t *testing.T) {
 				require.Equal(t, int64(4), serverLocal.counter)
 			},
 		},
-		// {
-		// 	name: "bidirectional batch processing",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		clientLocal := &clientLocal{}
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Test data
-		// 		serverItems := []string{"server1", "server2", "server3"}
-		// 		clientItems := []string{"client1", "client2", "client3"}
-
-		// 		// Track callback invocations
-		// 		serverCallbackItems := make([]string, 0)
-		// 		clientCallbackItems := make([]string, 0)
-		// 		var serverCallbackLock, clientCallbackLock sync.Mutex
-
-		// 		// Test server calling client's batch processor
-		// 		err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, i int) (bool, error) {
-		// 				serverCallbackLock.Lock()
-		// 				serverCallbackItems = append(serverCallbackItems, item)
-		// 				serverCallbackLock.Unlock()
-
-		// 				return true, nil
-		// 			})
-		// 			require.NoError(t, err)
-
-		// 			require.Equal(t, len(serverItems), processed)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Test client calling server's batch processor
-		// 		err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, i int) (bool, error) {
-		// 				clientCallbackLock.Lock()
-		// 				clientCallbackItems = append(clientCallbackItems, item)
-		// 				clientCallbackLock.Unlock()
-
-		// 				return true, nil
-		// 			})
-		// 			require.NoError(t, err)
-
-		// 			require.Equal(t, len(clientItems), processed)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Verify callbacks received all items
-		// 		require.Equal(t, serverItems, serverCallbackItems)
-		// 		require.Equal(t, clientItems, clientCallbackItems)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
-		// {
-		// 	name: "batch processing with early termination",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		clientLocal := &clientLocal{}
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Test data
-		// 		serverItems := []string{"server1", "server2", "server3", "server4", "server5"}
-		// 		clientItems := []string{"client1", "client2", "client3", "client4", "client5"}
-
-		// 		// Track callback invocations
-		// 		serverCallbackItems := make([]string, 0)
-		// 		clientCallbackItems := make([]string, 0)
-		// 		var serverCallbackLock, clientCallbackLock sync.Mutex
-
-		// 		// Test server calling client's batch processor with early termination
-		// 		err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, index int) (bool, error) {
-		// 				serverCallbackLock.Lock()
-		// 				serverCallbackItems = append(serverCallbackItems, item)
-		// 				serverCallbackLock.Unlock()
-
-		// 				return index < 2, nil
-		// 			})
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, 3, processed) // Should process first 3 items
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Test client calling server's batch processor with early termination
-		// 		err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, index int) (bool, error) {
-		// 				clientCallbackLock.Lock()
-		// 				clientCallbackItems = append(clientCallbackItems, item)
-		// 				clientCallbackLock.Unlock()
-
-		// 				return index < 3, nil
-		// 			})
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, 4, processed) // Should process first 4 items
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Verify callbacks received correct items
-		// 		require.Equal(t, []string{"server1", "server2", "server3"}, serverCallbackItems)
-		// 		require.Equal(t, []string{"client1", "client2", "client3", "client4"}, clientCallbackItems)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
-		// {
-		// 	name: "batch processing with errors",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		clientLocal := &clientLocal{}
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Test data
-		// 		serverItems := []string{"server1", "server2", "server3", "server4", "server5"}
-		// 		clientItems := []string{"client1", "client2", "client3", "client4", "client5"}
-
-		// 		// Track callback invocations
-		// 		serverCallbackItems := make([]string, 0)
-		// 		clientCallbackItems := make([]string, 0)
-		// 		var serverCallbackLock, clientCallbackLock sync.Mutex
-
-		// 		// Test server calling client's batch processor with error
-		// 		err := serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, serverItems, func(ctx context.Context, item string, index int) (bool, error) {
-		// 				if index == 2 {
-		// 					return false, errors.New("server-side error")
-		// 				}
-
-		// 				serverCallbackLock.Lock()
-		// 				serverCallbackItems = append(serverCallbackItems, item)
-		// 				serverCallbackLock.Unlock()
-
-		// 				return true, nil
-		// 			})
-		// 			require.Error(t, err)
-		// 			require.Equal(t, 2, processed) // Should process items until error
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Test client calling server's batch processor with error
-		// 		err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			processed, err := remote.ProcessBatch(ctx, clientItems, func(ctx context.Context, item string, index int) (bool, error) {
-		// 				if index == 3 {
-		// 					return false, errors.New("client-side error")
-		// 				}
-
-		// 				clientCallbackLock.Lock()
-		// 				clientCallbackItems = append(clientCallbackItems, item)
-		// 				clientCallbackLock.Unlock()
-
-		// 				return true, nil
-		// 			})
-		// 			require.Error(t, err)
-		// 			require.Equal(t, 3, processed) // Should process items until error
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Verify callbacks received correct items
-		// 		require.Equal(t, []string{"server1", "server2"}, serverCallbackItems)
-		// 		require.Equal(t, []string{"client1", "client2", "client3"}, clientCallbackItems)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
-		// {
-		// 	name: "nested RPCs",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		_, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), &clientLocal{}, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Test nested service operations
-		// 		err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			err := remote.Nested.SetValue(ctx, "test value")
-		// 			require.NoError(t, err)
-
-		// 			value, err := remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, "test value", value)
-
-		// 			err = remote.Nested.SetValue(ctx, "updated value")
-		// 			require.NoError(t, err)
-
-		// 			value, err = remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, "updated value", value)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
-		// {
-		// 	name: "bidirectional nested RPCs",
-		// 	run: func(t *testing.T) {
-		// 		ctx, cancel := context.WithCancel(context.Background())
-		// 		defer cancel()
-
-		// 		lis, serverConnected, clientConnected := setupConnection(t)
-		// 		defer lis.Close()
-
-		// 		// Initialize client with nested service
-		// 		clientLocal := &clientLocal{
-		// 			Nested: &nestedServiceLocal{
-		// 				value: "initial client value",
-		// 			},
-		// 		}
-
-		// 		serverRegistry, serverDone := startServer(t, ctx, lis, serverConnected)
-		// 		clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
-
-		// 		// Wait for client to connect to server
-		// 		serverConnected.Wait()
-		// 		clientConnected.Wait()
-
-		// 		// Test client calling server's nested service
-		// 		err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			// Set and verify server value
-		// 			err := remote.Nested.SetValue(ctx, "test server value")
-		// 			require.NoError(t, err)
-
-		// 			value, err := remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, "test server value", value)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Test server calling client's nested service
-		// 		err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			// Set and verify client value
-		// 			err := remote.Nested.SetValue(ctx, "test client value")
-		// 			require.NoError(t, err)
-
-		// 			value, err := remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-		// 			require.Equal(t, "test client value", value)
-
-		// 			// Test concurrent access to both nested services
-		// 			var wg sync.WaitGroup
-		// 			wg.Add(2)
-
-		// 			go func() {
-		// 				defer wg.Done()
-
-		// 				value, err := remote.Nested.GetValue(ctx)
-		// 				require.NoError(t, err)
-
-		// 				require.Equal(t, "test client value", value)
-		// 			}()
-
-		// 			go func() {
-		// 				defer wg.Done()
-
-		// 				err := clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 					value, err := remote.Nested.GetValue(ctx)
-		// 					require.NoError(t, err)
-
-		// 					require.Equal(t, "test server value", value)
-
-		// 					return nil
-		// 				})
-		// 				require.NoError(t, err)
-		// 			}()
-
-		// 			wg.Wait()
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		// Test nested service state persistence
-		// 		err = clientRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-		// 			value, err := remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-
-		// 			require.Equal(t, "test server value", value)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		err = serverRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-		// 			value, err := remote.Nested.GetValue(ctx)
-		// 			require.NoError(t, err)
-
-		// 			require.Equal(t, "test client value", value)
-
-		// 			return nil
-		// 		})
-		// 		require.NoError(t, err)
-
-		// 		cancel()
-		// 		clientDone.Wait()
-		// 		serverDone.Wait()
-		// 	},
-		// },
+		{
+			name: "nested RPCs",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				clientLocal := &clientLocal{
+					Nested: &nestedServiceLocal{},
+				}
+
+				serverLocal := &serverLocal{
+					Nested: &nestedServiceLocal{},
+				}
+
+				_, serverDone := startServer(t, ctx, lis, serverLocal, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test nested service operations
+				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					err := remote.Nested.SetValue(ctx, "test value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test value", value)
+
+					err = remote.Nested.SetValue(ctx, "updated value")
+					require.NoError(t, err)
+
+					value, err = remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "updated value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
+		{
+			name: "bidirectional nested RPCs",
+			run: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				lis, serverConnected, clientConnected := setupConnection(t)
+				defer lis.Close()
+
+				// Initialize client with nested service
+				clientLocal := &clientLocal{
+					Nested: &nestedServiceLocal{
+						value: "initial client value",
+					},
+				}
+
+				serverLocal := &serverLocal{
+					Nested: &nestedServiceLocal{},
+				}
+
+				serverRegistry, serverDone := startServer(t, ctx, lis, serverLocal, serverConnected)
+				clientRegistry, clientDone := startClient(t, ctx, lis.Addr().String(), clientLocal, clientConnected)
+
+				// Wait for client to connect to server
+				serverConnected.Wait()
+				clientConnected.Wait()
+
+				// Test client calling server's nested service
+				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					// Set and verify server value
+					err := remote.Nested.SetValue(ctx, "test server value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test server value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test server calling client's nested service
+				err = serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					// Set and verify client value
+					err := remote.Nested.SetValue(ctx, "test client value")
+					require.NoError(t, err)
+
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+					require.Equal(t, "test client value", value)
+
+					// Test concurrent access to both nested services
+					var wg sync.WaitGroup
+					wg.Add(2)
+
+					go func() {
+						defer wg.Done()
+
+						value, err := remote.Nested.GetValue(ctx)
+						require.NoError(t, err)
+
+						require.Equal(t, "test client value", value)
+					}()
+
+					go func() {
+						defer wg.Done()
+
+						err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+							value, err := remote.Nested.GetValue(ctx)
+							require.NoError(t, err)
+
+							require.Equal(t, "test server value", value)
+
+							return nil
+						})
+						require.NoError(t, err)
+					}()
+
+					wg.Wait()
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				// Test nested service state persistence
+				err = clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+
+					require.Equal(t, "test server value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				err = serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
+					value, err := remote.Nested.GetValue(ctx)
+					require.NoError(t, err)
+
+					require.Equal(t, "test client value", value)
+
+					return nil
+				})
+				require.NoError(t, err)
+
+				cancel()
+				clientDone.Wait()
+				serverDone.Wait()
+			},
+		},
 	}
 
 	for _, tt := range tests {
