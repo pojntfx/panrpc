@@ -369,6 +369,8 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 		}
 
 		functionType := function.Type().In(i)
+		argIndex := i - 1 // Capture the argument index
+
 		if functionType.Kind() == reflect.Func {
 			arg := reflect.MakeFunc(functionType, func(args []reflect.Value) (results []reflect.Value) {
 				defer func() {
@@ -398,7 +400,7 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 				}()
 
 				closureID := ""
-				if err := unmarshal(req.Args[i-2], &closureID); err != nil {
+				if err := unmarshal(req.Args[argIndex], &closureID); err != nil {
 					panic(err)
 				}
 
@@ -471,7 +473,7 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 		} else {
 			arg := reflect.New(functionType)
 
-			if err := unmarshal(req.Args[i-1], arg.Interface()); err != nil {
+			if err := unmarshal(req.Args[argIndex], arg.Interface()); err != nil {
 				return function, args, err
 			}
 
