@@ -41,16 +41,16 @@ type serverLocal struct {
 	ForRemotes func(cb func(remoteID string, remote clientRemote) error) error
 }
 
-func (s *serverLocal) Increment(ctx context.Context, delta int64) (int64, error) {
+func (s *serverLocal) TestSimple(ctx context.Context, delta int64) (int64, error) {
 	return atomic.AddInt64(&s.counter, delta), nil
 }
 
-func (s *serverLocal) Iterate(ctx context.Context, delta int64) (int64, error) {
+func (s *serverLocal) TestCallback(ctx context.Context, delta int64) (int64, error) {
 	targetID := GetRemoteID(ctx)
 
 	if err := s.ForRemotes(func(remoteID string, remote clientRemote) error {
 		if remoteID == targetID {
-			if err := remote.Println(ctx, fmt.Sprintf("Incrementing counter by %v", delta)); err != nil {
+			if err := remote.TestSimple(ctx, fmt.Sprintf("Incrementing counter by %v", delta)); err != nil {
 				return err
 			}
 		}
@@ -62,36 +62,9 @@ func (s *serverLocal) Iterate(ctx context.Context, delta int64) (int64, error) {
 	return atomic.AddInt64(&s.counter, delta), nil
 }
 
-func (s *serverLocal) ProcessBatch(
-	ctx context.Context,
-	items []string,
-	onProcess func(ctx context.Context, item string, i int) (bool, error),
-) (int, error) {
-	processed := 0
-	for i, item := range items {
-		shouldContinue, err := onProcess(ctx, item, i)
-		if err != nil {
-			return processed, err
-		}
-
-		processed++
-
-		if !shouldContinue {
-			return processed, nil
-		}
-	}
-
-	return processed, nil
-}
-
 type serverRemote struct {
-	Increment    func(ctx context.Context, delta int64) (int64, error)
-	Iterate      func(ctx context.Context, delta int64) (int64, error)
-	ProcessBatch func(
-		ctx context.Context,
-		items []string,
-		onProcess func(ctx context.Context, item string, i int) (bool, error),
-	) (int, error)
+	TestSimple   func(ctx context.Context, delta int64) (int64, error)
+	TestCallback func(ctx context.Context, delta int64) (int64, error)
 
 	Nested nestedServiceRemote
 }
@@ -108,7 +81,7 @@ type clientLocal struct {
 	ForRemotes func(cb func(remoteID string, remote serverRemote) error) error
 }
 
-func (c *clientLocal) Println(ctx context.Context, msg string) error {
+func (c *clientLocal) TestSimple(ctx context.Context, msg string) error {
 	c.messagesLock.Lock()
 	c.messages = append(c.messages, msg)
 	c.messagesLock.Unlock()
@@ -118,12 +91,12 @@ func (c *clientLocal) Println(ctx context.Context, msg string) error {
 	return nil
 }
 
-func (s *clientLocal) Iterate(ctx context.Context, delta int64) (int64, error) {
+func (s *clientLocal) TestCallback(ctx context.Context, delta int64) (int64, error) {
 	targetID := GetRemoteID(ctx)
 
 	if err := s.ForRemotes(func(remoteID string, remote serverRemote) error {
 		if remoteID == targetID {
-			if _, err := remote.Increment(ctx, 1); err != nil {
+			if _, err := remote.TestSimple(ctx, 1); err != nil {
 				return err
 			}
 
@@ -136,36 +109,9 @@ func (s *clientLocal) Iterate(ctx context.Context, delta int64) (int64, error) {
 	return atomic.AddInt64(&s.counter, delta), nil
 }
 
-func (c *clientLocal) ProcessBatch(
-	ctx context.Context,
-	items []string,
-	onProcess func(ctx context.Context, item string, i int) (bool, error),
-) (int, error) {
-	processed := 0
-	for i, item := range items {
-		shouldContinue, err := onProcess(ctx, item, i)
-		if err != nil {
-			return processed, err
-		}
-
-		processed++
-
-		if !shouldContinue {
-			return processed, nil
-		}
-	}
-
-	return processed, nil
-}
-
 type clientRemote struct {
-	Println      func(ctx context.Context, msg string) error
-	Iterate      func(ctx context.Context, delta int64) (int64, error)
-	ProcessBatch func(
-		ctx context.Context,
-		items []string,
-		onProcess func(ctx context.Context, item string, i int) (bool, error),
-	) (int, error)
+	TestSimple   func(ctx context.Context, msg string) error
+	TestCallback func(ctx context.Context, delta int64) (int64, error)
 
 	Nested nestedServiceRemote
 }
@@ -316,7 +262,7 @@ func TestRegistry(t *testing.T) {
 		run  func(t *testing.T)
 	}{
 		{
-			name: "calling RPC on server from client",
+			name: "calling a simple RPC on the server from the client",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -333,11 +279,11 @@ func TestRegistry(t *testing.T) {
 
 				// Test client calling server
 				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-					count, err := remote.Increment(ctx, 1)
+					count, err := remote.TestSimple(ctx, 1)
 					require.NoError(t, err)
 					require.Equal(t, int64(1), count)
 
-					count, err = remote.Increment(ctx, 2)
+					count, err = remote.TestSimple(ctx, 2)
 					require.NoError(t, err)
 					require.Equal(t, int64(3), count)
 
@@ -351,7 +297,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "calling RPC on client from server",
+			name: "calling a simple RPC on the client from the server",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -371,7 +317,7 @@ func TestRegistry(t *testing.T) {
 
 				// Test server calling client
 				err := serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-					err := remote.Println(ctx, "test message")
+					err := remote.TestSimple(ctx, "test message")
 					require.NoError(t, err)
 					return nil
 				})
@@ -390,7 +336,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "callback from client to server",
+			name: "calling a RPC on the server from the client that calls back the client",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -413,7 +359,7 @@ func TestRegistry(t *testing.T) {
 
 				// Test client calling server with callback
 				err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-					length, err := remote.Iterate(ctx, int64(iterations))
+					length, err := remote.TestCallback(ctx, int64(iterations))
 					require.NoError(t, err)
 
 					require.Equal(t, length, int64(iterations))
@@ -435,7 +381,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "callback from server to client",
+			name: "calling a RPC on the client from the server that calls back the server",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -459,7 +405,7 @@ func TestRegistry(t *testing.T) {
 
 				// Test client calling server with callback
 				err := serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-					length, err := remote.Iterate(ctx, int64(iterations))
+					length, err := remote.TestCallback(ctx, int64(iterations))
 					require.NoError(t, err)
 
 					require.Equal(t, length, int64(iterations))
@@ -477,7 +423,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "nested callbacks",
+			name: "calling a RPC on the server and on the client concurrently",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -501,14 +447,14 @@ func TestRegistry(t *testing.T) {
 
 				// Test server calling server with callback
 				err := serverRegistry.ForRemotes(func(remoteID string, remote clientRemote) error {
-					length, err := remote.Iterate(ctx, int64(iterations))
+					length, err := remote.TestCallback(ctx, int64(iterations))
 					require.NoError(t, err)
 
 					require.Equal(t, length, int64(iterations))
 
 					// Test client calling server with callback
 					clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
-						if _, err := remote.Increment(ctx, 3); err != nil {
+						if _, err := remote.TestSimple(ctx, 3); err != nil {
 							return err
 						}
 
@@ -528,7 +474,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "nested RPCs",
+			name: "calling a nested RPC on the server from the client",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -577,7 +523,7 @@ func TestRegistry(t *testing.T) {
 			},
 		},
 		{
-			name: "bidirectional nested RPCs",
+			name: "calling a nested RPC on the client from the server",
 			run: func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
