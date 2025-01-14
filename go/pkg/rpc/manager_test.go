@@ -2,10 +2,15 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	errTest = errors.New("test error")
 )
 
 func TestBasicClosureCreationAndCall(t *testing.T) {
@@ -43,6 +48,43 @@ func TestClosureWithJustErrorReturn(t *testing.T) {
 	result, err := m.CallClosure(context.Background(), closureID, []interface{}{})
 	require.ErrorIs(t, err, expectedErr)
 	require.Nil(t, result)
+}
+
+func TestClosureWithJustErrorReturnNil(t *testing.T) {
+	m := &closureManager{
+		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
+	}
+
+	fn := func(ctx context.Context) error {
+		return nil
+	}
+
+	closureID, cleanup, err := registerClosure(m, fn)
+	require.NoError(t, err)
+	defer cleanup()
+
+	result, err := m.CallClosure(context.Background(), closureID, []interface{}{})
+	require.NoError(t, err)
+	require.Nil(t, result)
+}
+
+func TestClosureWithValueReturnAndError(t *testing.T) {
+	m := &closureManager{
+		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
+	}
+
+	expectedErr := assert.AnError
+	fn := func(ctx context.Context) (int, error) {
+		return 5, expectedErr
+	}
+
+	closureID, cleanup, err := registerClosure(m, fn)
+	require.NoError(t, err)
+	defer cleanup()
+
+	result, err := m.CallClosure(context.Background(), closureID, []interface{}{})
+	require.ErrorIs(t, err, expectedErr)
+	require.Equal(t, 5, result)
 }
 
 func TestInvalidFunctionSignatureNoReturnValues(t *testing.T) {
@@ -153,6 +195,35 @@ func TestInvalidArgumentType(t *testing.T) {
 	// Call with wrong argument type (string instead of int)
 	_, err = m.CallClosure(context.Background(), closureID, []interface{}{"not an int"})
 	require.ErrorIs(t, err, ErrInvalidArg)
+}
+
+func TestInvalidClosureKind(t *testing.T) {
+	m := &closureManager{
+		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
+	}
+
+	fn := 1
+
+	_, cleanup, err := registerClosure(m, fn)
+	require.ErrorIs(t, err, ErrNotAFunction)
+	defer cleanup()
+}
+
+func TestClosureWithPanic(t *testing.T) {
+	m := &closureManager{
+		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
+	}
+
+	fn := func(ctx context.Context) error {
+		panic(errTest)
+	}
+
+	closureID, cleanup, err := registerClosure(m, fn)
+	require.NoError(t, err)
+	defer cleanup()
+
+	_, err = m.CallClosure(context.Background(), closureID, []interface{}{})
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestNonExistentClosure(t *testing.T) {
