@@ -224,6 +224,30 @@ type returnValueRemote struct {
 	TestValueAndError func(ctx context.Context, shouldError bool) (int64, error)
 }
 
+type remoteOnlyFields struct {
+	TestField bool
+}
+
+type remoteInvalidReturn struct {
+	TestFuncInvalidReturn func()
+}
+
+type remoteInvalidReturnTooManyReturnValues struct {
+	TestFuncInvalidReturn func() (bool, bool, bool)
+}
+
+type remoteNoErrorReturn struct {
+	TestFuncNoError func() bool
+}
+
+type remoteNoInputs struct {
+	TestFuncNoInputs func() error
+}
+
+type remoteNoContextInput struct {
+	TestFuncNoContext func(string) error
+}
+
 func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGroup) {
 	lis, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
@@ -964,3 +988,92 @@ func TestConvertValue(t *testing.T) {
 	}
 }
 
+func TestRemoteImplementationInvalidFieldType(t *testing.T) {
+	r := NewRegistry[remoteOnlyFields, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return net.ErrClosed },
+		func(v *Message[json.RawMessage]) error { return net.ErrClosed },
+		func(v any) (json.RawMessage, error) { return nil, net.ErrClosed },
+		func(data json.RawMessage, v any) error { return net.ErrClosed },
+		nil,
+	)
+
+	require.ErrorIs(t, err, net.ErrClosed)
+}
+
+func TestRemoteImplementationInvalidReturnNoValues(t *testing.T) {
+	r := NewRegistry[remoteInvalidReturn, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return nil },
+		func(v *Message[json.RawMessage]) error { return nil },
+		func(v any) (json.RawMessage, error) { return nil, nil },
+		func(data json.RawMessage, v any) error { return nil },
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInvalidReturn)
+}
+
+func TestRemoteImplementationInvalidReturnTooManyValues(t *testing.T) {
+	r := NewRegistry[remoteInvalidReturnTooManyReturnValues, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return nil },
+		func(v *Message[json.RawMessage]) error { return nil },
+		func(v any) (json.RawMessage, error) { return nil, nil },
+		func(data json.RawMessage, v any) error { return nil },
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInvalidReturn)
+}
+
+func TestRemoteImplementationInvalidReturnNoError(t *testing.T) {
+	r := NewRegistry[remoteNoErrorReturn, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return nil },
+		func(v *Message[json.RawMessage]) error { return nil },
+		func(v any) (json.RawMessage, error) { return nil, nil },
+		func(data json.RawMessage, v any) error { return nil },
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInvalidReturn)
+}
+
+func TestRemoteImplementationInvalidArgsNoInputs(t *testing.T) {
+	r := NewRegistry[remoteNoInputs, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return nil },
+		func(v *Message[json.RawMessage]) error { return nil },
+		func(v any) (json.RawMessage, error) { return nil, nil },
+		func(data json.RawMessage, v any) error { return nil },
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInvalidArgs)
+}
+
+func TestRemoteImplementationInvalidArgsNoContext(t *testing.T) {
+	r := NewRegistry[remoteNoContextInput, json.RawMessage](struct{}{}, nil)
+
+	err := r.LinkStream(
+		context.Background(),
+		func(v Message[json.RawMessage]) error { return nil },
+		func(v *Message[json.RawMessage]) error { return nil },
+		func(v any) (json.RawMessage, error) { return nil, nil },
+		func(data json.RawMessage, v any) error { return nil },
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInvalidArgs)
+}
