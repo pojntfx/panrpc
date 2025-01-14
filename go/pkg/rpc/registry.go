@@ -486,7 +486,7 @@ func (r Registry[R, T]) findLocalFunctionToCallRecursively(
 
 func findMethodByFunctionCallPathRecursively(root interface{}, functionCallPath string) (reflect.Value, error) {
 	functionCallPathParts := strings.Split(functionCallPath, ".")
-	if len(functionCallPathParts) == 0 {
+	if len(functionCallPathParts) == 1 && functionCallPathParts[0] == "" { // `strings.Split` always returns at least one element
 		return reflect.Value{}, ErrInvalidFunctionCallPath
 	}
 
