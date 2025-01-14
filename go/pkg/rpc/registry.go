@@ -662,9 +662,6 @@ func (r Registry[R, T]) LinkMessage(
 			r.hooks.OnClientConnect(remoteID)
 		}
 
-		if hooks.OnClientConnect != nil {
-			hooks.OnClientConnect(remoteID)
-		}
 		r.remotesLock.Unlock()
 
 		defer func() {
@@ -675,9 +672,6 @@ func (r Registry[R, T]) LinkMessage(
 				r.hooks.OnClientDisconnect(remoteID)
 			}
 
-			if hooks.OnClientDisconnect != nil {
-				hooks.OnClientDisconnect(remoteID)
-			}
 			r.remotesLock.Unlock()
 		}()
 
