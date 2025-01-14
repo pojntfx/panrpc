@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -193,6 +194,34 @@ type closureClientRemote struct {
 		length int,
 		onIteration func(ctx context.Context, i int, b string) (string, error),
 	) (int, error)
+}
+
+type returnValueLocal struct {
+	counter    int64
+	ForRemotes func(cb func(remoteID string, remote returnValueRemote) error) error
+}
+
+func (s *returnValueLocal) TestSingleError(ctx context.Context, shouldError bool) error {
+	if shouldError {
+		return errTest
+	}
+
+	atomic.AddInt64(&s.counter, 1)
+
+	return nil
+}
+
+func (s *returnValueLocal) TestValueAndError(ctx context.Context, shouldError bool) (int64, error) {
+	if shouldError {
+		return 0, errTest
+	}
+
+	return atomic.AddInt64(&s.counter, 1), nil
+}
+
+type returnValueRemote struct {
+	TestSingleError   func(ctx context.Context, shouldError bool) error
+	TestValueAndError func(ctx context.Context, shouldError bool) (int64, error)
 }
 
 func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGroup) {
@@ -798,3 +827,54 @@ func TestRPCWithClosureOnClientFromServer(t *testing.T) {
 
 	require.Equal(t, expectedIterations, actualIterations)
 }
+
+func TestRPCsWithReturnValueEdgecases(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lis, serverConnected, clientConnected := setupConnection(t)
+	defer lis.Close()
+
+	sl := &returnValueLocal{}
+	cl := &returnValueLocal{}
+
+	serverRegistry, serverDone := startServer[returnValueRemote, *returnValueLocal](t, ctx, lis, sl, serverConnected)
+	clientRegistry, clientDone := startClient[returnValueRemote, *returnValueLocal](t, ctx, lis.Addr().String(), cl, clientConnected)
+
+	sl.ForRemotes = serverRegistry.ForRemotes
+	cl.ForRemotes = clientRegistry.ForRemotes
+
+	// Wait for client to connect to server
+	serverConnected.Wait()
+	clientConnected.Wait()
+
+	err := clientRegistry.ForRemotes(func(remoteID string, remote returnValueRemote) error {
+		// Test single error return (success case)
+		err := remote.TestSingleError(ctx, false)
+		require.NoError(t, err)
+
+		// Test single error return (error case)
+		err = remote.TestSingleError(ctx, true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), errTest.Error())
+
+		// Test value and error (success case)
+		val, err := remote.TestValueAndError(ctx, false)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), val)
+
+		// Test value and error (error case)
+		val, err = remote.TestValueAndError(ctx, true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), errTest.Error())
+		require.Equal(t, int64(0), val)
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	cancel()
+	clientDone.Wait()
+	serverDone.Wait()
+}
+
