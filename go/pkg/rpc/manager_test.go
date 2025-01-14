@@ -87,7 +87,7 @@ func TestClosureWithValueReturnAndError(t *testing.T) {
 	require.Equal(t, 5, result)
 }
 
-func TestInvalidFunctionSignatureNoReturnValues(t *testing.T) {
+func TestClosureInvalidFunctionSignatureNoReturnValues(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -99,7 +99,7 @@ func TestInvalidFunctionSignatureNoReturnValues(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidReturn)
 }
 
-func TestInvalidFunctionSignatureOneInvalidReturn(t *testing.T) {
+func TestClosureInvalidFunctionSignatureOneInvalidReturn(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -113,7 +113,7 @@ func TestInvalidFunctionSignatureOneInvalidReturn(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidReturn)
 }
 
-func TestInvalidFunctionSignatureTwoInvalidReturns(t *testing.T) {
+func TestClosureInvalidFunctionSignatureTwoInvalidReturns(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -127,7 +127,7 @@ func TestInvalidFunctionSignatureTwoInvalidReturns(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidReturn)
 }
 
-func TestInvalidFunctionSignatureMoreThanTwoReturns(t *testing.T) {
+func TestClosureInvalidFunctionSignatureMoreThanTwoReturns(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -141,7 +141,7 @@ func TestInvalidFunctionSignatureMoreThanTwoReturns(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidReturn)
 }
 
-func TestCleanupRemovesClosure(t *testing.T) {
+func TestClosureCleanupRemovesClosure(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -161,7 +161,7 @@ func TestCleanupRemovesClosure(t *testing.T) {
 	require.ErrorIs(t, err, ErrClosureDoesNotExist)
 }
 
-func TestInvalidArgumentCount(t *testing.T) {
+func TestClosureInvalidArgumentCount(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -179,7 +179,7 @@ func TestInvalidArgumentCount(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidArgsCount)
 }
 
-func TestInvalidArgumentType(t *testing.T) {
+func TestClosureInvalidArgumentType(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -197,7 +197,7 @@ func TestInvalidArgumentType(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidArg)
 }
 
-func TestInvalidClosureKind(t *testing.T) {
+func TestClosureInvalidClosureKind(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -226,7 +226,7 @@ func TestClosureWithPanic(t *testing.T) {
 	require.ErrorIs(t, err, errTest)
 }
 
-func TestNonExistentClosure(t *testing.T) {
+func TestClosureNonExistent(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -235,7 +235,7 @@ func TestNonExistentClosure(t *testing.T) {
 	require.ErrorIs(t, err, ErrClosureDoesNotExist)
 }
 
-func TestConcurrentClosureCalls(t *testing.T) {
+func TestClosureCallsConcurrent(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}
@@ -267,7 +267,7 @@ func TestConcurrentClosureCalls(t *testing.T) {
 	}
 }
 
-func TestContextCancellation(t *testing.T) {
+func TestClosureContextCancellation(t *testing.T) {
 	m := &closureManager{
 		closures: make(map[string]func(args ...interface{}) (interface{}, error)),
 	}

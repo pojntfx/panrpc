@@ -54,6 +54,7 @@ func (s *serverLocal) TestCallback(ctx context.Context, delta int64) (int64, err
 				return err
 			}
 		}
+
 		return nil
 	}); err != nil {
 		return -1, err
@@ -62,9 +63,28 @@ func (s *serverLocal) TestCallback(ctx context.Context, delta int64) (int64, err
 	return atomic.AddInt64(&s.counter, delta), nil
 }
 
+func (s *serverLocal) TestCallbackWithError(ctx context.Context) error {
+	targetID := GetRemoteID(ctx)
+
+	if err := s.ForRemotes(func(remoteID string, remote clientRemote) error {
+		if remoteID == targetID {
+			if err := remote.TestSimpleWithError(ctx); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type serverRemote struct {
-	TestSimple   func(ctx context.Context, delta int64) (int64, error)
-	TestCallback func(ctx context.Context, delta int64) (int64, error)
+	TestSimple            func(ctx context.Context, delta int64) (int64, error)
+	TestCallback          func(ctx context.Context, delta int64) (int64, error)
+	TestCallbackWithError func(ctx context.Context) error
 
 	Nested nestedServiceRemote
 }
@@ -91,6 +111,10 @@ func (c *clientLocal) TestSimple(ctx context.Context, msg string) error {
 	return nil
 }
 
+func (c *clientLocal) TestSimpleWithError(ctx context.Context) error {
+	return errTest
+}
+
 func (s *clientLocal) TestCallback(ctx context.Context, delta int64) (int64, error) {
 	targetID := GetRemoteID(ctx)
 
@@ -110,8 +134,9 @@ func (s *clientLocal) TestCallback(ctx context.Context, delta int64) (int64, err
 }
 
 type clientRemote struct {
-	TestSimple   func(ctx context.Context, msg string) error
-	TestCallback func(ctx context.Context, delta int64) (int64, error)
+	TestSimple          func(ctx context.Context, msg string) error
+	TestCallback        func(ctx context.Context, delta int64) (int64, error)
+	TestSimpleWithError func(ctx context.Context) error
 
 	Nested nestedServiceRemote
 }
@@ -131,6 +156,7 @@ func (s *closureServerLocal) Iterate(
 			return -1, err
 		}
 	}
+
 	return length, nil
 }
 
@@ -157,6 +183,7 @@ func (s *closureClientLocal) Iterate(
 			return -1, err
 		}
 	}
+
 	return length, nil
 }
 
@@ -182,6 +209,7 @@ func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGro
 func startServer[R, L any](t *testing.T, ctx context.Context, lis net.Listener, serverLocal L, serverConnected *sync.WaitGroup) (*Registry[R, json.RawMessage], *sync.WaitGroup) {
 	serverRegistry := NewRegistry[R, json.RawMessage](
 		serverLocal,
+
 		&RegistryHooks{
 			OnClientConnect: func(remoteID string) {
 				serverConnected.Done()
@@ -417,6 +445,41 @@ func TestServerRPCWithCallbackToClient(t *testing.T) {
 	// Verify results
 	require.Len(t, cl.messages, 1)
 	require.Equal(t, fmt.Sprintf("Incrementing counter by %v", iterations), cl.messages[0])
+}
+
+func TestServerRPCWithCallbackToClientWithError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lis, serverConnected, clientConnected := setupConnection(t)
+	defer lis.Close()
+
+	cl := &clientLocal{}
+
+	sl := &serverLocal{}
+
+	serverRegistry, serverDone := startServer[clientRemote, *serverLocal](t, ctx, lis, sl, serverConnected)
+	clientRegistry, clientDone := startClient[serverRemote, *clientLocal](t, ctx, lis.Addr().String(), cl, clientConnected)
+
+	cl.ForRemotes = clientRegistry.ForRemotes
+	sl.ForRemotes = serverRegistry.ForRemotes
+
+	// Wait for client to connect to server
+	serverConnected.Wait()
+	clientConnected.Wait()
+
+	err := clientRegistry.ForRemotes(func(remoteID string, remote serverRemote) error {
+		err := remote.TestCallbackWithError(ctx)
+		// We need to compare strings here since error signatures get stripped when sent over the wire
+		require.Contains(t, err.Error(), errTest.Error())
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	cancel()
+	clientDone.Wait()
+	serverDone.Wait()
 }
 
 func TestClientRPCWithCallbackToServer(t *testing.T) {
