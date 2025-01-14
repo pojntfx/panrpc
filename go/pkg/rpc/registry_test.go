@@ -248,6 +248,47 @@ type remoteNoContextInput struct {
 	TestFuncNoContext func(string) error
 }
 
+type methodFinderInner struct{}
+
+func (i methodFinderInner) TestInnerMethod() error {
+	return nil
+}
+
+type methodFinderMiddleWithPointer struct {
+	Inner *methodFinderInner
+}
+
+func (m methodFinderMiddleWithPointer) TestMiddleMethod() error {
+	return nil
+}
+
+type methodFinderMiddleWithValue struct {
+	Inner methodFinderInner
+}
+
+func (m methodFinderMiddleWithValue) TestMiddleMethod() error {
+	return nil
+}
+
+type methodFinderOuter struct {
+	MiddlePtr  methodFinderMiddleWithPointer
+	MiddleVal  methodFinderMiddleWithValue
+	Inner      methodFinderInner
+	NotAStruct string
+}
+
+func (o methodFinderOuter) TestOuterMethod() error {
+	return nil
+}
+
+type methodFinderNestedPtr struct {
+	*methodFinderInner
+}
+
+type methodFinderMultiLevel struct {
+	*methodFinderNestedPtr
+}
+
 func setupConnection(t *testing.T) (net.Listener, *sync.WaitGroup, *sync.WaitGroup) {
 	lis, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
@@ -1076,4 +1117,161 @@ func TestRemoteImplementationInvalidArgsNoContext(t *testing.T) {
 	)
 
 	require.ErrorIs(t, err, ErrInvalidArgs)
+}
+
+func TestFindMethodByFunctionCallPathRecursively(t *testing.T) {
+	tests := []struct {
+		name             string
+		root             interface{}
+		functionCallPath string
+		expectError      error
+	}{
+		{
+			name:             "empty call path",
+			root:             methodFinderOuter{},
+			functionCallPath: "",
+			expectError:      ErrInvalidFunctionCallPath,
+		},
+		{
+			name:             "call path that is just a single dot",
+			root:             methodFinderOuter{},
+			functionCallPath: ".",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name:             "direct method call",
+			root:             methodFinderOuter{},
+			functionCallPath: "TestOuterMethod",
+			expectError:      nil,
+		},
+		{
+			name: "nested method through pointer",
+			root: methodFinderOuter{
+				MiddlePtr: methodFinderMiddleWithPointer{
+					Inner: &methodFinderInner{},
+				},
+			},
+			functionCallPath: "MiddlePtr.Inner.TestInnerMethod",
+			expectError:      nil,
+		},
+		{
+			name: "nested method through value",
+			root: methodFinderOuter{
+				MiddleVal: methodFinderMiddleWithValue{
+					Inner: methodFinderInner{},
+				},
+			},
+			functionCallPath: "MiddleVal.Inner.TestInnerMethod",
+			expectError:      nil,
+		},
+		{
+			name: "method on middle struct with pointer",
+			root: methodFinderOuter{
+				MiddlePtr: methodFinderMiddleWithPointer{
+					Inner: &methodFinderInner{},
+				},
+			},
+			functionCallPath: "MiddlePtr.TestMiddleMethod",
+			expectError:      nil,
+		},
+		{
+			name: "method on middle struct with value",
+			root: methodFinderOuter{
+				MiddleVal: methodFinderMiddleWithValue{
+					Inner: methodFinderInner{},
+				},
+			},
+			functionCallPath: "MiddleVal.TestMiddleMethod",
+			expectError:      nil,
+		},
+		{
+			name:             "path to non-existent field",
+			root:             methodFinderOuter{},
+			functionCallPath: "NonExistent.TestMethod",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name: "path through non-struct field",
+			root: methodFinderOuter{
+				NotAStruct: "string",
+			},
+			functionCallPath: "NotAStruct.TestMethod",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name:             "path to non-existent method",
+			root:             methodFinderOuter{},
+			functionCallPath: "NonExistentMethod",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name: "double pointer indirection",
+			root: &methodFinderOuter{
+				MiddlePtr: methodFinderMiddleWithPointer{
+					Inner: &methodFinderInner{},
+				},
+			},
+			functionCallPath: "MiddlePtr.Inner.TestInnerMethod",
+			expectError:      nil,
+		},
+		{
+			name: "embedded pointer struct",
+			root: methodFinderNestedPtr{
+				methodFinderInner: &methodFinderInner{},
+			},
+			functionCallPath: "TestInnerMethod", // Should work directly due to embedding
+			expectError:      nil,
+		},
+		{
+			name: "multi-level embedding",
+			root: methodFinderMultiLevel{
+				methodFinderNestedPtr: &methodFinderNestedPtr{
+					methodFinderInner: &methodFinderInner{},
+				},
+			},
+			functionCallPath: "TestInnerMethod", // Should work directly due to embedding
+			expectError:      nil,
+		},
+		{
+			name:             "path with dots",
+			root:             methodFinderOuter{},
+			functionCallPath: "Outer.Method.Extra.Dots",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name:             "path with only dots",
+			root:             methodFinderOuter{},
+			functionCallPath: "...",
+			expectError:      ErrCannotCallNonFunction,
+		},
+		{
+			name: "call to path with non-struct field in it's middle",
+			root: struct {
+				NonStructField string
+			}{
+				NonStructField: "test",
+			},
+			functionCallPath: "NonStructField.Length.Something", // Attempting to traverse through a string field
+			expectError:      ErrCannotCallNonFunction,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			function, err := findMethodByFunctionCallPathRecursively(tt.root, tt.functionCallPath)
+			require.ErrorIs(t, err, tt.expectError)
+
+			require.Equal(t, tt.expectError == nil, function.IsValid())
+
+			if tt.expectError == nil {
+				require.True(t, function.IsValid())
+				require.Equal(t, reflect.Func, function.Kind())
+
+				// Verify the method can be called
+				result := function.Call([]reflect.Value{})
+				require.Len(t, result, 1)
+				require.Nil(t, result[0].Interface())
+			}
+		})
+	}
 }
