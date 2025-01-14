@@ -198,3 +198,87 @@ func TestCloseWhileReceiving(t *testing.T) {
 		t.Fatal("test timed out")
 	}
 }
+
+func TestPublishToClosedBroadcaster(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	b := NewBroadcaster[string]()
+
+	// Set up a channel and receiver
+	receive, err := b.Receive("test", ctx)
+	require.NoError(t, err)
+
+	// Close the broadcaster
+	b.Close(nil)
+
+	// Try to publish after closing
+	done := make(chan struct{})
+	go func() {
+		b.Publish("test", "hello")
+		close(done)
+	}()
+
+	// The publish should return immediately since broadcaster is closed
+	select {
+	case <-done:
+		// Success - publish returned
+	case <-time.After(time.Second):
+		t.Fatal("Publish to closed broadcaster blocked")
+	}
+
+	// Verify receiver gets closed error
+	_, err = receive()
+	require.Equal(t, ErrClosed, err)
+}
+
+func TestPublishToChannelWithDoneContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	b := NewBroadcaster[string]()
+
+	// Set up a channel and receiver
+	receive, err := b.Receive("test", ctx)
+	require.NoError(t, err)
+
+	// Cancel the context
+	cancel()
+
+	// Try to publish after context is cancelled
+	done := make(chan struct{})
+	go func() {
+		b.Publish("test", "hello")
+		close(done)
+	}()
+
+	// The publish should return quickly since context is done
+	select {
+	case <-done:
+		// Success - publish returned
+	case <-time.After(time.Second):
+		t.Fatal("Publish to cancelled context blocked")
+	}
+
+	// Verify receiver gets context cancelled error
+	_, err = receive()
+	require.ErrorIs(t, err, context.Canceled)
+
+	b.Free("test", nil)
+}
+
+func TestReceiveFromClosedBroadcaster(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	b := NewBroadcaster[string]()
+
+	// Close the broadcaster first
+	b.Close(nil)
+
+	// Try to receive after closing
+	_, err := b.Receive("test", ctx)
+	require.Equal(t, ErrClosed, err)
+
+	// Verify the channel wasn't created
+	b.lock.Lock()
+	_, exists := b.channels["test"]
+	b.lock.Unlock()
+	require.False(t, exists, "Channel should not be created when broadcaster is closed")
+}
