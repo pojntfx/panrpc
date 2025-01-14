@@ -878,3 +878,89 @@ func TestRPCsWithReturnValueEdgecases(t *testing.T) {
 	serverDone.Wait()
 }
 
+func TestRegistryHooksInitialization(t *testing.T) {
+	registry := NewRegistry[any, any](nil, nil)
+
+	require.NotNil(t, registry.hooks)
+}
+
+func TestConvertValue(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     interface{}
+		dstType reflect.Type
+		want    interface{}
+		wantErr error
+	}{
+		{
+			name:    "int to int32",
+			src:     42,
+			dstType: reflect.TypeOf(int32(0)),
+			want:    int32(42),
+			wantErr: nil,
+		},
+		{
+			name:    "float64 to int",
+			src:     42.0,
+			dstType: reflect.TypeOf(0),
+			want:    42,
+			wantErr: nil,
+		},
+		{
+			name:    "string to interface",
+			src:     "test",
+			dstType: reflect.TypeOf((*interface{})(nil)).Elem(),
+			want:    "test",
+			wantErr: nil,
+		},
+		{
+			name:    "nested interface to int",
+			src:     interface{}(interface{}(42)),
+			dstType: reflect.TypeOf(0),
+			want:    42,
+			wantErr: nil,
+		},
+		{
+			name:    "slice of int to slice of int32",
+			src:     []int{1, 2, 3},
+			dstType: reflect.TypeOf([]int32{}),
+			want:    []int32{1, 2, 3},
+			wantErr: nil,
+		},
+		{
+			name:    "slice of interface to slice of int",
+			src:     []interface{}{1, 2, 3},
+			dstType: reflect.TypeOf([]int{}),
+			want:    []int{1, 2, 3},
+			wantErr: nil,
+		},
+		{
+			name:    "incompatible types",
+			src:     "cannot convert to int",
+			dstType: reflect.TypeOf(0),
+			want:    reflect.Value{},
+			wantErr: ErrReturnValueTooComplex,
+		},
+		{
+			name:    "slice with incompatible element",
+			src:     []interface{}{1, "not an int", 3},
+			dstType: reflect.TypeOf([]int{}),
+			want:    reflect.Value{},
+			wantErr: ErrReturnValueTooComplex,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srcVal := reflect.ValueOf(tt.src)
+			got, err := convertValue(srcVal, tt.dstType)
+
+			require.ErrorIs(t, tt.wantErr, err)
+
+			if err == nil {
+				require.Equal(t, tt.want, got.Interface())
+			}
+		})
+	}
+}
+
