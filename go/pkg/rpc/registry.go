@@ -177,16 +177,14 @@ func (r Registry[R, T]) makeRPC(
 			panic(err)
 		}
 
+		rr, err := responseResolver.Receive(callID, ctx)
+		if err != nil {
+			panic(err)
+		}
+
 		res := make(chan callResponse[T])
 		go func() {
 			defer responseResolver.Free(callID, context.Canceled)
-
-			rr, err := responseResolver.Receive(callID, ctx)
-			if err != nil {
-				res <- callResponse[T]{*new(T), err, true}
-
-				return
-			}
 
 			r, err := rr()
 			if err != nil {
