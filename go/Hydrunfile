@@ -16,6 +16,20 @@ if [ "$1" = "test" ]; then
     exit 0
 fi
 
+# Benchmark
+if [ "$1" = "benchmark" ]; then
+    # Configure Git
+    git config --global --add safe.directory '*'
+
+    # Generate dependencies
+    make depend
+
+    # Run benchmarks
+    make benchmark
+
+    exit 0
+fi
+
 # Go
 if [ "$1" = "go" ]; then
     # Install native dependencies

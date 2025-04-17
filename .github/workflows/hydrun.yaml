@@ -23,6 +23,15 @@ jobs:
             dst: out/nonexistent
             runner: ubuntu-latest
 
+          # Benchmarks
+          - id: benchmark
+            src: go
+            os: golang:bookworm
+            flags: -e '-v /tmp/ccache:/root/.cache/go-build'
+            cmd: ./Hydrunfile benchmark
+            dst: out/nonexistent
+            runner: ubuntu-latest
+
           # Binaries
           - id: go.purl
             src: go
