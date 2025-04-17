@@ -64,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target.id }}
-          path: ${{ matrix.target.dst }}
+          path: ${{ matrix.target.src }}/${{ matrix.target.dst }}
 
   publish-linux:
     runs-on: ubuntu-latest
